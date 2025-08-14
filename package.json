@@ -1,13 +1,17 @@
 {
   "name": "web-hand-guidance",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
+  "author": "adildsw",
+  "homepage": "https://adildsw.github.io/WebHandGuidance/",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^7.0.0",
@@ -16,6 +20,7 @@
     "@mediapipe/pose": "^0.5.1675469404",
     "@p5-wrapper/react": "^4.4.1",
     "@tailwindcss/vite": "^4.1.11",
+    "gh-pages": "^6.3.0",
     "lz-string": "^1.5.0",
     "p5": "^2.0.4",
     "react": "18.2.0",

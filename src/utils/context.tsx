@@ -10,7 +10,7 @@ const defaultConfig: Config = {
   markerDiameterMM: 5,
   testbedWidthMM: 160,
   testbedHeightMM: 100,
-  defaultHand: 'right',
+  defaultHand: 'Right',
   defaultTrials: 3,
   defaultRepetitions: 5,
   defaultMoveThreshold: 15,
@@ -50,7 +50,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     setConfigState((prev) => ({ ...prev, testbedHeightMM: height }));
   };
 
-  const setDefaultHand = (hand: 'right' | 'left') => {
+  const setDefaultHand = (hand: 'Right' | 'Left') => {
     setConfigState((prev) => ({ ...prev, defaultHand: hand }));
   };
 

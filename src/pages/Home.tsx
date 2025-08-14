@@ -11,7 +11,9 @@ const Home = () => {
     if (!file.name.toLowerCase().endsWith(".json")) return;
     const text = await file.text();
     const encoded = encodeURIComponent(text);
-    window.location.hash = `#/study?data=${encoded}`;
+
+    const participantId = prompt("Enter Participant ID:");
+    window.location.hash = `#/study?data=${encoded}&participantId=${participantId}`;
   };
 
   const go = (hash: string) => {
@@ -39,7 +41,7 @@ const Home = () => {
             onClick={() => go("#/create-study-tasks")}
             className="w-full px-4 py-3 rounded-lg bg-white border border-gray-300 text-gray-900 hover:bg-gray-100 cursor-pointer"
           >
-            Create Study Tasks
+            Create Tasks
           </button>
 
           <button

@@ -18,7 +18,7 @@ const Config = () => {
       setMarkerDiameter(5);
       setTestbedWidth(160);
       setTestbedHeight(100);
-      setDefaultHand('right');
+      setDefaultHand('Right');
       setDefaultTrials(3);
       setDefaultRepetitions(5);
       setDefaultMoveThreshold(15);
@@ -72,9 +72,9 @@ const Config = () => {
 
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm text-gray-600">Hand</label>
-              <select className="w-28 px-2 py-1 rounded border border-gray-300" value={config.defaultHand} onChange={(e) => setDefaultHand(e.target.value as 'left' | 'right')}>
-                <option value="right">Right</option>
-                <option value="left">Left</option>
+              <select className="w-28 px-2 py-1 rounded border border-gray-300" value={config.defaultHand} onChange={(e) => setDefaultHand(e.target.value as 'Left' | 'Right')}>
+                <option value="Right">Right</option>
+                <option value="Left">Left</option>
               </select>
             </div>
 

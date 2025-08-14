@@ -2,7 +2,7 @@ export type Pos = { x: number; y: number };
 
 export type Task = {
   tag: string;
-  hand: 'left' | 'right';
+  hand: 'Left' | 'Right';
   moveThreshold: number;
   trials: number;
   repetitions: number;

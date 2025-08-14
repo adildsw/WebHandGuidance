@@ -137,7 +137,7 @@ const TaskCreator = () => {
 
   const returnToHome = () => {
     if (!isModified || window.confirm('You have unsaved changes. Do you want to discard them?')) {
-      window.location.href = '/';
+      window.location.hash = '#/';
     }
   };
 
@@ -411,12 +411,12 @@ const TaskCreator = () => {
                 value={tasks[currentIndex].hand}
                 onChange={(e) => {
                   const newTasks = [...tasks];
-                  newTasks[currentIndex].hand = e.target.value as 'left' | 'right';
+                  newTasks[currentIndex].hand = e.target.value as 'Left' | 'Right';
                   setTasks(newTasks);
                 }}
               >
-                <option value="left">Left</option>
-                <option value="right">Right</option>
+                <option value="Left">Left</option>
+                <option value="Right">Right</option>
               </select>
             </div>
             <div className="flex flex-col items-center justify-between">

@@ -8,6 +8,7 @@ import { INCH_TO_MM, MM_TO_INCH } from '../utils/constants';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { Font } from 'p5';
 import { Pose } from '@mediapipe/pose';
+import { uid } from 'uid/single';
 
 const MP_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/';
 
@@ -51,7 +52,6 @@ const sketch: Sketch = (p5) => {
   p5.draw = () => {
     p5.clear();
 
-    // existing path & marker rendering ...
     p5.noFill();
     p5.stroke(255);
     p5.strokeWeight(2);
@@ -61,20 +61,11 @@ const sketch: Sketch = (p5) => {
       const cx = pts[i].x - w / 2,
         cy = pts[i].y - h / 2;
       p5.line(px, py, cx, cy);
-      const distance = p5.dist(px, py, cx, cy) * (devicePixelRatio / devicePPI) * INCH_TO_MM;
-      p5.textAlign(p5.CENTER, p5.TOP);
-      p5.textSize(10);
-      p5.fill(255);
-      p5.text(`${distance.toFixed(1)} mm`, (px + cx) / 2, (py + cy) / 2);
     }
     for (let i = 0; i < pts.length; i++) {
-      const cx = pts[i].x - w / 2,
-        cy = pts[i].y - w / 2 + (pts[i].y - w / 2 ? pts[i].y - h / 2 : 0); // keep your original if different
       const x = pts[i].x - w / 2,
         y = pts[i].y - h / 2;
-      if (i === 0) p5.fill(0, 207, 0);
-      else if (i === pts.length - 1) p5.fill(207, 0, 0);
-      else p5.fill(255);
+      p5.fill(255);
       p5.noStroke();
       p5.circle(x, y, markerDiameter);
       p5.fill(0);
@@ -87,7 +78,6 @@ const sketch: Sketch = (p5) => {
       p5.circle(x, y, moveThreshold * MM_TO_INCH * (devicePPI / devicePixelRatio));
     }
 
-    // wrist overlays
     const dot = Math.max(10, Math.min(20, markerDiameter * 0.9));
     if (leftWrist) {
       p5.noStroke();
@@ -117,9 +107,14 @@ const Study = () => {
   const rafRef = useRef<number | null>(null);
   const [wrists, setWrists] = useState<{ left: { x: number; y: number } | null; right: { x: number; y: number } | null }>({ left: null, right: null });
 
+  const [participantId, setParticipantId] = useState<string>('');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [taskLoaded, setTaskLoaded] = useState(false);
   const currentTask: Task | null = useMemo(() => (tasks.length > 0 ? tasks[0] : null), [tasks]);
+
+  const [currentTaskIndex, setCurrentTaskIndex] = useState<number>(0);
+  const [currentTrial, setCurrentTrial] = useState<number>(1);
+  const [currentRepetition, setCurrentRepetition] = useState<number>(1);
 
   const mapVideoToTestbed = (x: number, y: number) => {
     const v = videoRef.current;
@@ -141,6 +136,7 @@ const Study = () => {
     const hash = window.location.hash;
     const params = new URLSearchParams(hash.split('?')[1]);
     const encoded = params.get('data');
+    const pId = params.get('participantId');
     if (encoded) {
       try {
         const decoded = decodeURIComponent(encoded);
@@ -148,6 +144,7 @@ const Study = () => {
         if (Array.isArray(parsed)) {
           setTasks(parsed);
           setTaskLoaded(true);
+          setParticipantId(pId || 'P-' + uid(5));
         }
       } catch {
         setTaskLoaded(false);
@@ -250,7 +247,7 @@ const Study = () => {
       <div className="flex flex-col gap-2" style={{ width: `${testbedWidth}px` }}>
         <div className="w-full bg-gray-200 rounded-lg shadow flex items-center justify-between px-2 py-2">
           <div className="flex items-center px-1 gap-2">
-            <span className="text-xl font-semibold">Study In Progress...</span>
+            <span className="text-xl font-semibold">Hand Guidance Study</span>
           </div>
           <div className="flex flex-row gap-2">
             <button className="px-3 py-2 rounded text-lg bg-gray-300 cursor-pointer hover:bg-gray-600 hover:text-white items-center flex gap-1 font-bold" onClick={goHome}>
@@ -259,41 +256,54 @@ const Study = () => {
           </div>
         </div>
 
-        <div className="flex flex-col bg-white rounded-lg shadow gap-3 border border-gray-100 ">
-          <div className="bg-white p-4 pt-0 flex flex-row gap-3 justify-between overflow-auto">
+        <div className="flex flex-row gap-2">
+
+
+          
+          <div className="flex flex-row p-2 bg-white rounded-lg shadow gap-3 border border-gray-100 grow justify-center">
             <div className="flex flex-col items-center justify-between">
-              <label className="text-sm font-bold text-gray-600">Tag</label>
-              <span className="w-28 px-2 py-1 text-center rounded border border-gray-300">{currentTask?.tag ?? '-'}</span>
+              <label className="text-sm font-bold text-gray-600">Status</label>
+              <span className="px-2 py-1 text-center rounded font-semibold text-xl">Ready</span>
+            </div>
+          </div>
+          
+          <div className="flex flex-row p-2 bg-white rounded-lg shadow gap-3 border border-gray-100 ">
+            <div className="flex flex-col items-center justify-between">
+              <label className="text-sm font-bold text-gray-600">Participant ID</label>
+              <span className="px-2 py-1 text-center rounded font-semibold text-xl">{participantId}</span>
+            </div>
+          </div>
+
+          <div className="flex flex-row p-2 bg-white rounded-lg shadow gap-3 border border-gray-100 ">
+            <div className="flex flex-col items-center justify-between">
+              <label className="text-sm font-bold text-gray-600">Task</label>
+              <span className="px-2 py-1 text-center rounded font-semibold text-xl">{currentTaskIndex + 1 + ' / ' + String(tasks.length)}</span>
+            </div>
+
+            <div className="flex flex-col h-full items-center justify-center">
+              <label className="text-sm font-bold text-gray-600">Instruction</label>
+              <span className="w-48 px-2 py-1 text-center rounded font-semibold text-md">Move Hand to Target</span>
             </div>
 
             <div className="flex flex-col items-center justify-between">
-              <label className="text-sm font-bold text-gray-600">Hand</label>
-              <span className="w-24 px-2 py-1 text-center rounded border border-gray-300">{currentTask?.hand ?? '-'}</span>
+              <label className="text-sm font-bold text-gray-600">Use Hand</label>
+              <span className="px-2 py-1 text-center rounded font-semibold text-xl">{currentTask?.hand ?? '-'}</span>
             </div>
+          </div>
 
+          <div className="flex flex-row p-2 bg-white rounded-lg shadow gap-3 border border-gray-100 ">
             <div className="flex flex-col items-center justify-between">
               <label className="text-sm font-bold text-gray-600">Trials</label>
-              <span className="w-16 px-2 py-1 text-center rounded border border-gray-300">{currentTask ? String(currentTask.trials) : '-'}</span>
+              <span className="px-2 py-1 text-center rounded font-semibold text-xl">{currentTask ? currentTrial + ' / ' + String(currentTask.trials) : '-'}</span>
             </div>
 
             <div className="flex flex-col items-center justify-between">
               <label className="text-sm font-bold text-gray-600">Repetitions</label>
-              <span className="w-16 px-2 py-1 text-center rounded border border-gray-300">{currentTask ? String(currentTask.repetitions) : '-'}</span>
-            </div>
-
-            <div className="border-l border-gray-200 h-full mx-2" />
-
-            <div className="flex flex-col items-center justify-between">
-              <label className="text-sm text-gray-600 font-bold">Task Type</label>
-              <span className="text-center w-24 px-2 py-1 rounded border border-gray-300 bg-gray-100 text-gray-600">move</span>
-            </div>
-
-            <div className="flex flex-col items-center justify-between">
-              <label className="text-sm text-gray-600 font-bold">Move Threshold</label>
-              <span className="text-xs text-gray-400">{currentTask ? `${currentTask.moveThreshold} mm` : '-'}</span>
+              <span className="px-2 py-1 text-center rounded font-semibold text-xl">{currentTask ? currentRepetition + ' / ' + String(currentTask.repetitions) : '-'}</span>
             </div>
           </div>
         </div>
+        
 
         <div
           className="md:col-span-3 rounded-lg shadow-lg bg-gray-100 overflow-hidden flex items-center justify-center relative"
@@ -315,6 +325,10 @@ const Study = () => {
             />
           </div>
         </div>
+
+        <span className="text-center text-md text-gray-500">
+          Press <kbd className="bg-gray-200 py-1 font-bold px-2 rounded">Space</kbd> to Begin Task
+        </span>
       </div>
     </div>
   );
