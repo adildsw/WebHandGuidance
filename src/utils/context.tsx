@@ -1,28 +1,22 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-
-type Config = {
-  devicePPI: number;
-  devicePixelRatio: number;
-  calibrationMode: 'CREDIT' | 'RULER';
-};
-
-type ConfigContextType = {
-  config: Config;
-  setDevicePPI: (ppi: number) => void;
-  setCalibrationMode: (mode: 'CREDIT' | 'RULER') => void;
-};
+import { Config, ConfigContextType } from '../types/config';
 
 const defaultConfig: Config = {
-  devicePPI: 220,
+  devicePPI: 256,
   devicePixelRatio: typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1,
   calibrationMode: 'RULER',
+  markerDiameterMM: 5,
+  testbedWidthMM: 160,
+  testbedHeightMM: 100,
 };
 
 const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
 
 export function ConfigProvider({ children }: { children: ReactNode }) {
+  // localStorage.clear();
+
   const [config, setConfigState] = useState<Config>(() => {
-    const stored = typeof window !== 'undefined' ? localStorage.getItem('appConfig') : null;
+    var stored = typeof window !== 'undefined' ? localStorage.getItem('appConfig') : null;
     return stored ? JSON.parse(stored) : defaultConfig;
   });
 
@@ -36,6 +30,18 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
   const setCalibrationMode = (mode: 'CREDIT' | 'RULER') => {
     setConfigState((prev) => ({ ...prev, calibrationMode: mode }));
+  };
+
+  const setMarkerDiameter = (diameter: number) => {
+    setConfigState((prev) => ({ ...prev, markerDiameterMM: diameter }));
+  };
+
+  const setTestbedWidth = (width: number) => {
+    setConfigState((prev) => ({ ...prev, testbedWidthMM: width }));
+  };
+
+  const setTestbedHeight = (height: number) => {
+    setConfigState((prev) => ({ ...prev, testbedHeightMM: height }));
   };
 
   useEffect(() => {
@@ -57,11 +63,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  return (
-    <ConfigContext.Provider value={{ config, setDevicePPI, setCalibrationMode }}>
-      {children}
-    </ConfigContext.Provider>
-  );
+  return <ConfigContext.Provider value={{ config, setDevicePPI, setCalibrationMode, setMarkerDiameter, setTestbedWidth, setTestbedHeight }}>{children}</ConfigContext.Provider>;
 }
 
 export function useConfig() {

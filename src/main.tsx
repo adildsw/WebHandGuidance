@@ -5,9 +5,9 @@ import App from "./App.js";
 const rootElement = document.getElementById("root");
 if (rootElement) {
   createRoot(rootElement).render(
-    // <StrictMode>
+    <StrictMode>
       <App />
-    // </StrictMode>
+    </StrictMode>
   );
 } else {
   throw new Error("Root element with id 'root' not found");
