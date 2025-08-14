@@ -30,7 +30,7 @@ const Home = () => {
 
           <button
             onClick={openFile}
-            className="w-full px-4 py-3 rounded-lg bg-gray-200 text-gray-900 font-bold hover:bg-gray-400 cursor-pointer"
+            className="w-full px-4 py-3 rounded-lg bg-gray-200 text-gray-900 font-bold hover:bg-gray-800 hover:text-white cursor-pointer"
           >
             Start Study
           </button>
