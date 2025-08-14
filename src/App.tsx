@@ -2,7 +2,7 @@ import { HashRouter, Route, Routes } from 'react-router-dom';
 import Calibration from './pages/Calibration';
 import { ConfigProvider } from './utils/context';
 import TaskCreator from './pages/TaskCreator';
-import ParallaxBackground from './pages/ParallaxBackground';
+import ParallaxBackground from './extras/ParallaxBackground';
 import Config from './pages/Config';
 import Home from './pages/Home';
 import { library } from '@fortawesome/fontawesome-svg-core';
@@ -20,7 +20,7 @@ const App = () => {
             <Route path="/" element={<Home />} />
             <Route path="/calibration" element={<Calibration />} />
             <Route path="/config" element={<Config />} />
-            <Route path="/task-maker" element={<TaskCreator />} />
+            <Route path="/create-study-tasks" element={<TaskCreator />} />
           </Routes>
         </HashRouter>
       </ConfigProvider>

@@ -5,7 +5,7 @@ import type { Sketch } from '@p5-wrapper/react';
 import font from '../assets/sf-ui-display-bold.otf';
 import { Pos, Task } from '../types/task';
 import { useConfig } from '../utils/context';
-import { GENERATE_DEFAULT_TASK, INCH_TO_MM, MM_TO_INCH } from '../utils/constants';
+import { INCH_TO_MM, MM_TO_INCH } from '../utils/constants';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { Font } from 'p5';
 
@@ -84,7 +84,7 @@ const sketch: Sketch = (p5) => {
 };
 
 const TaskCreator = () => {
-  const { config } = useConfig();
+  const { config, generateDefaultTask } = useConfig();
   const { devicePPI, devicePixelRatio, testbedWidthMM, testbedHeightMM, markerDiameterMM } = config;
   const factor = (MM_TO_INCH * devicePPI) / devicePixelRatio;
   const testbedWidth = testbedWidthMM * factor;
@@ -97,7 +97,7 @@ const TaskCreator = () => {
   const [isStreaming, setIsStreaming] = useState(false);
 
   const [studyName, setStudyName] = useState<string>('unnamed_study');
-  const [tasks, setTasks] = useState<Task[]>([GENERATE_DEFAULT_TASK()]);
+  const [tasks, setTasks] = useState<Task[]>([generateDefaultTask()]);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
 
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
@@ -108,7 +108,7 @@ const TaskCreator = () => {
   const newStudyTask = () => {
     if (!isModified || window.confirm('You have unsaved changes. Do you want to discard them?')) {
       setCurrentIndex(0);
-      setTasks([GENERATE_DEFAULT_TASK()]);
+      setTasks([generateDefaultTask()]);
     }
   };
 
@@ -253,13 +253,13 @@ const TaskCreator = () => {
   };
 
   const addTask = () => {
-    const newTask = GENERATE_DEFAULT_TASK();
+    const newTask = generateDefaultTask();
     setTasks((prev) => [...prev, newTask]);
     setCurrentIndex(tasks.length);
   };
 
   const resetTask = () => {
-    const defaultTask = GENERATE_DEFAULT_TASK();
+    const defaultTask = generateDefaultTask();
     setTasks((prev) => {
       const newTasks = [...prev];
       newTasks[currentIndex] = defaultTask;
@@ -391,7 +391,7 @@ const TaskCreator = () => {
           </div>
 
           {/* Task Form */}
-          <div className="bg-white  p-4 pt-0 flex flex-row gap-3 justify-between">
+          <div className="bg-white  p-4 pt-0 flex flex-row gap-3 justify-between overflow-auto">
             <div className="flex flex-col items-center justify-between">
               <label className="text-sm font-bold text-gray-600">Tag</label>
               <input

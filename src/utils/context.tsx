@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Config, ConfigContextType } from '../types/config';
+import { Task } from '../types/task';
+import { uid } from 'uid/single';
 
 const defaultConfig: Config = {
   devicePPI: 256,
@@ -8,6 +10,10 @@ const defaultConfig: Config = {
   markerDiameterMM: 5,
   testbedWidthMM: 160,
   testbedHeightMM: 100,
+  defaultHand: 'right',
+  defaultTrials: 3,
+  defaultRepetitions: 5,
+  defaultMoveThreshold: 15,
 };
 
 const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
@@ -44,6 +50,33 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     setConfigState((prev) => ({ ...prev, testbedHeightMM: height }));
   };
 
+  const setDefaultHand = (hand: 'right' | 'left') => {
+    setConfigState((prev) => ({ ...prev, defaultHand: hand }));
+  };
+
+  const setDefaultTrials = (trials: number) => {
+    setConfigState((prev) => ({ ...prev, defaultTrials: trials }));
+  };
+
+  const setDefaultRepetitions = (repetitions: number) => {
+    setConfigState((prev) => ({ ...prev, defaultRepetitions: repetitions }));
+  };
+
+  const setDefaultMoveThreshold = (threshold: number) => {
+    setConfigState((prev) => ({ ...prev, defaultMoveThreshold: threshold }));
+  };
+
+  const generateDefaultTask = (): Task => {
+    return {
+      tag: 'task-' + uid(5),
+      hand: config.defaultHand,
+      trials: config.defaultTrials,
+      repetitions: config.defaultRepetitions,
+      moveThreshold: config.defaultMoveThreshold,
+      markers: [],
+    };
+  };
+
   useEffect(() => {
     localStorage.setItem('appConfig', JSON.stringify(config));
   }, [config]);
@@ -63,7 +96,25 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  return <ConfigContext.Provider value={{ config, setDevicePPI, setCalibrationMode, setMarkerDiameter, setTestbedWidth, setTestbedHeight }}>{children}</ConfigContext.Provider>;
+  return (
+    <ConfigContext.Provider
+      value={{
+        config,
+        setDevicePPI,
+        setCalibrationMode,
+        setMarkerDiameter,
+        setTestbedWidth,
+        setTestbedHeight,
+        setDefaultHand,
+        setDefaultTrials,
+        setDefaultRepetitions,
+        setDefaultMoveThreshold,
+        generateDefaultTask,
+      }}
+    >
+      {children}
+    </ConfigContext.Provider>
+  );
 }
 
 export function useConfig() {
