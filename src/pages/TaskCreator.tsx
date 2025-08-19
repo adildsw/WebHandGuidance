@@ -201,6 +201,7 @@ const TaskCreator = () => {
 
   const onMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const { x, y } = getMousePos(e);
+    console.log(`Mouse Position: ${x}, ${y}`);
     if (dragIndex !== null) {
       setTasks((prev) => {
         const newTasks = [...prev];
@@ -297,6 +298,8 @@ const TaskCreator = () => {
   return (
     <div className="w-screen h-screen flex gap-6 flex-col items-center justify-center select-none">
       <div className="flex flex-col gap-2" style={{ width: `${testbedWidth}px` }}>
+
+        {/* Create Study Task Top Bar */}
         <div className="w-full bg-gray-200 rounded-lg shadow flex items-center justify-between px-2 py-2">
           <div className="flex items-center px-1 gap-2">
             <span className="text-xl font-semibold">Create Study Tasks</span>
@@ -336,6 +339,7 @@ const TaskCreator = () => {
           </div>
         </div>
 
+        {/* Task Bar */}
         <div className="flex flex-col bg-white rounded-lg shadow gap-3 border border-gray-100 ">
           {/* Task Navigator */}
           <div className="flex flex-row w-full justify-between items-center border-b border-gray-100 p-2 bg-gray-100">
@@ -519,6 +523,8 @@ const TaskCreator = () => {
             </div>
           </div>
         </div>
+
+        {/* Task Instructions */}
         <span className="text-center text-sm text-gray-400">
           <span className="bg-gray-200 font-bold rounded p-1">Left Click</span> to Place Marker • <span className="bg-gray-200 font-bold rounded p-1">Right Click</span> to Delete
           Marker • <span className="bg-gray-200 font-bold rounded p-1">Left Click + Drag</span> to Reposition Marker

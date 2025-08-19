@@ -1,9 +1,11 @@
 import { Task } from "./task";
 
+export type CalibrationTools = 'CREDIT' | 'RULER' | 'DOLLAR';
+
 export type Config = {
   devicePPI: number;
   devicePixelRatio: number;
-  calibrationMode: 'CREDIT' | 'RULER';
+  calibrationTool: CalibrationTools;
   markerDiameterMM: number;
   testbedWidthMM: number;
   testbedHeightMM: number;
@@ -16,7 +18,7 @@ export type Config = {
 export type ConfigContextType = {
   config: Config;
   setDevicePPI: (ppi: number) => void;
-  setCalibrationMode: (mode: 'CREDIT' | 'RULER') => void;
+  setCalibrationTool: (tool: CalibrationTools) => void;
   setMarkerDiameter: (diameter: number) => void;
   setTestbedWidth: (width: number) => void;
   setTestbedHeight: (height: number) => void;

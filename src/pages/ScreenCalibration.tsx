@@ -1,65 +1,60 @@
 import { ReactP5Wrapper } from '@p5-wrapper/react';
-import type { P5CanvasInstance, Sketch } from '@p5-wrapper/react';
+import type { Sketch } from '@p5-wrapper/react';
 import { useConfig } from '../utils/context';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import font from '../assets/sf-ui-display-bold.otf';
-import { CREDIT_CARD_ASPECT_RATIO, CREDIT_CARD_WIDTH_INCH, MM_TO_INCH } from '../utils/constants';
+import { CREDIT_CARD_HEIGHT_INCH, CREDIT_CARD_WIDTH_INCH, DOLLAR_BILL_HEIGHT_INCH, DOLLAR_BILL_WIDTH_INCH, MM_TO_INCH } from '../utils/constants';
 import p5 from 'p5';
+import { CalibrationTools } from '../types/config';
 
 const sketch: Sketch = (p5) => {
-  const calculateDimensions = () => {
-    const p5WidthW = p5.windowWidth * 0.8;
-    const p5HeightW = p5WidthW / CREDIT_CARD_ASPECT_RATIO;
+  let width = 200;
+  let height = 400;
 
-    const p5HeightV = p5.windowHeight * 0.5;
-    const p5WidthV = p5HeightV * CREDIT_CARD_ASPECT_RATIO;
-
-    const calWidth = Math.min(p5WidthW, p5WidthV);
-    const calHeight = calWidth / CREDIT_CARD_ASPECT_RATIO;
-
-    return { calWidth, calHeight };
-  };
-
-  var { calWidth, calHeight } = calculateDimensions();
-
-  let calibrationMode : 'MEASURE' | 'CREDIT' = 'MEASURE';
+  let calibrationTool: CalibrationTools = 'RULER';
   let devicePPI = 96;
   let devicePixelRatio = 1;
 
   p5.setup = () => {
-    p5.createCanvas(calWidth, calHeight, p5.WEBGL);
+    console.log(height, width);
+    p5.createCanvas(width, height, p5.WEBGL);
     p5.loadFont(font, (loadedFont: p5.Font) => {
       p5.textFont(loadedFont);
     });
   };
 
   p5.windowResized = () => {
-    var { calWidth, calHeight } = calculateDimensions();
-    p5.resizeCanvas(calWidth, calHeight);
+    p5.resizeCanvas(width, height);
   };
 
   p5.updateWithProps = (props: any) => {
     if (typeof props.devicePPI === 'number') devicePPI = props.devicePPI;
     if (typeof props.devicePixelRatio === 'number') devicePixelRatio = props.devicePixelRatio;
-    if (typeof props.calibrationMode === 'string') calibrationMode = props.calibrationMode;
+    if (typeof props.calibrationTool === 'string') calibrationTool = props.calibrationTool;
+    if (typeof props.size === 'object') {
+      width = props.size.width;
+      height = props.size.height;
+      p5.resizeCanvas(width, height);
+    }
   };
 
   p5.draw = () => {
-    p5.background(255);
+    p5.clear();
 
-    p5.fill(250);
+    p5.fill(250, 250, 250, 96);
     p5.stroke(200);
     p5.strokeWeight(1);
-    p5.rect(-calWidth / 2, -calHeight / 2, calWidth, calHeight, 8);
+    p5.rect(-width / 2, -height / 2, width, height, 8);
 
-    if (calibrationMode === 'CREDIT') drawCreditCard();
+    if (calibrationTool === 'CREDIT') drawCreditCard();
+    else if (calibrationTool === 'DOLLAR') drawDollarBill();
     else drawRuler();
   };
 
   const drawCreditCard = () => {
     const width = (CREDIT_CARD_WIDTH_INCH * devicePPI) / devicePixelRatio;
-    const height = width / CREDIT_CARD_ASPECT_RATIO;
+    const height = (CREDIT_CARD_HEIGHT_INCH * devicePPI) / devicePixelRatio;
     p5.fill(230);
     p5.stroke(212);
     p5.strokeWeight(2);
@@ -93,6 +88,9 @@ const sketch: Sketch = (p5) => {
     p5.text('Should match 85.6 mm', 0, height / 2 + 20);
     p5.fill(200);
     p5.text(`${Math.round(width)} px `, 0, height / 2 + 35);
+
+    p5.textAlign(p5.CENTER, p5.CENTER);
+    p5.text('Place an actual credit card on the screen here', 0, 0);
   };
 
   const drawRuler = () => {
@@ -137,11 +135,68 @@ const sketch: Sketch = (p5) => {
       }
     }
   };
+
+  const drawDollarBill = () => {
+    const width = (DOLLAR_BILL_WIDTH_INCH * devicePPI) / devicePixelRatio;
+    const height = (DOLLAR_BILL_HEIGHT_INCH * devicePPI) / devicePixelRatio;
+    p5.fill(230);
+    p5.stroke(212);
+    p5.strokeWeight(2);
+    p5.rect(-width / 2, -height / 2, width, height, 8);
+
+    // Dimension Markers
+    p5.stroke(0);
+    p5.strokeWeight(1);
+    p5.fill(0);
+    p5.textSize(12);
+
+    // Vertical Dimensions
+    p5.line(-width / 2 - 10, -height / 2, -width / 2 - 10, height / 2);
+    p5.line(-width / 2 - 15, -height / 2, -width / 2 - 10, -height / 2);
+    p5.line(-width / 2 - 15, height / 2, -width / 2 - 10, height / 2);
+    p5.textAlign(p5.CENTER, p5.CENTER);
+    p5.push();
+    p5.translate(-width / 2 - 20, 0);
+    p5.rotate(-p5.HALF_PI);
+    p5.text('Should match 66.42 mm', 0, -15);
+    p5.fill(200);
+    p5.text(`${Math.round(height)} px`, 0, 0);
+    p5.pop();
+
+    // Horizontal Dimensions
+    p5.fill(0);
+    p5.line(-width / 2, height / 2 + 10, width / 2, height / 2 + 10);
+    p5.line(-width / 2, height / 2 + 10, -width / 2, height / 2 + 15);
+    p5.line(width / 2, height / 2 + 10, width / 2, height / 2 + 15);
+    p5.textAlign(p5.CENTER, p5.CENTER);
+    p5.text('Should match 156 mm', 0, height / 2 + 20);
+    p5.fill(200);
+    p5.text(`${Math.round(width)} px `, 0, height / 2 + 35);
+
+    p5.textAlign(p5.CENTER, p5.CENTER);
+    p5.text('Place an actual dollar bill on the screen here', 0, 0);
+  };
 };
 
-const Calibration = () => {
-  const { config, setDevicePPI, setCalibrationMode } = useConfig();
-  const { devicePPI, devicePixelRatio, calibrationMode } = config;
+const ScreenCalibration = () => {
+  const { config, setDevicePPI, setCalibrationTool } = useConfig();
+  const { devicePPI, devicePixelRatio, calibrationTool } = config;
+
+  const calibrationDivRef = useRef<HTMLDivElement | null>(null);
+  const [canvasSize, setCanvasSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+
+  useEffect(() => {
+    if (!calibrationDivRef.current) return;
+    const resize = () => {
+      const { clientWidth, clientHeight } = calibrationDivRef.current!;
+      setCanvasSize({ width: clientWidth, height: clientHeight });
+    };
+    resize();
+    window.addEventListener('resize', resize);
+    return () => {
+      window.removeEventListener('resize', resize);
+    };
+  }, []);
 
   const increaseScale = () => {
     setDevicePPI(devicePPI + 1);
@@ -169,35 +224,45 @@ const Calibration = () => {
   }, [config, setDevicePPI]);
 
   return (
-    <div className="w-screen h-screen flex gap-4 flex-col items-center justify-center">
+    <div className="w-screen h-screen flex gap-4 flex-col items-center justify-center p-16 py-8">
       <div className="w-full flex flex-col text-center gap-2">
         <h1 className="text-3xl font-bold">Calibrate Display</h1>
 
         <div className="flex flex-row gap-2 justify-center items-center">
-          <span className="text-sm font-bold">Select Calibration Mode:</span>
+          <span className="text-sm font-bold">Select Calibration Tool:</span>
           <button
             className={`text-sm px-4 py-1 rounded hover:bg-gray-300 cursor-pointer select-none font-bold active:bg-gray-400 ${
-              calibrationMode === 'RULER' ? 'bg-gray-200' : 'border-1 border-gray-200'
+              calibrationTool === 'RULER' ? 'bg-gray-200' : 'border-1 border-gray-200'
             }`}
-            onClick={() => setCalibrationMode('RULER')}
+            onClick={() => setCalibrationTool('RULER')}
           >
             Ruler
           </button>
           <button
             className={`text-sm px-4 py-1 rounded hover:bg-gray-300 cursor-pointer select-none font-bold active:bg-gray-400 ${
-              calibrationMode === 'CREDIT' ? 'bg-gray-300' : 'border-1 border-gray-200'
+              calibrationTool === 'CREDIT' ? 'bg-gray-300' : 'border-1 border-gray-200'
             }`}
-            onClick={() => setCalibrationMode('CREDIT')}
+            onClick={() => setCalibrationTool('CREDIT')}
           >
             Credit Card
+          </button>
+          <button
+            className={`text-sm px-4 py-1 rounded hover:bg-gray-300 cursor-pointer select-none font-bold active:bg-gray-400 ${
+              calibrationTool === 'DOLLAR' ? 'bg-gray-300' : 'border-1 border-gray-200'
+            }`}
+            onClick={() => setCalibrationTool('DOLLAR')}
+          >
+            Dollar Bill
           </button>
         </div>
         <div className="flex flex-col">
           <p className="text-gray-500 text-md italic">
             Please adjust the slider so that{' '}
-            {calibrationMode === 'RULER'
+            {calibrationTool === 'RULER'
               ? `the dimensions of the ruler on screen match the size of a standard ruler.`
-              : `the rectangle on the screen matches the size of a standard credit card.`}
+              : calibrationTool === 'CREDIT'
+              ? `the rectangle on the screen matches the size of a standard credit card.`
+              : `the rectangle on the screen matches the size of a US dollar bill.`}
           </p>
           <p className="text-gray-500 text-md italic">
             You can also use the <kbd className="bg-gray-100 font-bold px-2 rounded">+</kbd> and <kbd className="bg-gray-100 font-bold px-2 rounded">-</kbd> keys to adjust the
@@ -206,9 +271,9 @@ const Calibration = () => {
         </div>
       </div>
 
-      {/* create two buttons toggle between credit and ruler */}
-
-      <ReactP5Wrapper sketch={sketch} devicePPI={devicePPI} devicePixelRatio={devicePixelRatio} calibrationMode={calibrationMode} />
+      <div ref={calibrationDivRef} className="flex flex-col w-full grow">
+        <ReactP5Wrapper sketch={sketch} size={canvasSize} devicePPI={devicePPI} devicePixelRatio={devicePixelRatio} calibrationTool={calibrationTool} />
+      </div>
 
       <div className="flex flex-col">
         <span className="text-gray-600 text-center">
@@ -225,11 +290,14 @@ const Calibration = () => {
         </div>
       </div>
 
-      <button className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer" onClick={() => (window.location.hash = '#/')}>
+      <button
+        className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"
+        onClick={() => (window.location.hash = '#/')}
+      >
         Done
       </button>
     </div>
   );
 };
 
-export default Calibration;
+export default ScreenCalibration;

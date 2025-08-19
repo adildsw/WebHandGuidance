@@ -258,8 +258,6 @@ const Study = () => {
 
         <div className="flex flex-row gap-2">
 
-
-          
           <div className="flex flex-row p-2 bg-white rounded-lg shadow gap-3 border border-gray-100 grow justify-center">
             <div className="flex flex-col items-center justify-between">
               <label className="text-sm font-bold text-gray-600">Status</label>

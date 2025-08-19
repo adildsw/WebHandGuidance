@@ -1,12 +1,12 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Config, ConfigContextType } from '../types/config';
+import { CalibrationTools, Config, ConfigContextType } from '../types/config';
 import { Task } from '../types/task';
 import { uid } from 'uid/single';
 
 const defaultConfig: Config = {
   devicePPI: 256,
   devicePixelRatio: typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1,
-  calibrationMode: 'RULER',
+  calibrationTool: 'RULER',
   markerDiameterMM: 5,
   testbedWidthMM: 160,
   testbedHeightMM: 100,
@@ -19,8 +19,6 @@ const defaultConfig: Config = {
 const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
 
 export function ConfigProvider({ children }: { children: ReactNode }) {
-  // localStorage.clear();
-
   const [config, setConfigState] = useState<Config>(() => {
     var stored = typeof window !== 'undefined' ? localStorage.getItem('appConfig') : null;
     return stored ? JSON.parse(stored) : defaultConfig;
@@ -34,8 +32,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     setConfigState((prev) => ({ ...prev, devicePixelRatio: dpr }));
   };
 
-  const setCalibrationMode = (mode: 'CREDIT' | 'RULER') => {
-    setConfigState((prev) => ({ ...prev, calibrationMode: mode }));
+  const setCalibrationTool = (tool: CalibrationTools) => {
+    setConfigState((prev) => ({ ...prev, calibrationTool: tool }));
   };
 
   const setMarkerDiameter = (diameter: number) => {
@@ -101,7 +99,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       value={{
         config,
         setDevicePPI,
-        setCalibrationMode,
+        setCalibrationTool,
         setMarkerDiameter,
         setTestbedWidth,
         setTestbedHeight,
