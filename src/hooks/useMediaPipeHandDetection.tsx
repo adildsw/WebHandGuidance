@@ -180,21 +180,24 @@ const useDetection = (detectorType: 'WRIST' | 'FINGERTIP') => {
   }, [initializeDetector]);
 
   useEffect(() => {
-    if (animationFrameId.current) {
-      cancelAnimationFrame(animationFrameId.current);
-      animationFrameId.current = null;
-    }
+    const cleanup = () => {
+      if (animationFrameId.current) {
+        cancelAnimationFrame(animationFrameId.current);
+        animationFrameId.current = null;
+      }
 
-    if (videoRef.current && videoRef.current.srcObject) {
-      streamRef.current?.getTracks().forEach((track) => {
-        track.stop();
-      });
-      videoRef.current.srcObject = null;
-    }
-    if (objectDetectorRef.current) {
-      objectDetectorRef.current.close();
-      objectDetectorRef.current = null;
-    }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+      if (videoRef.current) videoRef.current.srcObject = null;
+
+      if (objectDetectorRef.current) {
+        objectDetectorRef.current.close();
+        objectDetectorRef.current = null;
+      }
+    };
+    return cleanup;
   }, []);
   return { videoRef, fingerDetection, wristDetection, loading, error, startWebcam };
 };
