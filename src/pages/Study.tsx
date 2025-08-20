@@ -18,6 +18,7 @@ const sketch: Sketch = (p5) => {
     devicePixelRatio = 1,
     markerDiameter = 10,
     moveThreshold = 15;
+  let worldPPI = 24;
   let pts: Pos[] = [];
   let leftWrist: { x: number; y: number } | null = null;
   let rightWrist: { x: number; y: number } | null = null;
@@ -41,6 +42,7 @@ const sketch: Sketch = (p5) => {
     if (typeof props.devicePixelRatio === 'number') devicePixelRatio = props.devicePixelRatio;
     if (typeof props.markerDiameter === 'number') markerDiameter = props.markerDiameter;
     if (Array.isArray(props.markers)) pts = props.markers;
+    if (typeof props.worldPPI === 'number') worldPPI = props.worldPPI;
 
     leftWrist = props.leftWrist ?? null;
     rightWrist = props.rightWrist ?? null;
@@ -55,15 +57,19 @@ const sketch: Sketch = (p5) => {
     p5.stroke(255);
     p5.strokeWeight(2);
     for (let i = 1; i < pts.length; i++) {
-      const px = pts[i - 1].x - w / 2,
-        py = pts[i - 1].y - h / 2;
-      const cx = pts[i].x - w / 2,
-        cy = pts[i].y - h / 2;
+      // const px = pts[i - 1].x - w / 2,
+      //   py = pts[i - 1].y - h / 2;
+      // const cx = pts[i].x - w / 2,
+      //   cy = pts[i].y - h / 2;
+      const px = pts[i - 1].x * MM_TO_INCH * worldPPI;
+      const py = pts[i - 1].y * MM_TO_INCH * worldPPI;
+      const cx = pts[i].x * MM_TO_INCH * worldPPI;
+      const cy = pts[i].y * MM_TO_INCH * worldPPI;
       p5.line(px, py, cx, cy);
     }
     for (let i = 0; i < pts.length; i++) {
-      const x = pts[i].x - w / 2,
-        y = pts[i].y - h / 2;
+      const x = pts[i].x * MM_TO_INCH * worldPPI;
+      const y = pts[i].y * MM_TO_INCH * worldPPI;
       p5.fill(255);
       p5.noStroke();
       p5.circle(x, y, markerDiameter);
@@ -74,26 +80,26 @@ const sketch: Sketch = (p5) => {
       p5.stroke(255);
       p5.strokeWeight(1);
       p5.noFill();
-      p5.circle(x, y, moveThreshold * MM_TO_INCH * (devicePPI / devicePixelRatio));
+      p5.circle(x, y, moveThreshold * MM_TO_INCH * worldPPI);
     }
 
     const dot = Math.max(10, Math.min(20, markerDiameter * 0.9));
     if (leftWrist) {
       p5.noStroke();
       p5.fill(0, 180, 255);
-      p5.circle(leftWrist.x - w / 2, leftWrist.y - h / 2, dot);
+      p5.circle(leftWrist.x, leftWrist.y, dot);
     }
     if (rightWrist) {
       p5.noStroke();
       p5.fill(255, 200, 0);
-      p5.circle(rightWrist.x - w / 2, rightWrist.y - h / 2, dot);
+      p5.circle(rightWrist.x, rightWrist.y, dot);
     }
   };
 };
 
 const Study = () => {
   const { config } = useConfig();
-  const { devicePPI, devicePixelRatio, testbedWidthMM, testbedHeightMM, markerDiameterMM } = config;
+  const { devicePPI, worldPPI, devicePixelRatio, testbedWidthMM, testbedHeightMM, markerDiameterMM } = config;
   const factor = (MM_TO_INCH * devicePPI) / devicePixelRatio;
   const testbedWidth = testbedWidthMM * factor;
   const testbedHeight = testbedHeightMM * factor;
@@ -314,6 +320,7 @@ const Study = () => {
               devicePixelRatio={devicePixelRatio}
               markerDiameter={markerDiameter}
               leftWrist={wrists.left}
+              worldPPI={worldPPI}
               rightWrist={wrists.right}
             />
           </div>

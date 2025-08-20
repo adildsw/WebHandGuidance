@@ -3,20 +3,7 @@ import type { ReactNode } from 'react';
 import type { CalibrationTools, Config, ConfigContextType } from '../types/config';
 import type { Task } from '../types/task';
 import { uid } from 'uid/single';
-
-const defaultConfig: Config = {
-  devicePPI: 256,
-  devicePixelRatio: typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1,
-  calibrationTool: 'RULER',
-  worldPPI: 24,
-  markerDiameterMM: 5,
-  testbedWidthMM: 160,
-  testbedHeightMM: 100,
-  defaultHand: 'Right',
-  defaultTrials: 3,
-  defaultRepetitions: 5,
-  defaultMoveThreshold: 15,
-};
+import { defaultConfig } from './constants';
 
 const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
 

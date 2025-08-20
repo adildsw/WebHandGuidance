@@ -1,3 +1,4 @@
+import type { Config } from '../types/config';
 import type { FingerTips } from '../types/detections';
 
 export const CREDIT_CARD_WIDTH_INCH = 3.37;
@@ -19,4 +20,20 @@ export const defaultFingerTips: FingerTips = {
   ring: null,
   pinky: null,
   thumb: null,
+};
+
+
+
+export const defaultConfig: Config = {
+  devicePPI: 109,
+  devicePixelRatio: typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1,
+  calibrationTool: 'RULER',
+  worldPPI: 24,
+  markerDiameterMM: 5,
+  testbedWidthMM: 160,
+  testbedHeightMM: 100,
+  defaultHand: 'Right',
+  defaultTrials: 3,
+  defaultRepetitions: 5,
+  defaultMoveThreshold: 50,
 };

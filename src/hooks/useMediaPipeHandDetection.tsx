@@ -105,7 +105,7 @@ const detectWrists = (detector: PoseLandmarker, video: HTMLVideoElement, testbed
   return { leftWrist, rightWrist };
 };
 
-const useDetection = (detectorType: 'WRIST' | 'FINGERTIP') => {
+const useDetection = (detectorType: 'WRIST' | 'FINGERTIP' | null) => {
   const { config } = useConfig();
   const { devicePPI, devicePixelRatio, testbedHeightMM, testbedWidthMM } = config;
   const testbedHeight = useMemo(() => (testbedHeightMM * MM_TO_INCH * devicePPI) / devicePixelRatio, [testbedHeightMM, devicePPI, devicePixelRatio]);
@@ -164,7 +164,7 @@ const useDetection = (detectorType: 'WRIST' | 'FINGERTIP') => {
     try {
       setLoading(true);
       setError(null);
-      const detector = detectorType === 'FINGERTIP' ? await initHandDetector() : await initPoseDetector();
+      const detector = detectorType === 'FINGERTIP' ? await initHandDetector() : detectorType === 'WRIST' ? await initPoseDetector() : null;
       objectDetectorRef.current = detector;
       setLoading(false);
       console.log('Object Detector initialized!');

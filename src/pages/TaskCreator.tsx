@@ -5,17 +5,16 @@ import type { Sketch } from '@p5-wrapper/react';
 import font from '../assets/sf-ui-display-bold.otf';
 import type { Pos, Task } from '../types/task';
 import { useConfig } from '../utils/context';
-import { MM_TO_INCH } from '../utils/constants';
+import { INCH_TO_MM, MM_TO_INCH } from '../utils/constants';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import type { Font } from 'p5';
+import useDetection from '../hooks/useMediaPipeHandDetection';
 
 const sketch: Sketch = (p5) => {
   let w = 400;
   let h = 300;
-  let devicePPI = 96;
-  let devicePixelRatio = 1;
+  let worldPPI = 26;
   let markerDiameter = 10;
-
   let moveThreshold = 15;
 
   let pts: Pos[] = [];
@@ -32,22 +31,12 @@ const sketch: Sketch = (p5) => {
     p5.drawingContext.antialias = true;
   };
 
-  p5.updateWithProps = (props: {
-    frameWidth?: number;
-    frameHeight?: number;
-    devicePPI?: number;
-    devicePixelRatio?: number;
-    moveThreshold?: number;
-    markerDiameter?: number;
-    markers?: Pos[];
-  }) => {
+  p5.updateWithProps = (props: { frameWidth?: number; frameHeight?: number; moveThreshold?: number; markerDiameter?: number; worldPPI?: number; markers?: Pos[] }) => {
     if (typeof props.frameWidth === 'number') w = props.frameWidth;
     if (typeof props.frameHeight === 'number') h = props.frameHeight;
-    if (typeof props.devicePPI === 'number') devicePPI = props.devicePPI;
     if (typeof props.moveThreshold === 'number') moveThreshold = props.moveThreshold;
-    if (typeof props.devicePixelRatio === 'number') devicePixelRatio = props.devicePixelRatio;
     if (typeof props.markerDiameter === 'number') markerDiameter = props.markerDiameter;
-
+    if (typeof props.worldPPI === 'number') worldPPI = props.worldPPI;
     if (Array.isArray(props.markers)) pts = props.markers;
     if (p5.width !== w || p5.height !== h) p5.resizeCanvas(w, h);
   };
@@ -58,26 +47,21 @@ const sketch: Sketch = (p5) => {
     p5.stroke(255);
     p5.strokeWeight(2);
     for (let i = 1; i < pts.length; i++) {
-      // const px = pts[i - 1].x - w / 2;
-      // const py = pts[i - 1].y - h / 2;
-      // const cx = pts[i].x - w / 2;
-      // const cy = pts[i].y - h / 2;
-      const px = pts[i - 1].x;
-      const py = pts[i - 1].y;
-      const cx = pts[i].x;
-      const cy = pts[i].y;
+      const px = pts[i - 1].x * MM_TO_INCH * worldPPI;
+      const py = pts[i - 1].y * MM_TO_INCH * worldPPI;
+      const cx = pts[i].x * MM_TO_INCH * worldPPI;
+      const cy = pts[i].y * MM_TO_INCH * worldPPI;
       p5.line(px, py, cx, cy);
 
-      // const distance = p5.dist(px, py, cx, cy) * (devicePixelRatio / devicePPI) * INCH_TO_MM;
-      const pixelDistance = p5.dist(px, py, cx, cy);
+      const pixelDistance = p5.dist(px, py, cx, cy) * (INCH_TO_MM / (worldPPI * 10));
       p5.textAlign(p5.CENTER, p5.TOP);
       p5.textSize(10);
       p5.fill(255);
-      p5.text(`${pixelDistance.toFixed(1)} px`, (px + cx) / 2, (py + cy) / 2);
+      p5.text(`${pixelDistance.toFixed(1)} cm`, (px + cx) / 2, (py + cy) / 2);
     }
     for (let i = 0; i < pts.length; i++) {
-      const cx = pts[i].x;
-      const cy = pts[i].y;
+      const cx = pts[i].x * MM_TO_INCH * worldPPI;
+      const cy = pts[i].y * MM_TO_INCH * worldPPI;
       if (i === 0) p5.fill(0, 207, 0);
       else if (i === pts.length - 1) p5.fill(207, 0, 0);
       else p5.fill(255);
@@ -91,23 +75,72 @@ const sketch: Sketch = (p5) => {
       p5.stroke(255, 255, 255);
       p5.strokeWeight(1);
       p5.noFill();
-      p5.circle(cx, cy, moveThreshold * MM_TO_INCH * (devicePPI / devicePixelRatio));
+      p5.circle(cx, cy, moveThreshold * MM_TO_INCH * worldPPI);
+    }
+
+    p5.stroke(255, 255, 255, 128);
+    p5.strokeWeight(1);
+    p5.line(0, -h, 0, h);
+    p5.line(-w, 0, w, 0);
+    const maxWidthMM = w * (INCH_TO_MM / worldPPI);
+    const maxHeightMM = h * (INCH_TO_MM / worldPPI);
+    const tickSize = 50;
+    p5.textSize(10);
+    p5.fill(255);
+
+    for (let i = 0; i > -maxWidthMM; i -= tickSize) {
+      if ((Math.abs(i) / tickSize) % 2 == 1) {
+        p5.line(i * (MM_TO_INCH * worldPPI), -2, i * (MM_TO_INCH * worldPPI), 2);
+        continue;
+      }
+      p5.line(i * (MM_TO_INCH * worldPPI), -5, i * (MM_TO_INCH * worldPPI), 5);
+      p5.textAlign(p5.CENTER, p5.BOTTOM);
+      p5.text(`${Math.round(i) / 10} cm`, i * (MM_TO_INCH * worldPPI), 20);
+    }
+    for (let i = 0; i <= maxWidthMM; i += tickSize) {
+      if ((Math.abs(i) / tickSize) % 2 == 1) {
+        p5.line(i * (MM_TO_INCH * worldPPI), -2, i * (MM_TO_INCH * worldPPI), 2);
+        continue;
+      }
+      p5.line(i * (MM_TO_INCH * worldPPI), -5, i * (MM_TO_INCH * worldPPI), 5);
+      p5.textAlign(p5.CENTER, p5.BOTTOM);
+      p5.text(`${Math.round(i) / 10} cm`, i * (MM_TO_INCH * worldPPI), 20);
+    }
+
+    for (let i = 0; i > -maxHeightMM; i -= tickSize) {
+      if (i == 0) continue;
+      if ((Math.abs(i) / tickSize) % 2 == 1) {
+        p5.line(-5, i * (MM_TO_INCH * worldPPI), 5, i * (MM_TO_INCH * worldPPI));
+        continue;
+      }
+      p5.line(-5, i * (MM_TO_INCH * worldPPI), 5, i * (MM_TO_INCH * worldPPI));
+      p5.textAlign(p5.LEFT, p5.CENTER);
+      p5.text(`${Math.round(i) / 10} cm`, 10, i * (MM_TO_INCH * worldPPI));
+    }
+    for (let i = 0; i <= maxHeightMM; i += tickSize) {
+      if (i == 0) continue;
+      if ((Math.abs(i) / tickSize) % 2 == 1) {
+        p5.line(-5, i * (MM_TO_INCH * worldPPI), 5, i * (MM_TO_INCH * worldPPI));
+        continue;
+      }
+      p5.line(-5, i * (MM_TO_INCH * worldPPI), 5, i * (MM_TO_INCH * worldPPI));
+      p5.textAlign(p5.LEFT, p5.CENTER);
+      p5.text(`${Math.round(i) / 10} cm`, 10, i * (MM_TO_INCH * worldPPI));
     }
   };
 };
 
 const TaskCreator = () => {
   const { config, generateDefaultTask } = useConfig();
-  const { devicePPI, devicePixelRatio, testbedWidthMM, testbedHeightMM, markerDiameterMM } = config;
+  const { worldPPI, devicePPI, devicePixelRatio, testbedWidthMM, testbedHeightMM, markerDiameterMM } = config;
   const factor = (MM_TO_INCH * devicePPI) / devicePixelRatio;
   const testbedWidth = testbedWidthMM * factor;
   const testbedHeight = testbedHeightMM * factor;
   const markerDiameter = markerDiameterMM * factor;
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const { videoRef, loading, error, startWebcam } = useDetection(null);
+
   const overlayRef = useRef<HTMLDivElement | null>(null);
-  const [isStreaming, setIsStreaming] = useState(false);
 
   const [studyName, setStudyName] = useState<string>('unnamed_study');
   const [tasks, setTasks] = useState<Task[]>([generateDefaultTask()]);
@@ -154,36 +187,6 @@ const TaskCreator = () => {
     }
   };
 
-  const stopStream = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-    if (videoRef.current) videoRef.current.srcObject = null;
-  };
-
-  useEffect(() => {
-    const startStream = async () => {
-      if (streamRef.current || isStreaming) return;
-      try {
-        setIsStreaming(true);
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
-      } finally {
-        setIsStreaming(false);
-      }
-    };
-    startStream();
-
-    return () => {
-      stopStream();
-    };
-  }, [isStreaming]);
-
   const withinBounds = (x: number, y: number) => {
     const clampedX = Math.max(markerDiameter / 2, Math.min(testbedWidth - markerDiameter / 2, x));
     const clampedY = Math.max(markerDiameter / 2, Math.min(testbedHeight - markerDiameter / 2, y));
@@ -214,9 +217,8 @@ const TaskCreator = () => {
 
   const onMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     let { x, y } = getMousePos(e);
-    x = x - testbedWidth / 2;
-    y = y - testbedHeight / 2;
-    console.log(`Mouse Position: ${x}, ${y}`);
+    x = (x - testbedWidth / 2) * INCH_TO_MM / worldPPI;
+    y = (y - testbedHeight / 2) * INCH_TO_MM / worldPPI;
     if (dragIndex !== null) {
       setTasks((prev) => {
         const newTasks = [...prev];
@@ -230,8 +232,11 @@ const TaskCreator = () => {
 
   const onMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     let { x, y } = getMousePos(e);
-    x = x - testbedWidth / 2;
-    y = y - testbedHeight / 2;
+    // x = x - testbedWidth / 2;
+    // y = y - testbedHeight / 2;
+    console.log(INCH_TO_MM, worldPPI, testbedWidth, x);
+    x = (x - testbedWidth / 2) * INCH_TO_MM / worldPPI;
+    y = (y - testbedHeight / 2) * INCH_TO_MM / worldPPI;
     if (e.button === 0) {
       const idx = findHoverIndex(x, y);
       if (idx !== null) {
@@ -258,8 +263,10 @@ const TaskCreator = () => {
   const onContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
     let { x, y } = getMousePos(e);
-    x = x - testbedWidth / 2;
-    y = y - testbedHeight / 2;
+    // x = x - testbedWidth / 2;
+    // y = y - testbedHeight / 2;
+    x = (x - testbedWidth / 2) * INCH_TO_MM / worldPPI;
+    y = (y - testbedHeight / 2) * INCH_TO_MM / worldPPI;
     const idx = findHoverIndex(x, y);
     if (idx !== null) {
       setTasks((prev) => {
@@ -313,6 +320,10 @@ const TaskCreator = () => {
   const disablePrev = currentIndex <= 0;
   const atLast = currentIndex === tasks.length - 1 || tasks.length === 0;
   const plusDisabled = tasks[currentIndex].markers.length < 3;
+
+  useEffect(() => {
+    startWebcam();
+  }, [startWebcam]);
 
   return (
     <div className="w-screen h-screen flex gap-6 flex-col items-center justify-center select-none">
@@ -501,11 +512,11 @@ const TaskCreator = () => {
 
             <div className="flex flex-col items-center justify-between">
               <label className="text-sm text-gray-600 font-bold">Move Threshold</label>
-              <span className="text-xs text-gray-400">{tasks[currentIndex].moveThreshold} mm</span>
+              <span className="text-xs text-gray-400">{tasks[currentIndex].moveThreshold} mm (@ 5ft away)</span>
               <input
                 type="range"
-                min={5}
-                max={30}
+                min={25}
+                max={150}
                 step={1}
                 value={tasks[currentIndex].moveThreshold}
                 onChange={(e) => {
@@ -533,16 +544,15 @@ const TaskCreator = () => {
             onContextMenu={onContextMenu}
             style={{ cursor: hoverIndex !== null ? 'pointer' : 'crosshair' }}
           >
-            <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
+            {!loading && !error && <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />}
             <div className="absolute inset-0">
               <ReactP5Wrapper
                 sketch={sketch}
                 frameWidth={testbedWidth}
                 frameHeight={testbedHeight}
                 moveThreshold={tasks[currentIndex].moveThreshold}
-                devicePPI={devicePPI}
+                worldPPI={worldPPI}
                 markers={tasks[currentIndex].markers}
-                devicePixelRatio={devicePixelRatio}
                 markerDiameter={markerDiameter}
               />
             </div>
@@ -550,7 +560,7 @@ const TaskCreator = () => {
         </div>
 
         {/* Task Instructions */}
-        <span className="text-center text-sm text-gray-400">
+        <span className="text-center text-sm text-gray-400 pt-2">
           <span className="bg-gray-200 font-bold rounded p-1">Left Click</span> to Place Marker • <span className="bg-gray-200 font-bold rounded p-1">Right Click</span> to Delete
           Marker • <span className="bg-gray-200 font-bold rounded p-1">Left Click + Drag</span> to Reposition Marker
         </span>

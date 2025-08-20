@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { useConfig } from '../utils/context';
+import { defaultConfig } from '../utils/constants';
 
 const Config = () => {
   const { config, setDevicePPI, setWorldPPI, setMarkerDiameter, setTestbedWidth, setTestbedHeight, setDefaultHand, setDefaultTrials, setDefaultRepetitions, setDefaultMoveThreshold } = useConfig();
@@ -15,15 +16,15 @@ const Config = () => {
 
   const resetParams = () => {
     if (confirm('Are you sure you want to reset all parameters to their default values?')) {
-      setDevicePPI(109);
-      setWorldPPI(96);
-      setMarkerDiameter(5);
-      setTestbedWidth(160);
-      setTestbedHeight(100);
-      setDefaultHand('Right');
-      setDefaultTrials(3);
-      setDefaultRepetitions(5);
-      setDefaultMoveThreshold(15);
+      setDevicePPI(defaultConfig.devicePPI);
+      setWorldPPI(defaultConfig.worldPPI);
+      setMarkerDiameter(defaultConfig.markerDiameterMM);
+      setTestbedWidth(defaultConfig.testbedWidthMM);
+      setTestbedHeight(defaultConfig.testbedHeightMM);
+      setDefaultHand(defaultConfig.defaultHand);
+      setDefaultTrials(defaultConfig.defaultTrials);
+      setDefaultRepetitions(defaultConfig.defaultRepetitions);
+      setDefaultMoveThreshold(defaultConfig.defaultMoveThreshold);
     }
   };
 
