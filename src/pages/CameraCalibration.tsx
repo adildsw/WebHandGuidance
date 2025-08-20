@@ -7,6 +7,8 @@ import font from '../assets/sf-ui-display-bold.otf';
 import p5 from 'p5';
 import { MM_TO_INCH } from '../utils/constants';
 
+import AR from "js-aruco";
+
 const sketch: Sketch = (p5) => {
   let width = 200;
   let height = 400;
@@ -38,6 +40,9 @@ const sketch: Sketch = (p5) => {
   };
 };
 
+// const detector = new AR.Detector({ dictionaryName: 'ARUCO_MIP_36h12' });
+const detector = new AR.Detector();
+
 const CameraCalibration = () => {
   const { config } = useConfig();
   const { devicePPI, devicePixelRatio, testbedHeightMM, testbedWidthMM } = config;
@@ -49,6 +54,13 @@ const CameraCalibration = () => {
   const streamRef = useRef<MediaStream | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
+
+  useEffect(() => {
+      const v = videoRef.current;
+      if (!v) return;
+      var markers = detector.detect(v);
+      console.log('Detected markers:', markers);
+  }, []);
 
   const startStream = async () => {
     if (streamRef.current || isStreaming) return;

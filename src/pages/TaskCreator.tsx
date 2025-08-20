@@ -50,21 +50,26 @@ const sketch: Sketch = (p5) => {
     p5.stroke(255);
     p5.strokeWeight(2);
     for (let i = 1; i < pts.length; i++) {
-      const px = pts[i - 1].x - w / 2;
-      const py = pts[i - 1].y - h / 2;
-      const cx = pts[i].x - w / 2;
-      const cy = pts[i].y - h / 2;
+      // const px = pts[i - 1].x - w / 2;
+      // const py = pts[i - 1].y - h / 2;
+      // const cx = pts[i].x - w / 2;
+      // const cy = pts[i].y - h / 2;
+      const px = pts[i - 1].x;
+      const py = pts[i - 1].y;
+      const cx = pts[i].x;
+      const cy = pts[i].y;
       p5.line(px, py, cx, cy);
 
-      const distance = p5.dist(px, py, cx, cy) * (devicePixelRatio / devicePPI) * INCH_TO_MM;
+      // const distance = p5.dist(px, py, cx, cy) * (devicePixelRatio / devicePPI) * INCH_TO_MM;
+      const pixelDistance = p5.dist(px, py, cx, cy);
       p5.textAlign(p5.CENTER, p5.TOP);
       p5.textSize(10);
       p5.fill(255);
-      p5.text(`${distance.toFixed(1)} mm`, (px + cx) / 2, (py + cy) / 2);
+      p5.text(`${pixelDistance.toFixed(1)} px`, (px + cx) / 2, (py + cy) / 2);
     }
     for (let i = 0; i < pts.length; i++) {
-      const cx = pts[i].x - w / 2;
-      const cy = pts[i].y - h / 2;
+      const cx = pts[i].x;
+      const cy = pts[i].y;
       if (i === 0) p5.fill(0, 207, 0);
       else if (i === pts.length - 1) p5.fill(207, 0, 0);
       else p5.fill(255);
@@ -200,7 +205,9 @@ const TaskCreator = () => {
   };
 
   const onMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const { x, y } = getMousePos(e);
+    let { x, y } = getMousePos(e);
+    x = x - testbedWidth / 2;
+    y = y - testbedHeight / 2;
     console.log(`Mouse Position: ${x}, ${y}`);
     if (dragIndex !== null) {
       setTasks((prev) => {
@@ -214,7 +221,9 @@ const TaskCreator = () => {
   };
 
   const onMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    const { x, y } = getMousePos(e);
+    let { x, y } = getMousePos(e);
+    x = x - testbedWidth / 2;
+    y = y - testbedHeight / 2;
     if (e.button === 0) {
       const idx = findHoverIndex(x, y);
       if (idx !== null) {
@@ -240,7 +249,9 @@ const TaskCreator = () => {
 
   const onContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
-    const { x, y } = getMousePos(e);
+    let { x, y } = getMousePos(e);
+    x = x - testbedWidth / 2;
+    y = y - testbedHeight / 2;
     const idx = findHoverIndex(x, y);
     if (idx !== null) {
       setTasks((prev) => {
@@ -298,7 +309,6 @@ const TaskCreator = () => {
   return (
     <div className="w-screen h-screen flex gap-6 flex-col items-center justify-center select-none">
       <div className="flex flex-col gap-2" style={{ width: `${testbedWidth}px` }}>
-
         {/* Create Study Task Top Bar */}
         <div className="w-full bg-gray-200 rounded-lg shadow flex items-center justify-between px-2 py-2">
           <div className="flex items-center px-1 gap-2">
@@ -395,11 +405,17 @@ const TaskCreator = () => {
           </div>
 
           {/* Task Form */}
-          <div className="bg-white  p-4 pt-0 flex flex-row gap-3 justify-between overflow-auto">
-            <div className="flex flex-col items-center justify-between">
+          <div className="bg-white px-4 flex flex-row gap-2 overflow-auto">
+            {/* <div className="flex flex-row items-center justify-center w-full gap-2">
+              <label className="text-xl font-bold text-gray-600">Task Configuration</label>
+            </div>
+
+            <div className="border-l border-gray-200 h-full mx-2" /> */}
+
+            <div className="flex flex-col grow items-center justify-between">
               <label className="text-sm font-bold text-gray-600">Tag</label>
               <input
-                className="w-28 px-2 py-1 text-center rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                className="grow px-2 py-1 text-center rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300"
                 value={tasks[currentIndex].tag}
                 onChange={(e) => {
                   const newTasks = [...tasks];
@@ -442,7 +458,7 @@ const TaskCreator = () => {
               />
             </div>
             <div className="flex flex-col items-center justify-between">
-              <label className="text-sm font-bold text-gray-600">Repetitions</label>
+              <label className="text-sm font-bold text-gray-600">Reps</label>
               <input
                 className="w-16 px-2 py-1 rounded border border-gray-300 text-center"
                 inputMode="numeric"
@@ -459,9 +475,10 @@ const TaskCreator = () => {
                 }}
               />
             </div>
+          </div>
 
-            <div className="border-l border-gray-200 h-full mx-2" />
-
+          {/* Task Form */}
+          <div className="bg-white  p-4 pt-0 flex flex-row gap-3 justify-between overflow-auto border-t border-gray-200">
             <div className="flex flex-col items-center justify-between">
               <label className="text-sm text-gray-600 font-bold">Task Type</label>
               <select
