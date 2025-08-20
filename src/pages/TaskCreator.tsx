@@ -3,11 +3,11 @@ import { ReactP5Wrapper } from '@p5-wrapper/react';
 import type { Sketch } from '@p5-wrapper/react';
 
 import font from '../assets/sf-ui-display-bold.otf';
-import { Pos, Task } from '../types/task';
+import type { Pos, Task } from '../types/task';
 import { useConfig } from '../utils/context';
-import { INCH_TO_MM, MM_TO_INCH } from '../utils/constants';
+import { MM_TO_INCH } from '../utils/constants';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { Font } from 'p5';
+import type { Font } from 'p5';
 
 const sketch: Sketch = (p5) => {
   let w = 400;
@@ -32,7 +32,15 @@ const sketch: Sketch = (p5) => {
     p5.drawingContext.antialias = true;
   };
 
-  p5.updateWithProps = (props: any) => {
+  p5.updateWithProps = (props: {
+    frameWidth?: number;
+    frameHeight?: number;
+    devicePPI?: number;
+    devicePixelRatio?: number;
+    moveThreshold?: number;
+    markerDiameter?: number;
+    markers?: Pos[];
+  }) => {
     if (typeof props.frameWidth === 'number') w = props.frameWidth;
     if (typeof props.frameHeight === 'number') h = props.frameHeight;
     if (typeof props.devicePPI === 'number') devicePPI = props.devicePPI;
@@ -146,21 +154,6 @@ const TaskCreator = () => {
     }
   };
 
-  const startStream = async () => {
-    if (streamRef.current || isStreaming) return;
-    try {
-      setIsStreaming(true);
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-    } finally {
-      setIsStreaming(false);
-    }
-  };
-
   const stopStream = () => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
@@ -170,11 +163,26 @@ const TaskCreator = () => {
   };
 
   useEffect(() => {
+    const startStream = async () => {
+      if (streamRef.current || isStreaming) return;
+      try {
+        setIsStreaming(true);
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+        }
+      } finally {
+        setIsStreaming(false);
+      }
+    };
     startStream();
+
     return () => {
       stopStream();
     };
-  }, []);
+  }, [isStreaming]);
 
   const withinBounds = (x: number, y: number) => {
     const clampedX = Math.max(markerDiameter / 2, Math.min(testbedWidth - markerDiameter / 2, x));

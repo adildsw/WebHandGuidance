@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { useConfig } from '../utils/context';
 
 const Config = () => {
-  const { config, setMarkerDiameter, setTestbedWidth, setTestbedHeight, setDefaultHand, setDefaultTrials, setDefaultRepetitions, setDefaultMoveThreshold } = useConfig();
+  const { config, setDevicePPI, setWorldPPI, setMarkerDiameter, setTestbedWidth, setTestbedHeight, setDefaultHand, setDefaultTrials, setDefaultRepetitions, setDefaultMoveThreshold } = useConfig();
 
   const toNumber = useCallback((s: string) => {
     const v = s.replace(/[^0-9.]/g, '');
@@ -15,6 +15,8 @@ const Config = () => {
 
   const resetParams = () => {
     if (confirm('Are you sure you want to reset all parameters to their default values?')) {
+      setDevicePPI(109);
+      setWorldPPI(96);
       setMarkerDiameter(5);
       setTestbedWidth(160);
       setTestbedHeight(100);
@@ -31,6 +33,32 @@ const Config = () => {
         <h1 className="text-2xl font-bold text-gray-900">Configurations</h1>
 
         <div className="w-full flex flex-col gap-5">
+
+          <div>
+            <div className="text-sm font-bold text-gray-600 mb-3">Calibation Parameters</div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm text-gray-600">Display PPI</label>
+              <input
+                className="w-28 px-2 py-1 text-center rounded border border-gray-300"
+                inputMode="decimal"
+                pattern="[0-9.]*"
+                value={String(config.devicePPI)}
+                onChange={(e) => setDevicePPI(toNumber(e.target.value))}
+              />
+            </div>
+
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm text-gray-600">World PPI (at 5 feet distance)</label>
+              <input
+                className="w-28 px-2 py-1 text-center rounded border border-gray-300"
+                inputMode="decimal"
+                pattern="[0-9.]*"
+                value={String(config.worldPPI)}
+                onChange={(e) => setWorldPPI(toNumber(e.target.value))}
+              />
+            </div>
+          </div>
+
           <div>
             <div className="text-sm font-bold text-gray-600 mb-3">Testbed Parameters</div>
             <div className="flex items-center justify-between mb-2">
@@ -118,7 +146,7 @@ const Config = () => {
             Reset to Default
           </button>
 
-          <button onClick={goHome} className="w-full px-4 py-3 rounded-lg bg-gray-300 text-gray-900 hover:bg-gray-400 cursor-pointer">
+          <button onClick={goHome} className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-gray-100 text-gray-900 hover:bg-gray-800 hover:text-white font-bold cursor-pointer">
             Done
           </button>
         </div>

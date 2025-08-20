@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import font from '../assets/sf-ui-display-bold.otf';
 import { CREDIT_CARD_HEIGHT_INCH, CREDIT_CARD_WIDTH_INCH, DOLLAR_BILL_HEIGHT_INCH, DOLLAR_BILL_WIDTH_INCH, MM_TO_INCH } from '../utils/constants';
 import p5 from 'p5';
-import { CalibrationTools } from '../types/config';
+import type { CalibrationTools } from '../types/config';
 
 const sketch: Sketch = (p5) => {
   let width = 200;
@@ -17,7 +17,6 @@ const sketch: Sketch = (p5) => {
   let devicePixelRatio = 1;
 
   p5.setup = () => {
-    console.log(height, width);
     p5.createCanvas(width, height, p5.WEBGL);
     p5.loadFont(font, (loadedFont: p5.Font) => {
       p5.textFont(loadedFont);
@@ -28,7 +27,12 @@ const sketch: Sketch = (p5) => {
     p5.resizeCanvas(width, height);
   };
 
-  p5.updateWithProps = (props: any) => {
+  p5.updateWithProps = (props: {
+    devicePPI?: number;
+    devicePixelRatio?: number;
+    calibrationTool?: CalibrationTools;
+    size?: { width: number; height: number };
+  }) => {
     if (typeof props.devicePPI === 'number') devicePPI = props.devicePPI;
     if (typeof props.devicePixelRatio === 'number') devicePixelRatio = props.devicePixelRatio;
     if (typeof props.calibrationTool === 'string') calibrationTool = props.calibrationTool;
@@ -198,20 +202,13 @@ const ScreenCalibration = () => {
     };
   }, []);
 
-  const increaseScale = () => {
-    setDevicePPI(devicePPI + 1);
-  };
-
-  const decreaseScale = () => {
-    setDevicePPI(devicePPI - 1);
-  };
-
   useEffect(() => {
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === '+') {
-        increaseScale();
+        setDevicePPI(devicePPI + 1);
       } else if (e.key === '-') {
-        decreaseScale();
+        setDevicePPI(devicePPI - 1);
       } else if (e.key === 'Enter') {
         window.location.hash = '#/';
       }
@@ -221,7 +218,7 @@ const ScreenCalibration = () => {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [config, setDevicePPI]);
+  }, [config, devicePPI, setDevicePPI]);
 
   return (
     <div className="w-screen h-screen flex gap-4 flex-col items-center justify-center p-16 py-8">
@@ -280,11 +277,11 @@ const ScreenCalibration = () => {
           <b>Display PPI:</b> {devicePPI}
         </span>
         <div className="flex flex-row gap-2">
-          <div className="bg-gray-200 px-2 rounded hover:bg-gray-300 cursor-pointer select-none font-bold active:bg-gray-400" onClick={() => decreaseScale()}>
+          <div className="bg-gray-200 px-2 rounded hover:bg-gray-300 cursor-pointer select-none font-bold active:bg-gray-400" onClick={() => setDevicePPI(devicePPI - 1)}>
             -
           </div>
           <input type="range" min="100" max="300" step="1" value={devicePPI} className="w-64" onChange={(e) => setDevicePPI(parseFloat(e.target.value))} />
-          <div className="bg-gray-200 px-2 rounded hover:bg-gray-300 cursor-pointer select-none font-bold active:bg-gray-400" onClick={() => increaseScale()}>
+          <div className="bg-gray-200 px-2 rounded hover:bg-gray-300 cursor-pointer select-none font-bold active:bg-gray-400" onClick={() => setDevicePPI(devicePPI + 1)}>
             +
           </div>
         </div>

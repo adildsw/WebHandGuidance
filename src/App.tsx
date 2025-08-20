@@ -6,7 +6,7 @@ import ParallaxBackground from './extras/ParallaxBackground';
 import Config from './pages/Config';
 import Home from './pages/Home';
 import { library } from '@fortawesome/fontawesome-svg-core';
-import { faChevronLeft, faChevronRight, faFile, faFolderOpen, faHome, faPencil, faPlus, faRedo, faSave, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faChevronLeft, faChevronRight, faFile, faFolderOpen, faHome, faPlus, faRedo, faSave, faTrash } from '@fortawesome/free-solid-svg-icons';
 import Study from './pages/Study';
 import CameraCalibration from './pages/CameraCalibration';
 

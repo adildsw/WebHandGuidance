@@ -1,12 +1,14 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { CalibrationTools, Config, ConfigContextType } from '../types/config';
-import { Task } from '../types/task';
+import { createContext, useContext, useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
+import type { CalibrationTools, Config, ConfigContextType } from '../types/config';
+import type { Task } from '../types/task';
 import { uid } from 'uid/single';
 
 const defaultConfig: Config = {
   devicePPI: 256,
   devicePixelRatio: typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1,
   calibrationTool: 'RULER',
+  worldPPI: 24,
   markerDiameterMM: 5,
   testbedWidthMM: 160,
   testbedHeightMM: 100,
@@ -20,12 +22,16 @@ const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
 
 export function ConfigProvider({ children }: { children: ReactNode }) {
   const [config, setConfigState] = useState<Config>(() => {
-    var stored = typeof window !== 'undefined' ? localStorage.getItem('appConfig') : null;
+    const stored = typeof window !== 'undefined' ? localStorage.getItem('appConfig') : null;
     return stored ? JSON.parse(stored) : defaultConfig;
   });
 
   const setDevicePPI = (ppi: number) => {
     setConfigState((prev) => ({ ...prev, devicePPI: ppi }));
+  };
+
+  const setWorldPPI = (ppi: number) => {
+    setConfigState((prev) => ({ ...prev, worldPPI: ppi }));
   };
 
   const setDevicePixelRatio = (dpr: number) => {
@@ -86,11 +92,19 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     window.addEventListener('orientationchange', update);
     const mq = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
     const mqHandler = () => update();
-    mq.addEventListener ? mq.addEventListener('change', mqHandler) : mq.addListener(mqHandler);
+    if (mq.addEventListener) {
+      mq.addEventListener('change', mqHandler);
+    } else {
+      mq.addListener(mqHandler);
+    }
     return () => {
       window.removeEventListener('resize', update);
       window.removeEventListener('orientationchange', update);
-      mq.removeEventListener ? mq.removeEventListener('change', mqHandler) : mq.removeListener(mqHandler);
+      if (mq.removeEventListener) {
+        mq.removeEventListener('change', mqHandler);
+      } else {
+        mq.removeListener(mqHandler);
+      }
     };
   }, []);
 
@@ -107,6 +121,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         setDefaultTrials,
         setDefaultRepetitions,
         setDefaultMoveThreshold,
+        setWorldPPI,
         generateDefaultTask,
       }}
     >
@@ -115,6 +130,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useConfig() {
   const context = useContext(ConfigContext);
   if (!context) throw new Error('useConfig must be used within a ConfigProvider');

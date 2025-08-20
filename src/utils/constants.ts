@@ -1,3 +1,5 @@
+import type { FingerTips } from '../types/detections';
+
 export const CREDIT_CARD_WIDTH_INCH = 3.37;
 export const CREDIT_CARD_HEIGHT_INCH = 2.13;
 export const CREDIT_CARD_ASPECT_RATIO = CREDIT_CARD_WIDTH_INCH / CREDIT_CARD_HEIGHT_INCH;
@@ -6,5 +8,15 @@ export const DOLLAR_BILL_WIDTH_INCH = 6.14;
 export const DOLLAR_BILL_HEIGHT_INCH = 2.61;
 export const DOLLAR_BILL_ASPECT_RATIO = DOLLAR_BILL_WIDTH_INCH / DOLLAR_BILL_HEIGHT_INCH;
 
+export const LETTER_HEIGHT_INCH = 11;
+
 export const MM_TO_INCH = 1 / 25.4;
 export const INCH_TO_MM = 25.4;
+
+export const defaultFingerTips: FingerTips = {
+  index: null,
+  middle: null,
+  ring: null,
+  pinky: null,
+  thumb: null,
+};

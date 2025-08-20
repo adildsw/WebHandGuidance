@@ -2,15 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ReactP5Wrapper } from '@p5-wrapper/react';
 import type { Sketch } from '@p5-wrapper/react';
 import font from '../assets/sf-ui-display-bold.otf';
-import { Pos, Task } from '../types/task';
+import type { Pos, Task } from '../types/task';
 import { useConfig } from '../utils/context';
-import { INCH_TO_MM, MM_TO_INCH } from '../utils/constants';
+import { MM_TO_INCH } from '../utils/constants';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { Font } from 'p5';
-import { Pose } from '@mediapipe/pose';
+import type { Font } from 'p5';
+import { FilesetResolver, PoseLandmarker } from '@mediapipe/tasks-vision';
 import { uid } from 'uid/single';
-
-const MP_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/';
+import { mapVideoToTestbed } from '../utils/math';
 
 const sketch: Sketch = (p5) => {
   let w = 400,
@@ -103,8 +102,6 @@ const Study = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  const poseRef = useRef<Pose | null>(null);
-  const rafRef = useRef<number | null>(null);
   const [wrists, setWrists] = useState<{ left: { x: number; y: number } | null; right: { x: number; y: number } | null }>({ left: null, right: null });
 
   const [participantId, setParticipantId] = useState<string>('');
@@ -115,22 +112,6 @@ const Study = () => {
   const [currentTaskIndex, setCurrentTaskIndex] = useState<number>(0);
   const [currentTrial, setCurrentTrial] = useState<number>(1);
   const [currentRepetition, setCurrentRepetition] = useState<number>(1);
-
-  const mapVideoToTestbed = (x: number, y: number) => {
-    const v = videoRef.current;
-    const vw = v?.videoWidth || 640;
-    const vh = v?.videoHeight || 480;
-    const cw = testbedWidth;
-    const ch = testbedHeight;
-    const s = Math.max(cw / vw, ch / vh);
-    const dispW = vw * s;
-    const dispH = vh * s;
-    const ox = (cw - dispW) / 2;
-    const oy = (ch - dispH) / 2;
-    const px = x * s + ox;
-    const py = y * s + oy;
-    return { x: px, y: py };
-  };
 
   useEffect(() => {
     const hash = window.location.hash;
@@ -153,74 +134,90 @@ const Study = () => {
   }, []);
 
   useEffect(() => {
-    let running = true;
-    const pose = new Pose({ locateFile: (f) => `${MP_BASE}${f}` });
-    pose.setOptions({
-      modelComplexity: 0,
-      smoothLandmarks: true,
-      enableSegmentation: false,
-      selfieMode: true,
-      minDetectionConfidence: 0.5,
-      minTrackingConfidence: 0.5,
-    });
-    pose.onResults((res) => {
-      const lm = res.poseLandmarks || [];
-      if (lm.length < 16) return;
+    let stream: MediaStream | null = null;
+    let pose: PoseLandmarker | null = null;
+    let raf: number | null = null;
+    const videoElement = videoRef.current;
 
-      const R = lm[15];
-      const L = lm[16];
-      if (!videoRef.current || !L || !R) return;
+    const init = async () => {
+      const vision = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm');
+      pose = await PoseLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath: './pose_landmarker_lite.task',
+        },
+        runningMode: 'VIDEO',
+        numPoses: 1,
+        minPoseDetectionConfidence: 0.5,
+        minPosePresenceConfidence: 0.5,
+        minTrackingConfidence: 0.5,
+      });
 
-      const vw = videoRef.current.videoWidth;
-      const vh = videoRef.current.videoHeight;
-      var lp: { x: number; y: number } | null = mapVideoToTestbed(L.x * vw, L.y * vh);
-      var rp: { x: number; y: number } | null = mapVideoToTestbed(R.x * vw, R.y * vh);
-
-      if (!L.visibility || L.visibility < 0.8) lp = null;
-      if (!R.visibility || R.visibility < 0.8) rp = null;
-
-      console.log('Left Wrist:', L.visibility, 'Right Wrist:', R.visibility);
-
-      setWrists({ left: lp, right: rp });
-    });
-
-    const start = async () => {
       const v = videoRef.current;
       if (!v) return;
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user' },
+        audio: false,
+      });
       v.srcObject = stream;
       await new Promise<void>((r) => {
         v.onloadedmetadata = () => r();
       });
       await v.play().catch(() => {});
-      const loop = async () => {
-        if (!running) return;
-        if (v.readyState >= 2) await pose.send({ image: v });
-        requestAnimationFrame(loop);
+
+      const loop = () => {
+        if (!pose || !v || v.readyState < 2) {
+          raf = requestAnimationFrame(loop);
+          return;
+        }
+        const res = pose.detectForVideo(v, performance.now());
+        const lm = res.landmarks?.[0] || [];
+        if (lm.length >= 17) {
+          const R = lm[15];
+          const L = lm[16];
+          if (L) L.x = 1 - L.x;
+          if (R) R.x = 1 - R.x;
+          const vw = v.videoWidth;
+          const vh = v.videoHeight;
+          let lp = L ? mapVideoToTestbed(L.x * vw, L.y * vh, vw, vh, testbedWidth, testbedHeight) : null;
+          let rp = R ? mapVideoToTestbed(R.x * vw, R.y * vh, vw, vh, testbedWidth, testbedHeight) : null;
+          if (!L?.visibility || L.visibility < 0.8) lp = null;
+          if (!R?.visibility || R.visibility < 0.8) rp = null;
+          setWrists({ left: lp, right: rp });
+        }
+        raf = requestAnimationFrame(loop);
       };
       loop();
     };
 
-    start();
+    init();
 
     return () => {
-      running = false;
-      pose.close();
-      const v = videoRef.current;
-      const s = v?.srcObject as MediaStream | null;
+      if (raf) cancelAnimationFrame(raf);
+      pose?.close();
+      pose = null;
+      const s = (videoElement?.srcObject as MediaStream) || null;
       if (s) s.getTracks().forEach((t) => t.stop());
-      if (v) v.srcObject = null;
+      if (videoElement) videoElement.srcObject = null;
     };
-  }, []);
+  }, [testbedHeight, testbedWidth]);
 
   const startStream = async () => {
     if (streamRef.current) return;
+    const v = videoRef.current;
+    if (!v) return;
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
-    streamRef.current = stream;
-    if (videoRef.current) {
-      videoRef.current.srcObject = stream;
-      await videoRef.current.play();
+    v.muted = true;
+    v.playsInline = true;
+    v.srcObject = stream;
+    v.style.transform = 'scaleX(-1)';
+    await new Promise<void>((r) => (v.readyState >= 1 ? r() : v.addEventListener('loadedmetadata', () => r(), { once: true })));
+    try {
+      await v.play();
+    } catch {
+      await new Promise((r) => setTimeout(r, 0));
+      await v.play();
     }
+    streamRef.current = stream;
   };
 
   const stopStream = () => {
@@ -257,14 +254,13 @@ const Study = () => {
         </div>
 
         <div className="flex flex-row gap-2">
-
           <div className="flex flex-row p-2 bg-white rounded-lg shadow gap-3 border border-gray-100 grow justify-center">
             <div className="flex flex-col items-center justify-between">
               <label className="text-sm font-bold text-gray-600">Status</label>
               <span className="px-2 py-1 text-center rounded font-semibold text-xl">Ready</span>
             </div>
           </div>
-          
+
           <div className="flex flex-row p-2 bg-white rounded-lg shadow gap-3 border border-gray-100 ">
             <div className="flex flex-col items-center justify-between">
               <label className="text-sm font-bold text-gray-600">Participant ID</label>
@@ -301,13 +297,12 @@ const Study = () => {
             </div>
           </div>
         </div>
-        
 
         <div
           className="md:col-span-3 rounded-lg shadow-lg bg-gray-100 overflow-hidden flex items-center justify-center relative"
           style={{ width: `${testbedWidth}px`, height: `${testbedHeight}px` }}
         >
-          <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
+          <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" />
           <div className="absolute inset-0">
             <ReactP5Wrapper
               sketch={sketch}
