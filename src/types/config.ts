@@ -13,7 +13,10 @@ export type Config = {
   defaultHand: 'Right' | 'Left';
   defaultTrials: number;
   defaultRepetitions: number;
-  defaultMoveThreshold: number;
+  defaultDistanceThreshold: number;
+  defaultHoldDuration: number;
+  defaultStartDuration: number;
+  defaultTaskType: 'MOVE' | 'HOLD';
 };
 
 export type ConfigContextType = {
@@ -27,6 +30,9 @@ export type ConfigContextType = {
   setDefaultHand: (hand: 'Right' | 'Left') => void;
   setDefaultTrials: (trials: number) => void;
   setDefaultRepetitions: (repetitions: number) => void;
-  setDefaultMoveThreshold: (threshold: number) => void;
+  setDefaultDistanceThreshold: (threshold: number) => void;
+  setDefaultHoldDuration: (duration: number) => void;
+  setDefaultStartDuration: (duration: number) => void;
+  setDefaultTaskType: (type: 'MOVE' | 'HOLD') => void;
   generateDefaultTask: () => Task;
 };

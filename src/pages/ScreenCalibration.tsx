@@ -205,9 +205,9 @@ const ScreenCalibration = () => {
   useEffect(() => {
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === '+') {
+      if (e.key === '+' || e.key === '=') {
         setDevicePPI(devicePPI + 1);
-      } else if (e.key === '-') {
+      } else if (e.key === '-' || e.key === '_') {
         setDevicePPI(devicePPI - 1);
       } else if (e.key === 'Enter') {
         window.location.hash = '#/';

@@ -10,7 +10,8 @@ const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
 export function ConfigProvider({ children }: { children: ReactNode }) {
   const [config, setConfigState] = useState<Config>(() => {
     const stored = typeof window !== 'undefined' ? localStorage.getItem('appConfig') : null;
-    return stored ? JSON.parse(stored) : defaultConfig;
+    const parsed = stored ? JSON.parse(stored) : {};
+    return { ...defaultConfig, ...parsed };
   });
 
   const setDevicePPI = (ppi: number) => {
@@ -53,8 +54,20 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     setConfigState((prev) => ({ ...prev, defaultRepetitions: repetitions }));
   };
 
-  const setDefaultMoveThreshold = (threshold: number) => {
-    setConfigState((prev) => ({ ...prev, defaultMoveThreshold: threshold }));
+  const setDefaultDistanceThreshold = (threshold: number) => {
+    setConfigState((prev) => ({ ...prev, defaultDistanceThreshold: threshold }));
+  };
+
+  const setDefaultHoldDuration = (duration: number) => {
+    setConfigState((prev) => ({ ...prev, defaultHoldDuration: duration }));
+  };
+
+  const setDefaultTaskType = (type: 'MOVE' | 'HOLD') => {
+    setConfigState((prev) => ({ ...prev, defaultTaskType: type }));
+  };
+
+  const setDefaultStartDuration = (duration: number) => {
+    setConfigState((prev) => ({ ...prev, defaultStartDuration: duration }));
   };
 
   const generateDefaultTask = (): Task => {
@@ -63,7 +76,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       hand: config.defaultHand,
       trials: config.defaultTrials,
       repetitions: config.defaultRepetitions,
-      moveThreshold: config.defaultMoveThreshold,
+      distanceThreshold: config.defaultDistanceThreshold,
+      holdDuration: config.defaultHoldDuration,
+      type: config.defaultTaskType,
       markers: [],
     };
   };
@@ -107,7 +122,10 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         setDefaultHand,
         setDefaultTrials,
         setDefaultRepetitions,
-        setDefaultMoveThreshold,
+        setDefaultDistanceThreshold,
+        setDefaultHoldDuration,
+        setDefaultStartDuration,
+        setDefaultTaskType,
         setWorldPPI,
         generateDefaultTask,
       }}

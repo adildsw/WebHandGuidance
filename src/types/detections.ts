@@ -16,7 +16,8 @@ export type WristDetectionResult = {
   rightWrist: Pos | null;
 }
 
-export type FingertipDetectionResult = {
-  leftFingerTips: FingerTips;
-  rightFingerTips: FingerTips;
-};
+export type PinchDetectionResult = {
+  pinchPos: { left: Pos | null; right: Pos | null };
+  indexPinch: { left: boolean; right: boolean };
+  middlePinch: { left: boolean; right: boolean };
+}

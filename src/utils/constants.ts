@@ -22,8 +22,6 @@ export const defaultFingerTips: FingerTips = {
   thumb: null,
 };
 
-
-
 export const defaultConfig: Config = {
   devicePPI: 109,
   devicePixelRatio: typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1,
@@ -35,5 +33,8 @@ export const defaultConfig: Config = {
   defaultHand: 'Right',
   defaultTrials: 3,
   defaultRepetitions: 5,
-  defaultMoveThreshold: 50,
+  defaultDistanceThreshold: 50,
+  defaultHoldDuration: 5000,
+  defaultStartDuration: 3000,
+  defaultTaskType: 'MOVE',
 };

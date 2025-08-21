@@ -9,13 +9,23 @@ import { INCH_TO_MM, MM_TO_INCH } from '../utils/constants';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import type { Font } from 'p5';
 import useDetection from '../hooks/useMediaPipeHandDetection';
+import { distance } from '../utils/math';
 
 const sketch: Sketch = (p5) => {
   let w = 400;
   let h = 300;
   let worldPPI = 26;
   let markerDiameter = 10;
-  let moveThreshold = 15;
+  let distanceThreshold = 50;
+  let axis = false;
+
+  let pinchPos: { left: Pos | null; right: Pos | null } = { left: null, right: null };
+  let indexPinch: { left: boolean; right: boolean } = { left: false, right: false };
+  let handedness: 'Left' | 'Right' = 'Right';
+
+  let wristPos: { left: Pos | null; right: Pos | null } = { left: null, right: null };
+
+  let lockedPos: Pos | null = null;
 
   let pts: Pos[] = [];
 
@@ -31,14 +41,33 @@ const sketch: Sketch = (p5) => {
     p5.drawingContext.antialias = true;
   };
 
-  p5.updateWithProps = (props: { frameWidth?: number; frameHeight?: number; moveThreshold?: number; markerDiameter?: number; worldPPI?: number; markers?: Pos[] }) => {
+  p5.updateWithProps = (props: {
+    frameWidth?: number;
+    frameHeight?: number;
+    distanceThreshold?: number;
+    markerDiameter?: number;
+    worldPPI?: number;
+    markers?: Pos[];
+    isAxisVisible?: boolean;
+    pinchPos?: { left: Pos | null; right: Pos | null };
+    indexPinch?: { left: boolean; right: boolean };
+    handedness?: 'Left' | 'Right';
+    lockedPos?: Pos | null;
+    wristPos?: { left: Pos | null; right: Pos | null };
+  }) => {
     if (typeof props.frameWidth === 'number') w = props.frameWidth;
     if (typeof props.frameHeight === 'number') h = props.frameHeight;
-    if (typeof props.moveThreshold === 'number') moveThreshold = props.moveThreshold;
+    if (typeof props.distanceThreshold === 'number') distanceThreshold = props.distanceThreshold;
     if (typeof props.markerDiameter === 'number') markerDiameter = props.markerDiameter;
     if (typeof props.worldPPI === 'number') worldPPI = props.worldPPI;
     if (Array.isArray(props.markers)) pts = props.markers;
     if (p5.width !== w || p5.height !== h) p5.resizeCanvas(w, h);
+    axis = props.isAxisVisible ?? false;
+    pinchPos = props.pinchPos ?? { left: null, right: null };
+    indexPinch = props.indexPinch ?? { left: false, right: false };
+    handedness = props.handedness ?? 'Right';
+    lockedPos = props.lockedPos ?? null;
+    wristPos = props.wristPos ?? { left: null, right: null };
   };
 
   p5.draw = () => {
@@ -54,30 +83,91 @@ const sketch: Sketch = (p5) => {
       p5.line(px, py, cx, cy);
 
       const pixelDistance = p5.dist(px, py, cx, cy) * (INCH_TO_MM / (worldPPI * 10));
-      p5.textAlign(p5.CENTER, p5.TOP);
+      p5.textAlign(p5.CENTER, p5.BOTTOM);
       p5.textSize(10);
       p5.fill(255);
       p5.text(`${pixelDistance.toFixed(1)} cm`, (px + cx) / 2, (py + cy) / 2);
     }
+
     for (let i = 0; i < pts.length; i++) {
       const cx = pts[i].x * MM_TO_INCH * worldPPI;
       const cy = pts[i].y * MM_TO_INCH * worldPPI;
-      if (i === 0) p5.fill(0, 207, 0);
-      else if (i === pts.length - 1) p5.fill(207, 0, 0);
+      if (i === 0) p5.fill(0, 230, 0);
+      else if (i === pts.length - 1) p5.fill(230, 0, 0);
       else p5.fill(255);
       p5.noStroke();
       p5.circle(cx, cy, markerDiameter);
+
+      p5.stroke(255, 255, 255);
+      p5.strokeWeight(1);
+      p5.noFill();
+      p5.circle(cx, cy, distanceThreshold * MM_TO_INCH * worldPPI);
+
       p5.fill(0);
       p5.textAlign(p5.CENTER, p5.CENTER);
       p5.textSize(12);
       p5.text(String(i + 1), cx, cy);
 
-      p5.stroke(255, 255, 255);
-      p5.strokeWeight(1);
-      p5.noFill();
-      p5.circle(cx, cy, moveThreshold * MM_TO_INCH * worldPPI);
+      p5.textAlign(p5.CENTER, p5.TOP);
+      p5.textSize(10);
+      p5.text(`(${(pts[i].x / 10).toFixed(1)}, ${(pts[i].y / 10).toFixed(1)})`, cx, cy + markerDiameter);
     }
 
+    if (axis) drawAxis();
+    drawPinch();
+
+    // if (wristPos.left) {
+    //   p5.fill(0, 0, 255, 192);
+    //   p5.circle(wristPos.left.x, wristPos.left.y, 12);
+    // }
+    // if (wristPos.right) {
+    //   p5.fill(0, 0, 255, 192);
+    //   p5.circle(wristPos.right.x, wristPos.right.y, 12);
+    // }
+  };
+
+  const drawPinch = () => {
+    p5.noStroke();
+    if (handedness === 'Left') {
+      if (indexPinch.left) p5.fill(0, 255, 0, 192);
+      else p5.fill(0, 0, 0, 128);
+      if (pinchPos.left) {
+        p5.circle(pinchPos.left.x, pinchPos.left.y, indexPinch.left ? 12 : 6);
+        if (!lockedPos && indexPinch.left) {
+          p5.stroke(255, 255, 255);
+          p5.strokeWeight(1);
+          p5.noFill();
+          p5.circle(pinchPos.left.x, pinchPos.left.y, distanceThreshold * MM_TO_INCH * worldPPI);
+        }
+      }
+    }
+
+    if (handedness === 'Right' && pinchPos.right && wristPos.right) {
+      if (indexPinch.right && !lockedPos) p5.fill(0, 255, 0, 192);
+      else if (indexPinch.right && lockedPos) {
+        const isWithinTarget = distance(wristPos.right.x, wristPos.right.y, lockedPos.x, lockedPos.y) < distanceThreshold * MM_TO_INCH * worldPPI / 2;
+        if (isWithinTarget) p5.fill(0, 255, 0, 192);
+        else p5.fill(255, 0, 0, 128);
+      }
+      else p5.fill(0, 0, 0, 128);
+      p5.circle(wristPos.right.x, wristPos.right.y, indexPinch.right ? 12 : 6);
+      if (!lockedPos && indexPinch.right) {
+        p5.stroke(255, 255, 255);
+        p5.strokeWeight(1);
+        p5.noFill();
+        p5.circle(wristPos.right.x, wristPos.right.y, distanceThreshold * MM_TO_INCH * worldPPI);
+      }
+    }
+
+    if (lockedPos) {
+      p5.stroke(255, 0, 0);
+      p5.strokeWeight(1);
+      p5.noFill();
+      p5.circle(lockedPos.x, lockedPos.y, distanceThreshold * MM_TO_INCH * worldPPI);
+    }
+  };
+
+  const drawAxis = () => {
     p5.stroke(255, 255, 255, 128);
     p5.strokeWeight(1);
     p5.line(0, -h, 0, h);
@@ -138,7 +228,11 @@ const TaskCreator = () => {
   const testbedHeight = testbedHeightMM * factor;
   const markerDiameter = markerDiameterMM * factor;
 
-  const { videoRef, loading, error, startWebcam } = useDetection(null);
+  const [isAxisVisible, setIsAxisVisible] = useState<boolean>(false);
+
+  const { videoRef, loading, error, startWebcam, startDetecting, stopDetecting, pinchDetection, wristDetection } = useDetection('WRIST AND PINCH', false);
+  const { pinchPos, indexPinch, middlePinch } = pinchDetection;
+  const { leftWrist, rightWrist } = wristDetection;
 
   const overlayRef = useRef<HTMLDivElement | null>(null);
 
@@ -150,6 +244,42 @@ const TaskCreator = () => {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
 
   const isModified = useMemo(() => tasks.length > 1 || tasks[currentIndex].markers.length > 0, [tasks, currentIndex]);
+
+  const moveTaskDistance = useMemo(() => {
+    let distance: number = 0;
+    for (let i = 1; i < tasks[currentIndex].markers.length; i++) {
+      const dx = tasks[currentIndex].markers[i].x - tasks[currentIndex].markers[i - 1].x;
+      const dy = tasks[currentIndex].markers[i].y - tasks[currentIndex].markers[i - 1].y;
+      distance += Math.sqrt(dx * dx + dy * dy);
+    }
+    return distance;
+  }, [tasks, currentIndex]);
+
+  const [lockedPos, setLockedPos] = useState<Pos | null>(null);
+
+  useEffect(() => {
+    if (tasks[currentIndex].hand === 'Left' && middlePinch.left && lockedPos === null) setLockedPos(wristDetection.leftWrist);
+    else if (tasks[currentIndex].hand === 'Right' && middlePinch.right && lockedPos === null) setLockedPos(wristDetection.rightWrist);
+    else if (tasks[currentIndex].hand === 'Left' && !middlePinch.left && lockedPos !== null) setLockedPos(null);
+    else if (tasks[currentIndex].hand === 'Right' && !middlePinch.right && lockedPos !== null) setLockedPos(null);
+  }, [lockedPos, middlePinch, tasks, wristDetection, currentIndex]);
+
+  useEffect(() => {
+    if (tasks[currentIndex].type === 'HOLD') startDetecting();
+    else stopDetecting();
+  }, [tasks, currentIndex, startDetecting, stopDetecting]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'v') {
+        setIsAxisVisible((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   const newStudyTask = () => {
     if (!isModified || window.confirm('You have unsaved changes. Do you want to discard them?')) {
@@ -187,25 +317,24 @@ const TaskCreator = () => {
     }
   };
 
-  const withinBounds = (x: number, y: number) => {
-    const clampedX = Math.max(markerDiameter / 2, Math.min(testbedWidth - markerDiameter / 2, x));
-    const clampedY = Math.max(markerDiameter / 2, Math.min(testbedHeight - markerDiameter / 2, y));
-    return { x: clampedX, y: clampedY };
-  };
-
+  /**
+   * Get mouse position in pixels relative to the center of the testbed overlay (Bottom-Right Positive Axes)
+   * @param e Mouse event
+   * @returns Object with x and y coordinates
+   */
   const getMousePos = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = (overlayRef.current as HTMLDivElement).getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    return withinBounds(x, y);
+    const x = e.clientX - rect.left - rect.width / 2;
+    const y = e.clientY - rect.top - rect.height / 2;
+    return { x, y };
   };
 
-  const findHoverIndex = (x: number, y: number) => {
+  const findHoverIndex = (pixelX: number, pixelY: number) => {
     let idx: number | null = null;
     const markers = tasks[currentIndex].markers;
     for (let i = 0; i < markers.length; i++) {
-      const dx = markers[i].x - x;
-      const dy = markers[i].y - y;
+      const dx = markers[i].x * MM_TO_INCH * worldPPI - pixelX;
+      const dy = markers[i].y * MM_TO_INCH * worldPPI - pixelY;
       const d2 = dx * dx + dy * dy;
       if (d2 <= (markerDiameter / 2 + 4) * (markerDiameter / 2 + 4)) {
         idx = i;
@@ -216,13 +345,13 @@ const TaskCreator = () => {
   };
 
   const onMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    let { x, y } = getMousePos(e);
-    x = (x - testbedWidth / 2) * INCH_TO_MM / worldPPI;
-    y = (y - testbedHeight / 2) * INCH_TO_MM / worldPPI;
+    const { x, y } = getMousePos(e);
+    const mx = (x / worldPPI) * INCH_TO_MM;
+    const my = (y / worldPPI) * INCH_TO_MM;
     if (dragIndex !== null) {
       setTasks((prev) => {
         const newTasks = [...prev];
-        newTasks[currentIndex].markers[dragIndex] = { x, y };
+        newTasks[currentIndex].markers[dragIndex] = { x: mx, y: my };
         return newTasks;
       });
       return;
@@ -231,10 +360,9 @@ const TaskCreator = () => {
   };
 
   const onMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    let { x, y } = getMousePos(e);
-    console.log(INCH_TO_MM, worldPPI, testbedWidth, x);
-    x = (x - testbedWidth / 2) * INCH_TO_MM / worldPPI;
-    y = (y - testbedHeight / 2) * INCH_TO_MM / worldPPI;
+    const { x, y } = getMousePos(e);
+    const mx = (x / worldPPI) * INCH_TO_MM;
+    const my = (y / worldPPI) * INCH_TO_MM;
     if (e.button === 0) {
       const idx = findHoverIndex(x, y);
       if (idx !== null) {
@@ -242,7 +370,7 @@ const TaskCreator = () => {
       } else {
         setTasks((prev) => {
           const newTasks = [...prev];
-          newTasks[currentIndex].markers.push({ x, y });
+          newTasks[currentIndex].markers.push({ x: mx, y: my });
           return newTasks;
         });
       }
@@ -261,8 +389,8 @@ const TaskCreator = () => {
   const onContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
     let { x, y } = getMousePos(e);
-    x = (x - testbedWidth / 2) * INCH_TO_MM / worldPPI;
-    y = (y - testbedHeight / 2) * INCH_TO_MM / worldPPI;
+    x = (x / worldPPI) * INCH_TO_MM;
+    y = (y / worldPPI) * INCH_TO_MM;
     const idx = findHoverIndex(x, y);
     if (idx !== null) {
       setTasks((prev) => {
@@ -327,7 +455,7 @@ const TaskCreator = () => {
         {/* Create Study Task Top Bar */}
         <div className="w-full bg-gray-200 rounded-lg shadow flex items-center justify-between px-2 py-2">
           <div className="flex items-center px-1 gap-2">
-            <span className="text-xl font-semibold">Create Study Tasks</span>
+            <span className="text-xl font-semibold">Study Task Designer</span>
           </div>
           <div className="flex flex-row gap-2">
             <input
@@ -365,7 +493,7 @@ const TaskCreator = () => {
         </div>
 
         {/* Task Bar */}
-        <div className="flex flex-col bg-white rounded-lg shadow gap-3 border border-gray-100 ">
+        <div className="flex flex-col bg-white rounded-lg shadow border border-gray-100 ">
           {/* Task Navigator */}
           <div className="flex flex-row w-full justify-between items-center border-b border-gray-100 p-2 bg-gray-100">
             <button
@@ -431,8 +559,7 @@ const TaskCreator = () => {
           </div>
 
           {/* Task Form */}
-          <div className="bg-white px-4 pb-3 flex flex-row gap-2 overflow-auto">
-
+          <div className="px-4 flex flex-row gap-2 overflow-auto bg-white p-2">
             <div className="flex flex-col items-center justify-between">
               <label className="text-sm font-bold text-gray-600">Hand</label>
               <select
@@ -447,24 +574,6 @@ const TaskCreator = () => {
                 <option value="Left">Left</option>
                 <option value="Right">Right</option>
               </select>
-            </div>
-            <div className="flex flex-col items-center justify-between">
-              <label className="text-sm font-bold text-gray-600">Trials</label>
-              <input
-                className="w-16 px-2 py-1 rounded border border-gray-300 text-center"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                value={String(tasks[currentIndex].trials)}
-                onChange={(e) => {
-                  const v = e.target.value.replace(/[^0-9]/g, '');
-                  const n = v === '' ? 0 : Number(v);
-                  setTasks((prev) => {
-                    const newTasks = [...prev];
-                    newTasks[currentIndex].trials = n;
-                    return newTasks;
-                  });
-                }}
-              />
             </div>
             <div className="flex flex-col items-center justify-between">
               <label className="text-sm font-bold text-gray-600">Reps</label>
@@ -484,34 +593,92 @@ const TaskCreator = () => {
                 }}
               />
             </div>
-            
             <div className="flex flex-col items-center justify-between">
-              <label className="text-sm text-gray-600 font-bold">Task Type</label>
-              <select
-                className="cursor-not-allowed text-center w-24 px-2 py-1 rounded border border-gray-300 bg-gray-200 text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                value="move"
-                disabled
-              >
-                <option value="move">Move</option>
-                <option value="hold">Hold</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col items-center justify-between">
-              <label className="text-sm text-gray-600 font-bold">Move Threshold</label>
-              <span className="text-xs text-gray-400">{tasks[currentIndex].moveThreshold} mm (@ 5ft away)</span>
+              <label className="text-sm font-bold text-gray-600">Trials</label>
               <input
-                type="range"
-                min={25}
-                max={150}
-                step={1}
-                value={tasks[currentIndex].moveThreshold}
+                className="w-16 px-2 py-1 rounded border border-gray-300 text-center"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={String(tasks[currentIndex].trials)}
                 onChange={(e) => {
-                  const newTasks = [...tasks];
-                  newTasks[currentIndex].moveThreshold = Number(e.target.value);
-                  setTasks(newTasks);
+                  const v = e.target.value.replace(/[^0-9]/g, '');
+                  const n = v === '' ? 0 : Number(v);
+                  setTasks((prev) => {
+                    const newTasks = [...prev];
+                    newTasks[currentIndex].trials = n;
+                    return newTasks;
+                  });
                 }}
               />
+            </div>
+
+            <div className="w-px bg-gray-300 mx-2" />
+
+            <div className="flex flex-row grow justify-between gap-4">
+              <div className="flex flex-col items-center justify-between">
+                <label className="text-sm text-gray-600 font-bold">Task Type</label>
+                <select
+                  className="text-center w-24 px-2 py-1 rounded border border-gray-300"
+                  value={tasks[currentIndex].type}
+                  onChange={(e) => {
+                    const newTasks = [...tasks];
+                    newTasks[currentIndex].type = e.target.value as 'MOVE' | 'HOLD';
+                    newTasks[currentIndex].holdDuration = config.defaultHoldDuration;
+                    newTasks[currentIndex].distanceThreshold = config.defaultDistanceThreshold;
+                    newTasks[currentIndex].markers = [];
+                    setTasks(newTasks);
+                  }}
+                >
+                  <option value="MOVE">Move</option>
+                  <option value="HOLD">Hold</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col grow items-center justify-between">
+                <label className="text-sm text-gray-600 font-bold">Distance Threshold</label>
+                <span className="text-xs text-gray-400">{tasks[currentIndex].distanceThreshold} mm (@ 5ft away)</span>
+                <input
+                  className="w-full"
+                  type="range"
+                  min={25}
+                  max={150}
+                  step={1}
+                  value={tasks[currentIndex].distanceThreshold}
+                  onChange={(e) => {
+                    const newTasks = [...tasks];
+                    newTasks[currentIndex].distanceThreshold = Number(e.target.value);
+                    setTasks(newTasks);
+                  }}
+                />
+              </div>
+
+              {tasks[currentIndex].type === 'HOLD' ? (
+                <div className="flex flex-col grow items-center justify-between">
+                  <label className="text-sm text-gray-600 font-bold">Hold Duration</label>
+                  <span className="text-xs text-gray-400">{tasks[currentIndex].holdDuration / 1000} s</span>
+                  <input
+                    className="w-full"
+                    type="range"
+                    min={1}
+                    max={10}
+                    step={1}
+                    value={tasks[currentIndex].holdDuration / 1000}
+                    onChange={(e) => {
+                      const newTasks = [...tasks];
+                      newTasks[currentIndex].holdDuration = Number(e.target.value) * 1000;
+                      setTasks(newTasks);
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="flex flex-col grow items-center justify-between">
+                  <label className="text-sm text-gray-600 font-bold">Movement Details</label>
+                  <span className="text-xs text-gray-400">
+                    {tasks[currentIndex].markers.length} markers | {(moveTaskDistance / 10).toFixed(1)} cm
+                  </span>
+                  <span className="w-full text-center text-xs text-gray-800">{Math.round((moveTaskDistance / 10) * tasks[currentIndex].repetitions)} cm per Trial</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -524,12 +691,12 @@ const TaskCreator = () => {
           <div
             ref={overlayRef}
             className="absolute inset-0"
-            onMouseMove={onMouseMove}
-            onMouseDown={onMouseDown}
-            onMouseUp={onMouseUp}
-            onMouseLeave={onMouseLeave}
-            onContextMenu={onContextMenu}
-            style={{ cursor: hoverIndex !== null ? 'pointer' : 'crosshair' }}
+            onMouseMove={tasks[currentIndex].type === 'MOVE' ? onMouseMove : undefined}
+            onMouseDown={tasks[currentIndex].type === 'MOVE' ? onMouseDown : undefined}
+            onMouseUp={tasks[currentIndex].type === 'MOVE' ? onMouseUp : undefined}
+            onMouseLeave={tasks[currentIndex].type === 'MOVE' ? onMouseLeave : undefined}
+            onContextMenu={tasks[currentIndex].type === 'MOVE' ? onContextMenu : undefined}
+            style={{ cursor: tasks[currentIndex].type === 'MOVE' ? (hoverIndex !== null ? 'pointer' : 'crosshair') : 'default' }}
           >
             {!loading && !error && <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />}
             <div className="absolute inset-0">
@@ -537,20 +704,30 @@ const TaskCreator = () => {
                 sketch={sketch}
                 frameWidth={testbedWidth}
                 frameHeight={testbedHeight}
-                moveThreshold={tasks[currentIndex].moveThreshold}
+                distanceThreshold={tasks[currentIndex].distanceThreshold}
                 worldPPI={worldPPI}
                 markers={tasks[currentIndex].markers}
                 markerDiameter={markerDiameter}
+                isAxisVisible={isAxisVisible}
+                handedness={tasks[currentIndex].hand}
+                pinchPos={pinchPos}
+                indexPinch={indexPinch}
+                lockedPos={lockedPos}
+                wristPos={{ left: leftWrist, right: rightWrist }}
               />
             </div>
           </div>
         </div>
 
         {/* Task Instructions */}
-        <span className="text-center text-sm text-gray-400 pt-2">
-          <span className="bg-gray-200 font-bold rounded p-1">Left Click</span> to Place Marker • <span className="bg-gray-200 font-bold rounded p-1">Right Click</span> to Delete
-          Marker • <span className="bg-gray-200 font-bold rounded p-1">Left Click + Drag</span> to Reposition Marker
-        </span>
+        {tasks[currentIndex].type === 'MOVE' ? (
+          <span className="text-center text-sm text-gray-400 pt-2">
+            <span className="bg-gray-200 font-bold rounded p-1">Left Click</span> to Place Marker • <span className="bg-gray-200 font-bold rounded p-1">Right Click</span> to Delete
+            Marker • <span className="bg-gray-200 font-bold rounded p-1">Left Click + Drag</span> to Reposition Marker
+          </span>
+        ) : (
+          <span className="text-center text-sm text-gray-400 pt-2">•••</span>
+        )}
         <span className="text-center text-sm text-gray-400 pt-2">
           Press <span className="bg-gray-200 font-bold rounded p-1">v</span> to Toggle Axis Visualization
         </span>

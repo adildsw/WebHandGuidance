@@ -3,7 +3,21 @@ import { useConfig } from '../utils/context';
 import { defaultConfig } from '../utils/constants';
 
 const Config = () => {
-  const { config, setDevicePPI, setWorldPPI, setMarkerDiameter, setTestbedWidth, setTestbedHeight, setDefaultHand, setDefaultTrials, setDefaultRepetitions, setDefaultMoveThreshold } = useConfig();
+  const {
+    config,
+    setDevicePPI,
+    setWorldPPI,
+    setMarkerDiameter,
+    setTestbedWidth,
+    setTestbedHeight,
+    setDefaultHand,
+    setDefaultTrials,
+    setDefaultRepetitions,
+    setDefaultDistanceThreshold,
+    setDefaultTaskType,
+    setDefaultHoldDuration,
+    setDefaultStartDuration
+  } = useConfig();
 
   const toNumber = useCallback((s: string) => {
     const v = s.replace(/[^0-9.]/g, '');
@@ -24,23 +38,27 @@ const Config = () => {
       setDefaultHand(defaultConfig.defaultHand);
       setDefaultTrials(defaultConfig.defaultTrials);
       setDefaultRepetitions(defaultConfig.defaultRepetitions);
-      setDefaultMoveThreshold(defaultConfig.defaultMoveThreshold);
+      setDefaultDistanceThreshold(defaultConfig.defaultDistanceThreshold);
+      setDefaultTaskType(defaultConfig.defaultTaskType);
+      setDefaultStartDuration(defaultConfig.defaultStartDuration);
+      setDefaultHoldDuration(defaultConfig.defaultHoldDuration);
     }
   };
 
   return (
     <div className="w-screen h-screen flex items-center justify-center select-none">
-      <div className="w-[360px] md:w-[420px] bg-white rounded-2xl shadow border border-gray-200 p-6 flex flex-col items-center gap-6">
+      <div className="w-[360px] md:w-[420px] bg-white rounded-2xl shadow border border-gray-200 p-4 flex flex-col items-center gap-4">
         <h1 className="text-2xl font-bold text-gray-900">Configurations</h1>
 
-        <div className="w-full flex flex-col gap-5">
+        <div className="w-full border border-gray-100 rounded-xl bg-gray-50 p-2 max-h-[90vh] overflow-auto flex flex-col gap-4">
+          
 
-          <div>
-            <div className="text-sm font-bold text-gray-600 mb-3">Calibation Parameters</div>
-            <div className="flex items-center justify-between mb-2">
+          <div className="flex flex-col gap-2">
+            <div className="text-sm font-bold text-gray-600 mb-1">Calibation Parameters</div>
+            <div className="flex items-center justify-between">
               <label className="text-sm text-gray-600">Display PPI</label>
               <input
-                className="w-28 px-2 py-1 text-center rounded border border-gray-300"
+                className="w-28 px-2 py-1 text-center rounded border border-gray-300 bg-white"
                 inputMode="decimal"
                 pattern="[0-9.]*"
                 value={String(config.devicePPI)}
@@ -48,10 +66,10 @@ const Config = () => {
               />
             </div>
 
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between">
               <label className="text-sm text-gray-600">World PPI (at 5 feet distance)</label>
               <input
-                className="w-28 px-2 py-1 text-center rounded border border-gray-300"
+                className="w-28 px-2 py-1 text-center rounded border border-gray-300 bg-white"
                 inputMode="decimal"
                 pattern="[0-9.]*"
                 value={String(config.worldPPI)}
@@ -60,12 +78,12 @@ const Config = () => {
             </div>
           </div>
 
-          <div>
-            <div className="text-sm font-bold text-gray-600 mb-3">Testbed Parameters</div>
-            <div className="flex items-center justify-between mb-2">
+          <div className="flex flex-col gap-2">
+            <div className="text-sm font-bold text-gray-600 mb-1">Testbed Parameters</div>
+            <div className="flex items-center justify-between">
               <label className="text-sm text-gray-600">Testbed Width (mm)</label>
               <input
-                className="w-28 px-2 py-1 text-center rounded border border-gray-300"
+                className="w-28 px-2 py-1 text-center rounded border border-gray-300 bg-white"
                 inputMode="decimal"
                 pattern="[0-9.]*"
                 value={String(config.testbedWidthMM)}
@@ -73,10 +91,10 @@ const Config = () => {
               />
             </div>
 
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between">
               <label className="text-sm text-gray-600">Testbed Height (mm)</label>
               <input
-                className="w-28 px-2 py-1 text-center rounded border border-gray-300"
+                className="w-28 px-2 py-1 text-center rounded border border-gray-300 bg-white"
                 inputMode="decimal"
                 pattern="[0-9.]*"
                 value={String(config.testbedHeightMM)}
@@ -87,7 +105,7 @@ const Config = () => {
             <div className="flex items-center justify-between">
               <label className="text-sm text-gray-600">Marker Diameter (mm)</label>
               <input
-                className="w-28 px-2 py-1 text-center rounded border border-gray-300"
+                className="w-28 px-2 py-1 text-center rounded border border-gray-300 bg-white"
                 inputMode="decimal"
                 pattern="[0-9.]*"
                 value={String(config.markerDiameterMM)}
@@ -96,21 +114,39 @@ const Config = () => {
             </div>
           </div>
 
-          <div>
-            <div className="text-sm font-bold text-gray-600 mb-3">Default Parameters</div>
+          <div className="flex flex-col gap-2">
+            <div className="text-sm font-bold text-gray-600 mb-1">Interaction Parameters</div>
+            <div className="flex items-center justify-between">
+              <label className="text-sm text-gray-600">Pinch Activate Duration (s)</label>
+              <input
+                className="w-28 px-2 py-1 text-center rounded border border-gray-300 bg-white"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={String(config.defaultStartDuration / 1000)}
+                onChange={(e) => setDefaultStartDuration(toNumber(e.target.value) * 1000)}
+              />
+            </div>
+          </div>
 
-            <div className="flex items-center justify-between mb-2">
+          <div className="flex flex-col gap-2">
+            <div className="text-sm font-bold text-gray-600 mb-1">Default Parameters</div>
+
+            <div className="flex items-center justify-between">
               <label className="text-sm text-gray-600">Hand</label>
-              <select className="w-28 px-2 py-1 rounded border border-gray-300" value={config.defaultHand} onChange={(e) => setDefaultHand(e.target.value as 'Left' | 'Right')}>
+              <select
+                className="w-28 px-2 py-1 rounded border border-gray-300 bg-white"
+                value={config.defaultHand}
+                onChange={(e) => setDefaultHand(e.target.value as 'Left' | 'Right')}
+              >
                 <option value="Right">Right</option>
                 <option value="Left">Left</option>
               </select>
             </div>
 
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between">
               <label className="text-sm text-gray-600">Trials</label>
               <input
-                className="w-28 px-2 py-1 text-center rounded border border-gray-300"
+                className="w-28 px-2 py-1 text-center rounded border border-gray-300 bg-white"
                 inputMode="numeric"
                 pattern="[0-9]*"
                 value={String(config.defaultTrials)}
@@ -118,10 +154,10 @@ const Config = () => {
               />
             </div>
 
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between">
               <label className="text-sm text-gray-600">Repetitions</label>
               <input
-                className="w-28 px-2 py-1 text-center rounded border border-gray-300"
+                className="w-28 px-2 py-1 text-center rounded border border-gray-300 bg-white"
                 inputMode="numeric"
                 pattern="[0-9]*"
                 value={String(config.defaultRepetitions)}
@@ -130,13 +166,24 @@ const Config = () => {
             </div>
 
             <div className="flex items-center justify-between">
-              <label className="text-sm text-gray-600">Move Threshold (mm)</label>
+              <label className="text-sm text-gray-600">Distance Threshold (mm)</label>
               <input
-                className="w-28 px-2 py-1 text-center rounded border border-gray-300"
+                className="w-28 px-2 py-1 text-center rounded border border-gray-300 bg-white"
                 inputMode="numeric"
                 pattern="[0-9]*"
-                value={String(config.defaultMoveThreshold)}
-                onChange={(e) => setDefaultMoveThreshold(toNumber(e.target.value))}
+                value={String(config.defaultDistanceThreshold)}
+                onChange={(e) => setDefaultDistanceThreshold(toNumber(e.target.value))}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <label className="text-sm text-gray-600">Hold Duration (s)</label>
+              <input
+                className="w-28 px-2 py-1 text-center rounded border border-gray-300 bg-white"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={String(config.defaultHoldDuration / 1000)}
+                onChange={(e) => setDefaultHoldDuration(toNumber(e.target.value) * 1000)}
               />
             </div>
           </div>
@@ -147,7 +194,10 @@ const Config = () => {
             Reset to Default
           </button>
 
-          <button onClick={goHome} className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-gray-100 text-gray-900 hover:bg-gray-800 hover:text-white font-bold cursor-pointer">
+          <button
+            onClick={goHome}
+            className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-gray-100 text-gray-900 hover:bg-gray-800 hover:text-white font-bold cursor-pointer"
+          >
             Done
           </button>
         </div>

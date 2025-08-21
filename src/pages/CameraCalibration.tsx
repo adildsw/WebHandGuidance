@@ -1,11 +1,11 @@
 import { ReactP5Wrapper } from '@p5-wrapper/react';
 import type { Sketch } from '@p5-wrapper/react';
 import { useConfig } from '../utils/context';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import font from '../assets/sf-ui-display-bold.otf';
 import p5 from 'p5';
-import { defaultFingerTips, LETTER_HEIGHT_INCH, MM_TO_INCH } from '../utils/constants';
+import { LETTER_HEIGHT_INCH, MM_TO_INCH } from '../utils/constants';
 import { distance } from '../utils/math';
 import useDetection from '../hooks/useMediaPipeHandDetection';
 import type { Pos } from '../types/task';
@@ -58,12 +58,9 @@ const sketch: Sketch = (p5) => {
     p5.noStroke();
     p5.fill(0, 0, 0, 128);
 
-    const fps = p5.frameRate();
-    console.log("Current FPS:", fps);
-
     if (pinchReady.left) p5.fill(0, 255, 0, 192);
     else p5.fill(0, 0, 0, 128);
-    if (pinchPos.left) p5.circle(pinchPos.left.x, pinchPos.left.y, pinchReady.right ? 12 : 6);
+    if (pinchPos.left) p5.circle(pinchPos.left.x, pinchPos.left.y, pinchReady.left ? 12 : 6);
 
     if (pinchReady.right) p5.fill(0, 255, 0, 192);
     else p5.fill(0, 0, 0, 128);
@@ -107,40 +104,19 @@ const CameraCalibration = () => {
   const testbedWidth = testbedWidthMM * MM_TO_INCH * factor;
   const testbedHeight = testbedHeightMM * MM_TO_INCH * factor;
 
-  const { videoRef, fingerDetection, loading, error, startWebcam } = useDetection('FINGERTIP');
-  const leftFingers = fingerDetection?.leftFingerTips || defaultFingerTips;
-  const rightFingers = fingerDetection?.rightFingerTips || defaultFingerTips;
-  const [pinchReady, setPinchReady] = useState({ left: false, right: false });
-  const [calibrationReady, setCalibrationReady] = useState({ left: false, right: false });
+  const { videoRef, pinchDetection, loading, error, startWebcam } = useDetection('PINCH', true);
   const [calibrationStartTime, setCalibrationStartTime] = useState<number | null>(null);
   const [isCalibrated, setIsCalibrated] = useState(false);
   const timerRef = useRef<number | null>(null);
 
   const overlayRef = useRef<HTMLDivElement | null>(null);
 
-  const PINCH_THRESHOLD = 0.25;
-  const CALIBRATION_THRESHOLD = 0.3;
-  const CALIBRATION_TIMER = 5000;
-
-  const pinchPos: { left: Pos | null; right: Pos | null } = useMemo(() => {
-    const left =
-      leftFingers.index && leftFingers.thumb
-        ? {
-            x: (leftFingers.index.x + leftFingers.thumb.x) / 2,
-            y: (leftFingers.index.y + leftFingers.thumb.y) / 2,
-          }
-        : null;
-    const right =
-      rightFingers.index && rightFingers.thumb
-        ? {
-            x: (rightFingers.index.x + rightFingers.thumb.x) / 2,
-            y: (rightFingers.index.y + rightFingers.thumb.y) / 2,
-          }
-        : null;
-    return { left, right };
-  }, [leftFingers, rightFingers]);
-
+  const pinchPos = pinchDetection.pinchPos;
   const latestPinchPos = useRef(pinchPos);
+
+  const pinchReady = pinchDetection.indexPinch;
+  const calibrationReady = pinchDetection.middlePinch;
+  const CALIBRATION_TIMER = config.defaultStartDuration;
 
   useEffect(() => {
     latestPinchPos.current = pinchPos;
@@ -152,38 +128,6 @@ const CameraCalibration = () => {
     const elapsed = Date.now() - calibrationStartTime;
     return Math.min(elapsed / CALIBRATION_TIMER, 1);
   })();
-
-  useEffect(() => {
-    let litDist = null;
-    let ritDist = null;
-    let lmtDist = null;
-    let rmtDist = null;
-
-    if (leftFingers.index && leftFingers.thumb) {
-      litDist = distance(leftFingers.index.x, leftFingers.index.y, leftFingers.thumb.x, leftFingers.thumb.y) / factor;
-    }
-    if (rightFingers.index && rightFingers.thumb) {
-      ritDist = distance(rightFingers.index.x, rightFingers.index.y, rightFingers.thumb.x, rightFingers.thumb.y) / factor;
-    }
-    if (leftFingers.middle && leftFingers.thumb) {
-      lmtDist = distance(leftFingers.middle.x, leftFingers.middle.y, leftFingers.thumb.x, leftFingers.thumb.y) / factor;
-    }
-    if (rightFingers.middle && rightFingers.thumb) {
-      rmtDist = distance(rightFingers.middle.x, rightFingers.middle.y, rightFingers.thumb.x, rightFingers.thumb.y) / factor;
-    }
-
-    const pinch = {
-      left: litDist && litDist < PINCH_THRESHOLD ? true : false,
-      right: ritDist && ritDist < PINCH_THRESHOLD ? true : false,
-    };
-    setPinchReady(pinch);
-
-    const cal = {
-      left: lmtDist && lmtDist < CALIBRATION_THRESHOLD ? true : false,
-      right: rmtDist && rmtDist < CALIBRATION_THRESHOLD ? true : false,
-    };
-    setCalibrationReady(cal);
-  }, [leftFingers, rightFingers, factor]);
 
   useEffect(() => {
     const ready = calibrationReady.left && calibrationReady.right && pinchReady.left && pinchReady.right;
