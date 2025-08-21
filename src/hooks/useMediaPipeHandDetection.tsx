@@ -12,7 +12,7 @@ import { useConfig } from '../utils/context';
 // | MODEL INITIALIZATIONS
 // |-------------------------
 const initHandDetector = async () => {
-  const vision = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm');
+  const vision = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm');
   const handDetector = await HandLandmarker.createFromOptions(vision, {
     baseOptions: {
       modelAssetPath: './hand_landmarker.task',

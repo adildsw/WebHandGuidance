@@ -232,8 +232,6 @@ const TaskCreator = () => {
 
   const onMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     let { x, y } = getMousePos(e);
-    // x = x - testbedWidth / 2;
-    // y = y - testbedHeight / 2;
     console.log(INCH_TO_MM, worldPPI, testbedWidth, x);
     x = (x - testbedWidth / 2) * INCH_TO_MM / worldPPI;
     y = (y - testbedHeight / 2) * INCH_TO_MM / worldPPI;
@@ -263,8 +261,6 @@ const TaskCreator = () => {
   const onContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
     let { x, y } = getMousePos(e);
-    // x = x - testbedWidth / 2;
-    // y = y - testbedHeight / 2;
     x = (x - testbedWidth / 2) * INCH_TO_MM / worldPPI;
     y = (y - testbedHeight / 2) * INCH_TO_MM / worldPPI;
     const idx = findHoverIndex(x, y);
@@ -381,8 +377,19 @@ const TaskCreator = () => {
             >
               <FontAwesomeIcon icon="chevron-left" />
             </button>
+
             <span className="font-bold">Task #{currentIndex + 1}</span>
+
             <div className="flex flex-row gap-2 items-center">
+              <input
+                className=" rounded border border-gray-300 px-1 py-1 ml-2 text-sm italic shrink-1"
+                value={tasks[currentIndex].tag}
+                onChange={(e) => {
+                  const newTasks = [...tasks];
+                  newTasks[currentIndex].tag = e.target.value;
+                  setTasks(newTasks);
+                }}
+              />
               <button
                 className={'px-2 py-2 rounded text-xs border border-gray-200 items-center flex gap-1 font-bold cursor-pointer hover:bg-gray-200'}
                 onClick={resetTask}
@@ -424,25 +431,8 @@ const TaskCreator = () => {
           </div>
 
           {/* Task Form */}
-          <div className="bg-white px-4 flex flex-row gap-2 overflow-auto">
-            {/* <div className="flex flex-row items-center justify-center w-full gap-2">
-              <label className="text-xl font-bold text-gray-600">Task Configuration</label>
-            </div>
+          <div className="bg-white px-4 pb-3 flex flex-row gap-2 overflow-auto">
 
-            <div className="border-l border-gray-200 h-full mx-2" /> */}
-
-            <div className="flex flex-col grow items-center justify-between">
-              <label className="text-sm font-bold text-gray-600">Tag</label>
-              <input
-                className="grow px-2 py-1 text-center rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                value={tasks[currentIndex].tag}
-                onChange={(e) => {
-                  const newTasks = [...tasks];
-                  newTasks[currentIndex].tag = e.target.value;
-                  setTasks(newTasks);
-                }}
-              />
-            </div>
             <div className="flex flex-col items-center justify-between">
               <label className="text-sm font-bold text-gray-600">Hand</label>
               <select
@@ -494,10 +484,7 @@ const TaskCreator = () => {
                 }}
               />
             </div>
-          </div>
-
-          {/* Task Form */}
-          <div className="bg-white  p-4 pt-0 flex flex-row gap-3 justify-between overflow-auto border-t border-gray-200">
+            
             <div className="flex flex-col items-center justify-between">
               <label className="text-sm text-gray-600 font-bold">Task Type</label>
               <select
@@ -563,6 +550,9 @@ const TaskCreator = () => {
         <span className="text-center text-sm text-gray-400 pt-2">
           <span className="bg-gray-200 font-bold rounded p-1">Left Click</span> to Place Marker • <span className="bg-gray-200 font-bold rounded p-1">Right Click</span> to Delete
           Marker • <span className="bg-gray-200 font-bold rounded p-1">Left Click + Drag</span> to Reposition Marker
+        </span>
+        <span className="text-center text-sm text-gray-400 pt-2">
+          Press <span className="bg-gray-200 font-bold rounded p-1">v</span> to Toggle Axis Visualization
         </span>
       </div>
     </div>

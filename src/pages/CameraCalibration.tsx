@@ -55,13 +55,11 @@ const sketch: Sketch = (p5) => {
   p5.draw = () => {
     p5.clear();
 
-    // p5.fill(250, 250, 250, 96);
-    // p5.stroke(200);
-    // p5.strokeWeight(1);
-    // p5.rect(-width / 2, -height / 2, width, height, 8);
-
     p5.noStroke();
     p5.fill(0, 0, 0, 128);
+
+    const fps = p5.frameRate();
+    console.log("Current FPS:", fps);
 
     if (pinchReady.left) p5.fill(0, 255, 0, 192);
     else p5.fill(0, 0, 0, 128);
@@ -87,7 +85,7 @@ const sketch: Sketch = (p5) => {
       p5.text(dist.toFixed(2) + ' px', (pinchPos.left.x + pinchPos.right.x) / 2, (pinchPos.left.y + pinchPos.right.y) / 2);
 
       p5.fill(0, 0, 0, 128);
-      // p5.textStyle(p5.BOLD);
+      p5.textStyle(p5.BOLD);
       p5.textAlign(p5.CENTER, p5.TOP);
       p5.text(LETTER_HEIGHT_INCH + ' inches', (pinchPos.left.x + pinchPos.right.x) / 2, (pinchPos.left.y + pinchPos.right.y) / 2);
 

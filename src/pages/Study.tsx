@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ReactP5Wrapper } from '@p5-wrapper/react';
 import type { Sketch } from '@p5-wrapper/react';
 import font from '../assets/sf-ui-display-bold.otf';
@@ -7,21 +7,20 @@ import { useConfig } from '../utils/context';
 import { MM_TO_INCH } from '../utils/constants';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import type { Font } from 'p5';
-import { FilesetResolver, PoseLandmarker } from '@mediapipe/tasks-vision';
 import { uid } from 'uid/single';
-import { mapVideoToTestbed } from '../utils/math';
+import useDetection from '../hooks/useMediaPipeHandDetection';
 
 const sketch: Sketch = (p5) => {
-  let w = 400,
-    h = 300;
-  let devicePPI = 96,
-    devicePixelRatio = 1,
-    markerDiameter = 10,
-    moveThreshold = 15;
+  let w = 400;
+  let h = 300;
+  let markerDiameter = 10;
+  let moveThreshold = 15;
   let worldPPI = 24;
   let pts: Pos[] = [];
+
   let leftWrist: { x: number; y: number } | null = null;
   let rightWrist: { x: number; y: number } | null = null;
+
   let f: Font;
 
   p5.preload = () => {
@@ -34,12 +33,19 @@ const sketch: Sketch = (p5) => {
     p5.drawingContext.antialias = true;
   };
 
-  p5.updateWithProps = (props: any) => {
+  p5.updateWithProps = (props: {
+    frameWidth?: number;
+    frameHeight?: number;
+    moveThreshold?: number;
+    markerDiameter?: number;
+    worldPPI?: number;
+    markers?: Pos[];
+    leftWrist?: Pos | null;
+    rightWrist?: Pos | null;
+  }) => {
     if (typeof props.frameWidth === 'number') w = props.frameWidth;
     if (typeof props.frameHeight === 'number') h = props.frameHeight;
-    if (typeof props.devicePPI === 'number') devicePPI = props.devicePPI;
     if (typeof props.moveThreshold === 'number') moveThreshold = props.moveThreshold;
-    if (typeof props.devicePixelRatio === 'number') devicePixelRatio = props.devicePixelRatio;
     if (typeof props.markerDiameter === 'number') markerDiameter = props.markerDiameter;
     if (Array.isArray(props.markers)) pts = props.markers;
     if (typeof props.worldPPI === 'number') worldPPI = props.worldPPI;
@@ -57,10 +63,6 @@ const sketch: Sketch = (p5) => {
     p5.stroke(255);
     p5.strokeWeight(2);
     for (let i = 1; i < pts.length; i++) {
-      // const px = pts[i - 1].x - w / 2,
-      //   py = pts[i - 1].y - h / 2;
-      // const cx = pts[i].x - w / 2,
-      //   cy = pts[i].y - h / 2;
       const px = pts[i - 1].x * MM_TO_INCH * worldPPI;
       const py = pts[i - 1].y * MM_TO_INCH * worldPPI;
       const cx = pts[i].x * MM_TO_INCH * worldPPI;
@@ -105,10 +107,13 @@ const Study = () => {
   const testbedHeight = testbedHeightMM * factor;
   const markerDiameter = markerDiameterMM * factor;
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-
-  const [wrists, setWrists] = useState<{ left: { x: number; y: number } | null; right: { x: number; y: number } | null }>({ left: null, right: null });
+  const { videoRef, error, loading, wristDetection, startWebcam } = useDetection('WRIST');
+  const wrists = useMemo(() => {
+    return {
+      left: wristDetection?.leftWrist,
+      right: wristDetection?.rightWrist,
+    }
+  }, [wristDetection]);
 
   const [participantId, setParticipantId] = useState<string>('');
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -140,106 +145,9 @@ const Study = () => {
   }, []);
 
   useEffect(() => {
-    let stream: MediaStream | null = null;
-    let pose: PoseLandmarker | null = null;
-    let raf: number | null = null;
-    const videoElement = videoRef.current;
+    startWebcam();
+  }, [startWebcam]);
 
-    const init = async () => {
-      const vision = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm');
-      pose = await PoseLandmarker.createFromOptions(vision, {
-        baseOptions: {
-          modelAssetPath: './pose_landmarker_lite.task',
-        },
-        runningMode: 'VIDEO',
-        numPoses: 1,
-        minPoseDetectionConfidence: 0.5,
-        minPosePresenceConfidence: 0.5,
-        minTrackingConfidence: 0.5,
-      });
-
-      const v = videoRef.current;
-      if (!v) return;
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user' },
-        audio: false,
-      });
-      v.srcObject = stream;
-      await new Promise<void>((r) => {
-        v.onloadedmetadata = () => r();
-      });
-      await v.play().catch(() => {});
-
-      const loop = () => {
-        if (!pose || !v || v.readyState < 2) {
-          raf = requestAnimationFrame(loop);
-          return;
-        }
-        const res = pose.detectForVideo(v, performance.now());
-        const lm = res.landmarks?.[0] || [];
-        if (lm.length >= 17) {
-          const R = lm[15];
-          const L = lm[16];
-          if (L) L.x = 1 - L.x;
-          if (R) R.x = 1 - R.x;
-          const vw = v.videoWidth;
-          const vh = v.videoHeight;
-          let lp = L ? mapVideoToTestbed(L.x * vw, L.y * vh, vw, vh, testbedWidth, testbedHeight) : null;
-          let rp = R ? mapVideoToTestbed(R.x * vw, R.y * vh, vw, vh, testbedWidth, testbedHeight) : null;
-          if (!L?.visibility || L.visibility < 0.8) lp = null;
-          if (!R?.visibility || R.visibility < 0.8) rp = null;
-          setWrists({ left: lp, right: rp });
-        }
-        raf = requestAnimationFrame(loop);
-      };
-      loop();
-    };
-
-    init();
-
-    return () => {
-      if (raf) cancelAnimationFrame(raf);
-      pose?.close();
-      pose = null;
-      const s = (videoElement?.srcObject as MediaStream) || null;
-      if (s) s.getTracks().forEach((t) => t.stop());
-      if (videoElement) videoElement.srcObject = null;
-    };
-  }, [testbedHeight, testbedWidth]);
-
-  const startStream = async () => {
-    if (streamRef.current) return;
-    const v = videoRef.current;
-    if (!v) return;
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
-    v.muted = true;
-    v.playsInline = true;
-    v.srcObject = stream;
-    v.style.transform = 'scaleX(-1)';
-    await new Promise<void>((r) => (v.readyState >= 1 ? r() : v.addEventListener('loadedmetadata', () => r(), { once: true })));
-    try {
-      await v.play();
-    } catch {
-      await new Promise((r) => setTimeout(r, 0));
-      await v.play();
-    }
-    streamRef.current = stream;
-  };
-
-  const stopStream = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-    if (videoRef.current) videoRef.current.srcObject = null;
-  };
-
-  useEffect(() => {
-    startStream();
-    return () => {
-      stopStream();
-    };
-  }, []);
 
   const goHome = () => {
     window.location.hash = '#/';
@@ -308,7 +216,7 @@ const Study = () => {
           className="md:col-span-3 rounded-lg shadow-lg bg-gray-100 overflow-hidden flex items-center justify-center relative"
           style={{ width: `${testbedWidth}px`, height: `${testbedHeight}px` }}
         >
-          <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" />
+          {!error && !loading && <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />}
           <div className="absolute inset-0">
             <ReactP5Wrapper
               sketch={sketch}
