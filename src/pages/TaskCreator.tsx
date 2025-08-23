@@ -72,6 +72,14 @@ const sketch: Sketch = (p5) => {
 
   p5.draw = () => {
     p5.clear();
+
+    if (axis) drawAxis();
+    
+    drawMarkers();
+    drawPinch();
+  };
+
+  const drawMarkers = () => {
     p5.noFill();
     p5.stroke(255);
     p5.strokeWeight(2);
@@ -112,35 +120,10 @@ const sketch: Sketch = (p5) => {
       p5.textSize(10);
       p5.text(`(${(pts[i].x / 10).toFixed(1)}, ${(pts[i].y / 10).toFixed(1)})`, cx, cy + markerDiameter);
     }
-
-    if (axis) drawAxis();
-    drawPinch();
-
-    // if (wristPos.left) {
-    //   p5.fill(0, 0, 255, 192);
-    //   p5.circle(wristPos.left.x, wristPos.left.y, 12);
-    // }
-    // if (wristPos.right) {
-    //   p5.fill(0, 0, 255, 192);
-    //   p5.circle(wristPos.right.x, wristPos.right.y, 12);
-    // }
-  };
+  }
 
   const drawPinch = () => {
     p5.noStroke();
-    if (handedness === 'Left') {
-      if (indexPinch.left) p5.fill(0, 255, 0, 192);
-      else p5.fill(0, 0, 0, 128);
-      if (pinchPos.left) {
-        p5.circle(pinchPos.left.x, pinchPos.left.y, indexPinch.left ? 12 : 6);
-        if (!lockedPos && indexPinch.left) {
-          p5.stroke(255, 255, 255);
-          p5.strokeWeight(1);
-          p5.noFill();
-          p5.circle(pinchPos.left.x, pinchPos.left.y, distanceThreshold * MM_TO_INCH * worldPPI);
-        }
-      }
-    }
 
     if (handedness === 'Right' && pinchPos.right && wristPos.right) {
       if (indexPinch.right && !lockedPos) p5.fill(0, 255, 0, 192);
@@ -151,11 +134,30 @@ const sketch: Sketch = (p5) => {
       }
       else p5.fill(0, 0, 0, 128);
       p5.circle(wristPos.right.x, wristPos.right.y, indexPinch.right ? 12 : 6);
+
       if (!lockedPos && indexPinch.right) {
         p5.stroke(255, 255, 255);
         p5.strokeWeight(1);
         p5.noFill();
         p5.circle(wristPos.right.x, wristPos.right.y, distanceThreshold * MM_TO_INCH * worldPPI);
+      }
+    }
+
+    if (handedness === 'Left' && pinchPos.left && wristPos.left) {
+      if (indexPinch.left && !lockedPos) p5.fill(0, 255, 0, 192);
+      else if (indexPinch.left && lockedPos) {
+        const isWithinTarget = distance(wristPos.left.x, wristPos.left.y, lockedPos.x, lockedPos.y) < distanceThreshold * MM_TO_INCH * worldPPI / 2;
+        if (isWithinTarget) p5.fill(0, 255, 0, 192);
+        else p5.fill(255, 0, 0, 128);
+      }
+      else p5.fill(0, 0, 0, 128);
+      p5.circle(wristPos.left.x, wristPos.left.y, indexPinch.left ? 12 : 6);
+
+      if (!lockedPos && indexPinch.left) {
+        p5.stroke(255, 255, 255);
+        p5.strokeWeight(1);
+        p5.noFill();
+        p5.circle(wristPos.left.x, wristPos.left.y, distanceThreshold * MM_TO_INCH * worldPPI);
       }
     }
 
@@ -537,9 +539,9 @@ const TaskCreator = () => {
               {atLast ? (
                 <button
                   className={`px-3 py-2 rounded text-lg bg-gray-200 items-center flex gap-1 font-bold ${
-                    plusDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-600 hover:text-white'
+                    (plusDisabled && tasks[currentIndex].type !== 'HOLD') ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-600 hover:text-white'
                   }`}
-                  disabled={plusDisabled}
+                  disabled={plusDisabled && tasks[currentIndex].type !== 'HOLD'}
                   onClick={addTask}
                 >
                   <FontAwesomeIcon icon="plus" />
@@ -726,7 +728,7 @@ const TaskCreator = () => {
             Marker • <span className="bg-gray-200 font-bold rounded p-1">Left Click + Drag</span> to Reposition Marker
           </span>
         ) : (
-          <span className="text-center text-sm text-gray-400 pt-2">•••</span>
+          <span className="text-center text-sm text-gray-400 pt-2">Raise your <span className="bg-gray-200 font-bold rounded p-1">{tasks[currentIndex].hand} Hand</span> and <span className="bg-gray-200 font-bold rounded p-1">Index Pinch</span> to Visualize Marker • <span className="bg-gray-200 font-bold rounded p-1">Middle Pinch</span> to Lock Marker</span>
         )}
         <span className="text-center text-sm text-gray-400 pt-2">
           Press <span className="bg-gray-200 font-bold rounded p-1">v</span> to Toggle Axis Visualization

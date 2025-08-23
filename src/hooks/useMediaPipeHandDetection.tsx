@@ -9,7 +9,7 @@ import type { Pos } from '../types/task';
 import { useConfig } from '../utils/context';
 
 const INDEX_PINCH_THRESHOLD = 0.25;
-const MIDDLE_PINCH_THRESHOLD = 0.3;
+const MIDDLE_PINCH_THRESHOLD = 0.15;
 
 // |-------------------------
 // | MODEL INITIALIZATIONS
@@ -129,8 +129,8 @@ const detectWrists = (detector: PoseLandmarker, video: HTMLVideoElement, testbed
     const res = detector.detectForVideo(video, performance.now());
     const lm = res.landmarks?.[0] || [];
     if (lm.length >= 17) {
-      const R = lm[15];
-      const L = lm[16];
+      const R = lm[16];
+      const L = lm[15];
       if (L) L.x = 1 - L.x;
       if (R) R.x = 1 - R.x;
       const vw = video.videoWidth;
