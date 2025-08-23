@@ -3,7 +3,7 @@
 import { FilesetResolver, HandLandmarker, PoseLandmarker } from '@mediapipe/tasks-vision';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import type { FingerTips, PinchDetectionResult, WristDetectionResult } from '../types/detections';
-import { defaultFingerTips, MM_TO_INCH } from '../utils/constants';
+import { defaultFingerTips, HAND_LANDMARKER_MODEL_PATH, MM_TO_INCH, POSE_LANDMARKER_MODEL_PATH, VISION_TASKS_WASM_URL } from '../utils/constants';
 import { distance, mapVideoToTestbed } from '../utils/math';
 import type { Pos } from '../types/task';
 import { useConfig } from '../utils/context';
@@ -15,10 +15,10 @@ const MIDDLE_PINCH_THRESHOLD = 0.15;
 // | MODEL INITIALIZATIONS
 // |-------------------------
 const initHandDetector = async () => {
-  const vision = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm');
+  const vision = await FilesetResolver.forVisionTasks(VISION_TASKS_WASM_URL);
   const handDetector = await HandLandmarker.createFromOptions(vision, {
     baseOptions: {
-      modelAssetPath: './hand_landmarker.task',
+      modelAssetPath: HAND_LANDMARKER_MODEL_PATH,
     },
     runningMode: 'VIDEO',
     numHands: 2,
@@ -31,10 +31,10 @@ const initHandDetector = async () => {
 };
 
 const initPoseDetector = async () => {
-  const vision = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm');
+  const vision = await FilesetResolver.forVisionTasks(VISION_TASKS_WASM_URL);
   const poseDetector = await PoseLandmarker.createFromOptions(vision, {
     baseOptions: {
-      modelAssetPath: './pose_landmarker_lite.task',
+      modelAssetPath: POSE_LANDMARKER_MODEL_PATH
     },
     runningMode: 'VIDEO',
     numPoses: 1,

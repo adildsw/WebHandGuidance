@@ -3,7 +3,6 @@ import type { Sketch } from '@p5-wrapper/react';
 import { useConfig } from '../utils/context';
 import { useEffect, useRef, useState } from 'react';
 
-import font from '../assets/sf-ui-display-bold.otf';
 import p5 from 'p5';
 import { LETTER_HEIGHT_INCH, MM_TO_INCH } from '../utils/constants';
 import { distance } from '../utils/math';
@@ -22,7 +21,7 @@ const sketch: Sketch = (p5) => {
   let f: p5.Font;
 
   p5.preload = () => {
-    f = p5.loadFont(font);
+    f = p5.loadFont('./fonts/sf-ui-display-bold.otf');
   };
 
   p5.setup = () => {

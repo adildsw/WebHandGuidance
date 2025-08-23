@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ReactP5Wrapper } from '@p5-wrapper/react';
 import type { Sketch } from '@p5-wrapper/react';
-import font from '../assets/sf-ui-display-bold.otf';
 import type { Pos, Task } from '../types/task';
 import { useConfig } from '../utils/context';
 import { MM_TO_INCH } from '../utils/constants';
@@ -24,7 +23,7 @@ const sketch: Sketch = (p5) => {
   let f: Font;
 
   p5.preload = () => {
-    f = p5.loadFont(font);
+    f = p5.loadFont('./fonts/sf-ui-display-bold.otf');
   };
 
   p5.setup = () => {

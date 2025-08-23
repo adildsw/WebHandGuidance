@@ -38,3 +38,8 @@ export const defaultConfig: Config = {
   defaultStartDuration: 3000,
   defaultTaskType: 'MOVE',
 };
+
+export const HAND_LANDMARKER_MODEL_PATH = './models/hand_landmarker.task';
+export const POSE_LANDMARKER_MODEL_PATH = './models/pose_landmarker_lite.task';
+
+export const VISION_TASKS_WASM_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm';
