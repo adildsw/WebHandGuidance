@@ -1,6 +1,6 @@
 // useMediaPipeObjectDetection.js
 
-import { FilesetResolver, HandLandmarker, PoseLandmarker } from '@mediapipe/tasks-vision';
+import { FilesetResolver, HandLandmarker, PoseLandmarker, type NormalizedLandmark } from '@mediapipe/tasks-vision';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import type { FingerTips, PinchDetectionResult, WristDetectionResult } from '../types/detections';
 import { defaultFingerTips, HAND_LANDMARKER_MODEL_PATH, MM_TO_INCH, POSE_LANDMARKER_MODEL_PATH, VISION_TASKS_WASM_URL } from '../utils/constants';
@@ -128,11 +128,9 @@ const detectWrists = (detector: PoseLandmarker, video: HTMLVideoElement, testbed
   try {
     const res = detector.detectForVideo(video, performance.now());
     const lm = res.landmarks?.[0] || [];
-    if (lm.length >= 17) {
-      const R = lm[16];
-      const L = lm[15];
-      if (L) L.x = 1 - L.x;
-      if (R) R.x = 1 - R.x;
+    if (lm.length >= 21) {
+      const R: NormalizedLandmark = {x: 1 - (lm[16].x + lm[18].x + lm[20].x) / 3, y: ( lm[16].y + lm[18].y + lm[20].y) / 3, z: lm[16].z, visibility: lm[16].visibility};
+      const L: NormalizedLandmark = {x: 1 - (lm[15].x + lm[17].x + lm[19].x) / 3, y: (lm[15].y + lm[17].y + lm[19].y) / 3, z: lm[15].z, visibility: lm[15].visibility};
       const vw = video.videoWidth;
       const vh = video.videoHeight;
       leftWrist = L ? mapVideoToTestbed(L.x * vw, L.y * vh, vw, vh, testbedWidth, testbedHeight) : null;
