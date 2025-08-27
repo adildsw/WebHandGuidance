@@ -390,8 +390,6 @@ const TaskCreator = () => {
   const onContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
     let { x, y } = getMousePos(e);
-    x = (x / worldPPI) * INCH_TO_MM;
-    y = (y / worldPPI) * INCH_TO_MM;
     const idx = findHoverIndex(x, y);
     if (idx !== null) {
       setTasks((prev) => {
