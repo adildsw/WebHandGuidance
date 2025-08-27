@@ -1,7 +1,7 @@
-import { FilesetResolver, HandLandmarker, PoseLandmarker } from '@mediapipe/tasks-vision';
+import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import type { FingerTips, PinchDetectionResult, WristDetectionResult } from '../types/detections';
-import { defaultFingerTips, HAND_LANDMARKER_MODEL_PATH, MM_TO_INCH, POSE_LANDMARKER_MODEL_PATH, VISION_TASKS_WASM_URL } from '../utils/constants';
+import { defaultFingerTips, HAND_LANDMARKER_MODEL_PATH, MM_TO_INCH, VISION_TASKS_WASM_URL } from '../utils/constants';
 import { distance, mapVideoToTestbed } from '../utils/math';
 import { useConfig } from '../utils/context';
 
@@ -27,22 +27,6 @@ const initHandDetector = async () => {
   });
 
   return handDetector;
-};
-
-const initPoseDetector = async () => {
-  const vision = await FilesetResolver.forVisionTasks(VISION_TASKS_WASM_URL);
-  const poseDetector = await PoseLandmarker.createFromOptions(vision, {
-    baseOptions: {
-      modelAssetPath: POSE_LANDMARKER_MODEL_PATH,
-    },
-    runningMode: 'VIDEO',
-    numPoses: 1,
-    minPoseDetectionConfidence: 0.5,
-    minPosePresenceConfidence: 0.5,
-    minTrackingConfidence: 0.5,
-  });
-
-  return poseDetector;
 };
 
 // |-------------------------
@@ -134,20 +118,18 @@ const detectPinchAndWrist = (detector: HandLandmarker, video: HTMLVideoElement, 
   return { pinch, wrist };
 };
 
-const useDetection = (detectionMode: 'WRIST' | 'PINCH' | 'WRIST AND PINCH' | null = null, runOnStart: boolean = false) => {
+const useDetection = (runOnStart: boolean = false) => {
   const { config } = useConfig();
   const { devicePPI, devicePixelRatio, testbedHeightMM, testbedWidthMM } = config;
   const testbedHeight = useMemo(() => (testbedHeightMM * MM_TO_INCH * devicePPI) / devicePixelRatio, [testbedHeightMM, devicePPI, devicePixelRatio]);
   const testbedWidth = useMemo(() => (testbedWidthMM * MM_TO_INCH * devicePPI) / devicePixelRatio, [testbedWidthMM, devicePPI, devicePixelRatio]);
 
   const isDetecting = useRef<boolean>(runOnStart);
-  const detectorType = useRef<'WRIST' | 'PINCH' | 'WRIST AND PINCH' | null>(detectionMode);
   const factor = devicePPI / devicePixelRatio;
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const wristDetectorRef = useRef<PoseLandmarker | null>(null);
-  const pinchDetectorRef = useRef<HandLandmarker | null>(null);
+  const detectorRef = useRef<HandLandmarker | null>(null);
   const animationFrameId = useRef<number | null>(null);
 
   const [pinchDetection, setPinchDetection] = useState<PinchDetectionResult>({
@@ -172,27 +154,20 @@ const useDetection = (detectionMode: 'WRIST' | 'PINCH' | 'WRIST AND PINCH' | nul
     isDetecting.current = false;
   }, []);
 
-  const setDetectionMode = (mode: 'WRIST' | 'PINCH') => {
-    if (detectorType.current !== mode) {
-      detectorType.current = mode;
-    }
-  };
-
   const performDetectionLoop = useCallback(() => {
-    if (!videoRef.current || !wristDetectorRef.current || !pinchDetectorRef.current) {
+    if (!videoRef.current || !detectorRef.current) {
       animationFrameId.current = requestAnimationFrame(performDetectionLoop);
       return;
     }
     const video = videoRef.current;
-    // const wristDetector = wristDetectorRef.current;
-    const pinchDetector = pinchDetectorRef.current;
+    const detector = detectorRef.current;
     if (video.videoWidth === 0 || video.videoHeight === 0) {
       animationFrameId.current = requestAnimationFrame(performDetectionLoop);
       return;
     }
 
     if (isDetecting.current) {
-      const { pinch, wrist } = detectPinchAndWrist(pinchDetector, video, testbedWidth, testbedHeight, factor);
+      const { pinch, wrist } = detectPinchAndWrist(detector, video, testbedWidth, testbedHeight, factor);
       setPinchDetection(pinch);
       setWristDetection(wrist);
     }
@@ -222,8 +197,7 @@ const useDetection = (detectionMode: 'WRIST' | 'PINCH' | 'WRIST AND PINCH' | nul
     try {
       setLoading(true);
       setError(null);
-      wristDetectorRef.current = await initPoseDetector();
-      pinchDetectorRef.current = await initHandDetector();
+      detectorRef.current = await initHandDetector();
       setLoading(false);
     } catch (err) {
       console.error('Failed to initialize Object Detector:', err);
@@ -249,18 +223,14 @@ const useDetection = (detectionMode: 'WRIST' | 'PINCH' | 'WRIST AND PINCH' | nul
       }
       if (videoRef.current) videoRef.current.srcObject = null;
 
-      if (wristDetectorRef.current) {
-        wristDetectorRef.current.close();
-        wristDetectorRef.current = null;
-      }
-      if (pinchDetectorRef.current) {
-        pinchDetectorRef.current.close();
-        pinchDetectorRef.current = null;
+      if (detectorRef.current) {
+        detectorRef.current.close();
+        detectorRef.current = null;
       }
     };
     return cleanup;
   }, []);
-  return { videoRef, pinchDetection, wristDetection, loading, error, startWebcam, startDetecting, stopDetecting, setDetectionMode };
+  return { videoRef, pinchDetection, wristDetection, loading, error, startWebcam, startDetecting, stopDetecting };
 };
 
 export default useDetection;

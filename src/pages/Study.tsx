@@ -3,7 +3,7 @@ import { ReactP5Wrapper } from '@p5-wrapper/react';
 import type { Sketch } from '@p5-wrapper/react';
 import type { Pos, Task } from '../types/task';
 import { useConfig } from '../utils/context';
-import { MM_TO_INCH } from '../utils/constants';
+import { INCH_TO_MM, MM_TO_INCH } from '../utils/constants';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import type { Font } from 'p5';
 import { uid } from 'uid/single';
@@ -80,7 +80,7 @@ const sketch: Sketch = (p5) => {
     p5.stroke(255);
     p5.strokeWeight(2);
 
-    for (let i = 0; i < markers.length; i++) {
+    for (let i = currentTarget; i < Math.min(markers.length, currentTarget + 2); i++) {
       const cx = markers[i].x * MM_TO_INCH * worldPPI;
       const cy = markers[i].y * MM_TO_INCH * worldPPI;
 
@@ -101,13 +101,14 @@ const sketch: Sketch = (p5) => {
           p5.strokeWeight(1);
         }
         p5.noFill();
+        // p5.circle(cx, cy, distanceThreshold);
         p5.circle(cx, cy, distanceThreshold * MM_TO_INCH * worldPPI);
       }
 
       // Draw Lines
-      if (i === currentTarget) p5.stroke(255, 0, 0);
-      else if (i < currentTarget) p5.stroke(0, 0, 255, 32);
-      else p5.stroke(255);
+      // if (i === currentTarget) p5.stroke(255, 0, 0);
+      // else if (i < currentTarget) p5.stroke(0, 0, 255, 32);
+      p5.stroke(255);
       p5.strokeWeight(i === currentTarget ? 2 : 1);
       if (i > 0) {
         const px = markers[i - 1].x * MM_TO_INCH * worldPPI;
@@ -141,13 +142,13 @@ const sketch: Sketch = (p5) => {
 const Study = () => {
   const { config } = useConfig();
   const { devicePPI, worldPPI, devicePixelRatio, testbedWidthMM, testbedHeightMM, markerDiameterMM } = config;
-  const factor = (MM_TO_INCH * devicePPI) / devicePixelRatio;
-  const testbedWidth = testbedWidthMM * factor;
-  const testbedHeight = testbedHeightMM * factor;
-  const markerDiameter = markerDiameterMM * factor;
+  const factor = devicePPI / devicePixelRatio;
+  const testbedWidth = testbedWidthMM * factor * MM_TO_INCH;
+  const testbedHeight = testbedHeightMM * factor * MM_TO_INCH;
+  const markerDiameter = markerDiameterMM * factor * MM_TO_INCH;
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { videoRef, error, loading, wristDetection, pinchDetection, startWebcam } = useDetection('WRIST AND PINCH', true);
+  const { videoRef, error, loading, wristDetection, pinchDetection, startWebcam } = useDetection(true);
   // const { pinchPos, indexPinch, middlePinch } = pinchDetection;
   const { leftWrist, rightWrist } = wristDetection;
 
@@ -217,16 +218,38 @@ const Study = () => {
     if (currentTaskIndex === null) return;
     if (currentTask === null) return;
     if (currentTarget === null) return;
+    if (currentRepetition === null) return;
+    if (currentTrial === null) return;
 
-    const activeWrist = currentTask.hand === 'Left' ? leftWrist : rightWrist;
-    if (activeWrist === null) return;
+    const { type, hand, markers, distanceThreshold, trials, repetitions } = currentTask;
 
-    const d = distance(activeWrist.x, activeWrist.y, currentTask.markers[currentTarget].x, currentTask.markers[currentTarget].y);
-    if (d < currentTask.distanceThreshold) {
-      if (currentTarget < currentTask.markers.length - 1) {
+    const activeWrist = hand === 'Left' ? { ...leftWrist } : { ...rightWrist };
+    if (activeWrist.x === undefined || activeWrist.y === undefined) return;
+
+    const ax = activeWrist.x;
+    const ay = activeWrist.y;
+    const cx = markers[currentTarget].x * MM_TO_INCH * worldPPI;
+    const cy = markers[currentTarget].y * MM_TO_INCH * worldPPI;
+    const dt = distanceThreshold * MM_TO_INCH * worldPPI;
+
+    const d = distance(ax, ay, cx, cy);
+    if (d > dt / 2) return;
+
+    if (type === 'MOVE') {
+      if (currentTarget < markers.length - 1) {
         setCurrentTarget(currentTarget + 1);
+      } else if (currentRepetition < repetitions - 1) {
+        setCurrentRepetition(currentRepetition + 1);
+        setCurrentTarget(0);
+      } else if (currentTrial < trials - 1) {
+        setCurrentTrial(currentTrial + 1);
+        setCurrentRepetition(0);
+        setCurrentTarget(0);
       } else {
         setCurrentTaskIndex(currentTaskIndex + 1);
+        setCurrentTrial(0);
+        setCurrentRepetition(0);
+        setCurrentTarget(0);
       }
     }
   }, [currentTask, currentTarget, leftWrist, rightWrist, currentTaskIndex]);

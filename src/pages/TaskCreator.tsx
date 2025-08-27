@@ -8,7 +8,6 @@ import { INCH_TO_MM, MM_TO_INCH } from '../utils/constants';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import type { Font } from 'p5';
 import useDetection from '../hooks/useMediaPipeHandDetection';
-import { distance } from '../utils/math';
 
 const sketch: Sketch = (p5) => {
   let w = 400;
@@ -17,14 +16,6 @@ const sketch: Sketch = (p5) => {
   let markerDiameter = 10;
   let distanceThreshold = 50;
   let axis = false;
-
-  let pinchPos: { left: Pos | null; right: Pos | null } = { left: null, right: null };
-  let indexPinch: { left: boolean; right: boolean } = { left: false, right: false };
-  let handedness: 'Left' | 'Right' = 'Right';
-
-  let wristPos: { left: Pos | null; right: Pos | null } = { left: null, right: null };
-
-  let lockedPos: Pos | null = null;
 
   let pts: Pos[] = [];
 
@@ -48,11 +39,6 @@ const sketch: Sketch = (p5) => {
     worldPPI?: number;
     markers?: Pos[];
     isAxisVisible?: boolean;
-    pinchPos?: { left: Pos | null; right: Pos | null };
-    indexPinch?: { left: boolean; right: boolean };
-    handedness?: 'Left' | 'Right';
-    lockedPos?: Pos | null;
-    wristPos?: { left: Pos | null; right: Pos | null };
   }) => {
     if (typeof props.frameWidth === 'number') w = props.frameWidth;
     if (typeof props.frameHeight === 'number') h = props.frameHeight;
@@ -62,20 +48,13 @@ const sketch: Sketch = (p5) => {
     if (Array.isArray(props.markers)) pts = props.markers;
     if (p5.width !== w || p5.height !== h) p5.resizeCanvas(w, h);
     axis = props.isAxisVisible ?? false;
-    pinchPos = props.pinchPos ?? { left: null, right: null };
-    indexPinch = props.indexPinch ?? { left: false, right: false };
-    handedness = props.handedness ?? 'Right';
-    lockedPos = props.lockedPos ?? null;
-    wristPos = props.wristPos ?? { left: null, right: null };
   };
 
   p5.draw = () => {
     p5.clear();
 
     if (axis) drawAxis();
-    
     drawMarkers();
-    drawPinch();
   };
 
   const drawMarkers = () => {
@@ -118,53 +97,6 @@ const sketch: Sketch = (p5) => {
       p5.textAlign(p5.CENTER, p5.TOP);
       p5.textSize(10);
       p5.text(`(${(pts[i].x / 10).toFixed(1)}, ${(pts[i].y / 10).toFixed(1)})`, cx, cy + markerDiameter);
-    }
-  }
-
-  const drawPinch = () => {
-    p5.noStroke();
-
-    if (handedness === 'Right' && pinchPos.right && wristPos.right) {
-      if (indexPinch.right && !lockedPos) p5.fill(0, 255, 0, 192);
-      else if (indexPinch.right && lockedPos) {
-        const isWithinTarget = distance(wristPos.right.x, wristPos.right.y, lockedPos.x, lockedPos.y) < distanceThreshold * MM_TO_INCH * worldPPI / 2;
-        if (isWithinTarget) p5.fill(0, 255, 0, 192);
-        else p5.fill(255, 0, 0, 128);
-      }
-      else p5.fill(0, 0, 0, 128);
-      p5.circle(wristPos.right.x, wristPos.right.y, indexPinch.right ? 12 : 6);
-
-      if (!lockedPos && indexPinch.right) {
-        p5.stroke(255, 255, 255);
-        p5.strokeWeight(1);
-        p5.noFill();
-        p5.circle(wristPos.right.x, wristPos.right.y, distanceThreshold * MM_TO_INCH * worldPPI);
-      }
-    }
-
-    if (handedness === 'Left' && pinchPos.left && wristPos.left) {
-      if (indexPinch.left && !lockedPos) p5.fill(0, 255, 0, 192);
-      else if (indexPinch.left && lockedPos) {
-        const isWithinTarget = distance(wristPos.left.x, wristPos.left.y, lockedPos.x, lockedPos.y) < distanceThreshold * MM_TO_INCH * worldPPI / 2;
-        if (isWithinTarget) p5.fill(0, 255, 0, 192);
-        else p5.fill(255, 0, 0, 128);
-      }
-      else p5.fill(0, 0, 0, 128);
-      p5.circle(wristPos.left.x, wristPos.left.y, indexPinch.left ? 12 : 6);
-
-      if (!lockedPos && indexPinch.left) {
-        p5.stroke(255, 255, 255);
-        p5.strokeWeight(1);
-        p5.noFill();
-        p5.circle(wristPos.left.x, wristPos.left.y, distanceThreshold * MM_TO_INCH * worldPPI);
-      }
-    }
-
-    if (lockedPos) {
-      p5.stroke(255, 0, 0);
-      p5.strokeWeight(1);
-      p5.noFill();
-      p5.circle(lockedPos.x, lockedPos.y, distanceThreshold * MM_TO_INCH * worldPPI);
     }
   };
 
@@ -231,9 +163,7 @@ const TaskCreator = () => {
 
   const [isAxisVisible, setIsAxisVisible] = useState<boolean>(false);
 
-  const { videoRef, loading, error, startWebcam, startDetecting, stopDetecting, pinchDetection, wristDetection } = useDetection('WRIST AND PINCH', false);
-  const { pinchPos, indexPinch, middlePinch } = pinchDetection;
-  const { leftWrist, rightWrist } = wristDetection;
+  const { videoRef, loading, error, startWebcam } = useDetection(false);
 
   const overlayRef = useRef<HTMLDivElement | null>(null);
 
@@ -255,20 +185,6 @@ const TaskCreator = () => {
     }
     return distance;
   }, [tasks, currentIndex]);
-
-  const [lockedPos, setLockedPos] = useState<Pos | null>(null);
-
-  useEffect(() => {
-    if (tasks[currentIndex].hand === 'Left' && middlePinch.left && lockedPos === null) setLockedPos(wristDetection.leftWrist);
-    else if (tasks[currentIndex].hand === 'Right' && middlePinch.right && lockedPos === null) setLockedPos(wristDetection.rightWrist);
-    else if (tasks[currentIndex].hand === 'Left' && !middlePinch.left && lockedPos !== null) setLockedPos(null);
-    else if (tasks[currentIndex].hand === 'Right' && !middlePinch.right && lockedPos !== null) setLockedPos(null);
-  }, [lockedPos, middlePinch, tasks, wristDetection, currentIndex]);
-
-  useEffect(() => {
-    if (tasks[currentIndex].type === 'HOLD') startDetecting();
-    else stopDetecting();
-  }, [tasks, currentIndex, startDetecting, stopDetecting]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -369,11 +285,18 @@ const TaskCreator = () => {
       if (idx !== null) {
         setDragIndex(idx);
       } else {
-        setTasks((prev) => {
-          const newTasks = [...prev];
-          newTasks[currentIndex].markers.push({ x: mx, y: my });
-          return newTasks;
-        });
+        if (tasks[currentIndex].type === 'MOVE')
+          setTasks((prev) => {
+            const newTasks = [...prev];
+            newTasks[currentIndex].markers.push({ x: mx, y: my });
+            return newTasks;
+          });
+        else
+          setTasks((prev) => {
+            const newTasks = [...prev];
+            newTasks[currentIndex].markers = [{ x: mx, y: my }];
+            return newTasks;
+          });
       }
     }
   };
@@ -391,7 +314,7 @@ const TaskCreator = () => {
     e.preventDefault();
     let { x, y } = getMousePos(e);
     const idx = findHoverIndex(x, y);
-    if (idx !== null) {
+    if (idx !== null && tasks[currentIndex].markers.length > 1) {
       setTasks((prev) => {
         const newTasks = [...prev];
         newTasks[currentIndex].markers = newTasks[currentIndex].markers.filter((_, i) => i !== idx);
@@ -536,7 +459,7 @@ const TaskCreator = () => {
               {atLast ? (
                 <button
                   className={`px-3 py-2 rounded text-lg bg-gray-200 items-center flex gap-1 font-bold ${
-                    (plusDisabled && tasks[currentIndex].type !== 'HOLD') ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-600 hover:text-white'
+                    plusDisabled && tasks[currentIndex].type !== 'HOLD' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-600 hover:text-white'
                   }`}
                   disabled={plusDisabled && tasks[currentIndex].type !== 'HOLD'}
                   onClick={addTask}
@@ -577,10 +500,11 @@ const TaskCreator = () => {
             <div className="flex flex-col items-center justify-between">
               <label className="text-sm font-bold text-gray-600">Reps</label>
               <input
-                className="w-16 px-2 py-1 rounded border border-gray-300 text-center"
+                className={`w-16 px-2 py-1 rounded border border-gray-300 text-center ${tasks[currentIndex].type === 'HOLD' ? 'opacity-50 cursor-not-allowed' : ''}`}
                 inputMode="numeric"
                 pattern="[0-9]*"
                 value={String(tasks[currentIndex].repetitions)}
+                disabled={tasks[currentIndex].type === 'HOLD'}
                 onChange={(e) => {
                   const v = e.target.value.replace(/[^0-9]/g, '');
                   const n = v === '' ? 0 : Number(v);
@@ -620,12 +544,11 @@ const TaskCreator = () => {
                   className="text-center w-24 px-2 py-1 rounded border border-gray-300"
                   value={tasks[currentIndex].type}
                   onChange={(e) => {
-                    const newTasks = [...tasks];
-                    newTasks[currentIndex].type = e.target.value as 'MOVE' | 'HOLD';
-                    newTasks[currentIndex].holdDuration = config.defaultHoldDuration;
-                    newTasks[currentIndex].distanceThreshold = config.defaultDistanceThreshold;
-                    newTasks[currentIndex].markers = [];
-                    setTasks(newTasks);
+                    setTasks((prev) => {
+                      const newTasks = [...prev];
+                      newTasks[currentIndex] = generateDefaultTask(e.target.value as 'MOVE' | 'HOLD');
+                      return newTasks;
+                    });
                   }}
                 >
                   <option value="MOVE">Move</option>
@@ -690,12 +613,12 @@ const TaskCreator = () => {
           <div
             ref={overlayRef}
             className="absolute inset-0"
-            onMouseMove={tasks[currentIndex].type === 'MOVE' ? onMouseMove : undefined}
-            onMouseDown={tasks[currentIndex].type === 'MOVE' ? onMouseDown : undefined}
-            onMouseUp={tasks[currentIndex].type === 'MOVE' ? onMouseUp : undefined}
-            onMouseLeave={tasks[currentIndex].type === 'MOVE' ? onMouseLeave : undefined}
-            onContextMenu={tasks[currentIndex].type === 'MOVE' ? onContextMenu : undefined}
-            style={{ cursor: tasks[currentIndex].type === 'MOVE' ? (hoverIndex !== null ? 'pointer' : 'crosshair') : 'default' }}
+            onMouseMove={onMouseMove}
+            onMouseDown={onMouseDown}
+            onMouseUp={onMouseUp}
+            onMouseLeave={onMouseLeave}
+            onContextMenu={onContextMenu}
+            style={{ cursor: hoverIndex !== null ? 'pointer' : 'crosshair' }}
           >
             {!loading && !error && <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />}
             <div className="absolute inset-0">
@@ -708,11 +631,6 @@ const TaskCreator = () => {
                 markers={tasks[currentIndex].markers}
                 markerDiameter={markerDiameter}
                 isAxisVisible={isAxisVisible}
-                handedness={tasks[currentIndex].hand}
-                pinchPos={pinchPos}
-                indexPinch={indexPinch}
-                lockedPos={lockedPos}
-                wristPos={{ left: leftWrist, right: rightWrist }}
               />
             </div>
           </div>
@@ -721,11 +639,13 @@ const TaskCreator = () => {
         {/* Task Instructions */}
         {tasks[currentIndex].type === 'MOVE' ? (
           <span className="text-center text-sm text-gray-400 pt-2">
-            <span className="bg-gray-200 font-bold rounded p-1">Left Click</span> to Place Marker • <span className="bg-gray-200 font-bold rounded p-1">Right Click</span> to Delete
-            Marker • <span className="bg-gray-200 font-bold rounded p-1">Left Click + Drag</span> to Reposition Marker
+            <span className="bg-gray-200 font-bold rounded p-1">Left Click</span> to Place Marker • <span className="bg-gray-200 font-bold rounded p-1">Left Click + Drag</span> to
+            Reposition Marker • <span className="bg-gray-200 font-bold rounded p-1">Right Click</span> to Delete Marker
           </span>
         ) : (
-          <span className="text-center text-sm text-gray-400 pt-2">Raise your <span className="bg-gray-200 font-bold rounded p-1">{tasks[currentIndex].hand} Hand</span> and <span className="bg-gray-200 font-bold rounded p-1">Index Pinch</span> to Visualize Marker • <span className="bg-gray-200 font-bold rounded p-1">Middle Pinch</span> to Lock Marker</span>
+          <span className="text-center text-sm text-gray-400 pt-2">
+            <span className="bg-gray-200 font-bold rounded p-1">Left Click + Drag</span> to Reposition Hold Target
+          </span>
         )}
         <span className="text-center text-sm text-gray-400 pt-2">
           Press <span className="bg-gray-200 font-bold rounded p-1">v</span> to Toggle Axis Visualization

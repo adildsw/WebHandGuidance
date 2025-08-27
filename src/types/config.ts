@@ -1,4 +1,4 @@
-import type { Task } from "./task";
+import type { Pos, Task } from "./task";
 
 export type CalibrationTools = 'CREDIT' | 'RULER' | 'DOLLAR';
 
@@ -34,5 +34,5 @@ export type ConfigContextType = {
   setDefaultHoldDuration: (duration: number) => void;
   setDefaultStartDuration: (duration: number) => void;
   setDefaultTaskType: (type: 'MOVE' | 'HOLD') => void;
-  generateDefaultTask: () => Task;
+  generateDefaultTask: (type?: 'MOVE' | 'HOLD') => Task;
 };

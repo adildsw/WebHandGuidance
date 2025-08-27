@@ -36,7 +36,7 @@ export const defaultConfig: Config = {
   defaultDistanceThreshold: 50,
   defaultHoldDuration: 5000,
   defaultStartDuration: 3000,
-  defaultTaskType: 'MOVE',
+  defaultTaskType: 'MOVE'
 };
 
 export const HAND_LANDMARKER_MODEL_PATH = './models/hand_landmarker.task';
