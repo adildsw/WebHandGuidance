@@ -8,6 +8,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import type { Font } from 'p5';
 import { uid } from 'uid/single';
 import useDetection from '../hooks/useMediaPipeHandDetection';
+import { decodeBase64 } from '../utils/encoder';
 
 const sketch: Sketch = (p5) => {
   let w = 400;
@@ -111,12 +112,12 @@ const Study = () => {
     return {
       left: wristDetection?.leftWrist,
       right: wristDetection?.rightWrist,
-    }
+    };
   }, [wristDetection]);
 
   const [participantId, setParticipantId] = useState<string>('');
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [taskLoaded, setTaskLoaded] = useState(false);
+  const [isTaskCorrupt, setIsTaskCorrupt] = useState(false);
   const currentTask: Task | null = useMemo(() => (tasks.length > 0 ? tasks[0] : null), [tasks]);
 
   const [currentTaskIndex, setCurrentTaskIndex] = useState<number>(0);
@@ -130,15 +131,16 @@ const Study = () => {
     const pId = params.get('participantId');
     if (encoded) {
       try {
-        const decoded = decodeURIComponent(encoded);
+        // const decoded = decodeURIComponent(encoded);
+        const decoded = decodeBase64(encoded);
         const parsed = JSON.parse(decoded);
         if (Array.isArray(parsed)) {
           setTasks(parsed);
-          setTaskLoaded(true);
+          setIsTaskCorrupt(false);
           setParticipantId(pId || 'P-' + uid(5));
         }
       } catch {
-        setTaskLoaded(false);
+        setIsTaskCorrupt(true);
       }
     }
   }, []);
@@ -146,7 +148,6 @@ const Study = () => {
   useEffect(() => {
     startWebcam();
   }, [startWebcam]);
-
 
   const goHome = () => {
     window.location.hash = '#/';
@@ -215,22 +216,28 @@ const Study = () => {
           className="md:col-span-3 rounded-lg shadow-lg bg-gray-100 overflow-hidden flex items-center justify-center relative"
           style={{ width: `${testbedWidth}px`, height: `${testbedHeight}px` }}
         >
-          {!error && !loading && <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />}
-          <div className="absolute inset-0">
-            <ReactP5Wrapper
-              sketch={sketch}
-              frameWidth={testbedWidth}
-              frameHeight={testbedHeight}
-              moveThreshold={currentTask?.moveThreshold ?? 15}
-              devicePPI={devicePPI}
-              markers={currentTask?.markers ?? []}
-              devicePixelRatio={devicePixelRatio}
-              markerDiameter={markerDiameter}
-              leftWrist={wrists.left}
-              worldPPI={worldPPI}
-              rightWrist={wrists.right}
-            />
-          </div>
+          {!error && !loading && (
+            <video ref={videoRef} muted playsInline className={`absolute inset-0 w-full h-full object-cover ${isTaskCorrupt && 'blur'}`} style={{ transform: 'scaleX(-1)' }} />
+          )}
+          {isTaskCorrupt ? (
+            <span className="text-red-600 bg-white border p-2 font-bold text-gray-500 z-9">[ERROR] Corrupt Task Data</span>
+          ) : (
+            <div className="absolute inset-0">
+              <ReactP5Wrapper
+                sketch={sketch}
+                frameWidth={testbedWidth}
+                frameHeight={testbedHeight}
+                moveThreshold={currentTask?.distanceThreshold ?? 15}
+                devicePPI={devicePPI}
+                markers={currentTask?.markers ?? []}
+                devicePixelRatio={devicePixelRatio}
+                markerDiameter={markerDiameter}
+                leftWrist={wrists.left}
+                worldPPI={worldPPI}
+                rightWrist={wrists.right}
+              />
+            </div>
+          )}
         </div>
 
         <span className="text-center text-md text-gray-500">

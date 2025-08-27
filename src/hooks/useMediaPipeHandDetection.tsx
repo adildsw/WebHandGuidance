@@ -1,15 +1,16 @@
 // useMediaPipeObjectDetection.js
 
-import { FilesetResolver, HandLandmarker, PoseLandmarker, type NormalizedLandmark } from '@mediapipe/tasks-vision';
+import { FilesetResolver, HandLandmarker, PoseLandmarker } from '@mediapipe/tasks-vision';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import type { FingerTips, PinchDetectionResult, WristDetectionResult } from '../types/detections';
 import { defaultFingerTips, HAND_LANDMARKER_MODEL_PATH, MM_TO_INCH, POSE_LANDMARKER_MODEL_PATH, VISION_TASKS_WASM_URL } from '../utils/constants';
 import { distance, mapVideoToTestbed } from '../utils/math';
-import type { Pos } from '../types/task';
 import { useConfig } from '../utils/context';
 
 const INDEX_PINCH_THRESHOLD = 0.25;
-const MIDDLE_PINCH_THRESHOLD = 0.15;
+const MIDDLE_PINCH_THRESHOLD = 0.25;
+const PINCH_INDICES: Record<keyof FingerTips, number> = { thumb: 4, index: 8, middle: 12, ring: 16, pinky: 20 };
+const WRIST_INDICES = { wrist1: 0, wrist2: 5, wrist3: 17 };
 
 // |-------------------------
 // | MODEL INITIALIZATIONS
@@ -34,7 +35,7 @@ const initPoseDetector = async () => {
   const vision = await FilesetResolver.forVisionTasks(VISION_TASKS_WASM_URL);
   const poseDetector = await PoseLandmarker.createFromOptions(vision, {
     baseOptions: {
-      modelAssetPath: POSE_LANDMARKER_MODEL_PATH
+      modelAssetPath: POSE_LANDMARKER_MODEL_PATH,
     },
     runningMode: 'VIDEO',
     numPoses: 1,
@@ -49,13 +50,17 @@ const initPoseDetector = async () => {
 // |-------------------------
 // | MODEL DETECTIONS
 // |-------------------------
-const detectPinch = (detector: HandLandmarker, video: HTMLVideoElement, testbedWidth: number, testbedHeight: number, factor: number) => {
+const detectPinchAndWrist = (detector: HandLandmarker, video: HTMLVideoElement, testbedWidth: number, testbedHeight: number, factor: number) => {
   const leftFingerTips: FingerTips = { ...defaultFingerTips };
   const rightFingerTips: FingerTips = { ...defaultFingerTips };
   const pinch: PinchDetectionResult = {
     pinchPos: { left: null, right: null },
     indexPinch: { left: false, right: false },
     middlePinch: { left: false, right: false },
+  };
+  const wrist: WristDetectionResult = {
+    leftWrist: null,
+    rightWrist: null,
   };
 
   try {
@@ -68,9 +73,8 @@ const detectPinch = (detector: HandLandmarker, video: HTMLVideoElement, testbedW
       const handed = (detections.handedness?.[i]?.[0]?.categoryName || detections.handedness?.[i]?.[0]?.displayName || '').toLowerCase();
       const side = handed === 'left' ? 'left' : handed === 'right' ? 'right' : hands.length === 1 ? ((hands[i]?.[0]?.x ?? 0.5) < 0.5 ? 'left' : 'right') : null;
       if (!side) continue;
-      const indices: Record<keyof FingerTips, number> = { thumb: 4, index: 8, middle: 12, ring: 16, pinky: 20 };
-      for (const k of Object.keys(indices) as (keyof FingerTips)[]) {
-        const lm = hands[i]?.[indices[k]];
+      for (const k of Object.keys(PINCH_INDICES) as (keyof FingerTips)[]) {
+        const lm = hands[i]?.[PINCH_INDICES[k]];
         if (!lm) continue;
         const x = 1 - lm.x;
         const y = lm.y;
@@ -78,6 +82,18 @@ const detectPinch = (detector: HandLandmarker, video: HTMLVideoElement, testbedW
         if (!pt) continue;
         if (side === 'left') leftFingerTips[k] = pt;
         else rightFingerTips[k] = pt;
+      }
+
+      const w1 = hands[i]?.[WRIST_INDICES.wrist1];
+      const w2 = hands[i]?.[WRIST_INDICES.wrist2];
+      const w3 = hands[i]?.[WRIST_INDICES.wrist3];
+      if (w1 && w2 && w3) {
+        const x = 1 - ((w1.x + w2.x + w3.x) / 3);
+        const y = (w1.y + w2.y + w3.y) / 3;
+        const pt = mapVideoToTestbed(x * vw, y * vh, vw, vh, testbedWidth, testbedHeight);
+
+        if (side === 'left') wrist.leftWrist = pt;
+        else wrist.rightWrist = pt;
       }
     }
 
@@ -113,37 +129,107 @@ const detectPinch = (detector: HandLandmarker, video: HTMLVideoElement, testbedW
       rightFingerTips.middle && rightFingerTips.thumb && pinch.indexPinch.right
         ? distance(rightFingerTips.middle.x, rightFingerTips.middle.y, rightFingerTips.thumb.x, rightFingerTips.thumb.y) / factor < MIDDLE_PINCH_THRESHOLD
         : false;
-
   } catch (err) {
     console.error('Error during hand detection:', err);
   }
 
-  return pinch;
+  return { pinch, wrist };
 };
 
-const detectWrists = (detector: PoseLandmarker, video: HTMLVideoElement, testbedWidth: number, testbedHeight: number) => {
-  let leftWrist: Pos | null = null;
-  let rightWrist: Pos | null = null;
+// const detectPinch = (detector: HandLandmarker, video: HTMLVideoElement, testbedWidth: number, testbedHeight: number, factor: number) => {
+//   const leftFingerTips: FingerTips = { ...defaultFingerTips };
+//   const rightFingerTips: FingerTips = { ...defaultFingerTips };
+//   const pinch: PinchDetectionResult = {
+//     pinchPos: { left: null, right: null },
+//     indexPinch: { left: false, right: false },
+//     middlePinch: { left: false, right: false },
+//   };
 
-  try {
-    const res = detector.detectForVideo(video, performance.now());
-    const lm = res.landmarks?.[0] || [];
-    if (lm.length >= 21) {
-      const R: NormalizedLandmark = {x: 1 - (lm[16].x + lm[18].x + lm[20].x) / 3, y: ( lm[16].y + lm[18].y + lm[20].y) / 3, z: lm[16].z, visibility: lm[16].visibility};
-      const L: NormalizedLandmark = {x: 1 - (lm[15].x + lm[17].x + lm[19].x) / 3, y: (lm[15].y + lm[17].y + lm[19].y) / 3, z: lm[15].z, visibility: lm[15].visibility};
-      const vw = video.videoWidth;
-      const vh = video.videoHeight;
-      leftWrist = L ? mapVideoToTestbed(L.x * vw, L.y * vh, vw, vh, testbedWidth, testbedHeight) : null;
-      rightWrist = R ? mapVideoToTestbed(R.x * vw, R.y * vh, vw, vh, testbedWidth, testbedHeight) : null;
-      if (!L?.visibility || L.visibility < 0.8) leftWrist = null;
-      if (!R?.visibility || R.visibility < 0.8) rightWrist = null;
-    }
-  } catch (err) {
-    console.error('Error during wrist detection:', err);
-  }
+//   try {
+//     const detections = detector.detectForVideo(video, performance.now());
+//     const vw = video.videoWidth;
+//     const vh = video.videoHeight;
+//     const hands = detections.landmarks || [];
 
-  return { leftWrist, rightWrist };
-};
+//     for (let i = 0; i < hands.length; i++) {
+//       const handed = (detections.handedness?.[i]?.[0]?.categoryName || detections.handedness?.[i]?.[0]?.displayName || '').toLowerCase();
+//       const side = handed === 'left' ? 'left' : handed === 'right' ? 'right' : hands.length === 1 ? ((hands[i]?.[0]?.x ?? 0.5) < 0.5 ? 'left' : 'right') : null;
+//       if (!side) continue;
+//       const indices: Record<keyof FingerTips, number> = { thumb: 4, index: 8, middle: 12, ring: 16, pinky: 20 };
+//       for (const k of Object.keys(indices) as (keyof FingerTips)[]) {
+//         const lm = hands[i]?.[indices[k]];
+//         if (!lm) continue;
+//         const x = 1 - lm.x;
+//         const y = lm.y;
+//         const pt = mapVideoToTestbed(x * vw, y * vh, vw, vh, testbedWidth, testbedHeight);
+//         if (!pt) continue;
+//         if (side === 'left') leftFingerTips[k] = pt;
+//         else rightFingerTips[k] = pt;
+//       }
+//     }
+
+//     pinch.pinchPos.left =
+//       leftFingerTips.index && leftFingerTips.thumb
+//         ? {
+//             x: (leftFingerTips.index.x + leftFingerTips.thumb.x) / 2,
+//             y: (leftFingerTips.index.y + leftFingerTips.thumb.y) / 2,
+//           }
+//         : null;
+
+//     pinch.pinchPos.right =
+//       rightFingerTips.index && rightFingerTips.thumb
+//         ? {
+//             x: (rightFingerTips.index.x + rightFingerTips.thumb.x) / 2,
+//             y: (rightFingerTips.index.y + rightFingerTips.thumb.y) / 2,
+//           }
+//         : null;
+
+//     pinch.indexPinch.left =
+//       leftFingerTips.index && leftFingerTips.thumb
+//         ? distance(leftFingerTips.index.x, leftFingerTips.index.y, leftFingerTips.thumb.x, leftFingerTips.thumb.y) / factor < INDEX_PINCH_THRESHOLD
+//         : false;
+//     pinch.indexPinch.right =
+//       rightFingerTips.index && rightFingerTips.thumb
+//         ? distance(rightFingerTips.index.x, rightFingerTips.index.y, rightFingerTips.thumb.x, rightFingerTips.thumb.y) / factor < INDEX_PINCH_THRESHOLD
+//         : false;
+//     pinch.middlePinch.left =
+//       leftFingerTips.middle && leftFingerTips.thumb && pinch.indexPinch.left
+//         ? distance(leftFingerTips.middle.x, leftFingerTips.middle.y, leftFingerTips.thumb.x, leftFingerTips.thumb.y) / factor < MIDDLE_PINCH_THRESHOLD
+//         : false;
+//     pinch.middlePinch.right =
+//       rightFingerTips.middle && rightFingerTips.thumb && pinch.indexPinch.right
+//         ? distance(rightFingerTips.middle.x, rightFingerTips.middle.y, rightFingerTips.thumb.x, rightFingerTips.thumb.y) / factor < MIDDLE_PINCH_THRESHOLD
+//         : false;
+//   } catch (err) {
+//     console.error('Error during hand detection:', err);
+//   }
+
+//   return pinch;
+// };
+
+// const detectWrists = (detector: PoseLandmarker, video: HTMLVideoElement, testbedWidth: number, testbedHeight: number) => {
+//   let leftWrist: Pos | null = null;
+//   let rightWrist: Pos | null = null;
+
+//   try {
+//     const res = detector.detectForVideo(video, performance.now());
+//     const lm = res.landmarks?.[0] || [];
+//     if (lm.length >= 21) {
+//       const R: NormalizedLandmark = { x: 1 - (lm[16].x + lm[18].x + lm[20].x) / 3, y: (lm[16].y + lm[18].y + lm[20].y) / 3, z: lm[16].z, visibility: lm[16].visibility };
+//       const L: NormalizedLandmark = { x: 1 - (lm[15].x + lm[17].x + lm[19].x) / 3, y: (lm[15].y + lm[17].y + lm[19].y) / 3, z: lm[15].z, visibility: lm[15].visibility };
+//       const vw = video.videoWidth;
+//       const vh = video.videoHeight;
+//       leftWrist = L ? mapVideoToTestbed(L.x * vw, L.y * vh, vw, vh, testbedWidth, testbedHeight) : null;
+//       rightWrist = R ? mapVideoToTestbed(R.x * vw, R.y * vh, vw, vh, testbedWidth, testbedHeight) : null;
+//       if (!L?.visibility || L.visibility < 0.8) leftWrist = null;
+//       if (!R?.visibility || R.visibility < 0.8) rightWrist = null;
+//     }
+//   } catch (err) {
+//     console.error('Error during wrist detection:', err);
+//   }
+
+//   return { leftWrist, rightWrist };
+// };
 
 const useDetection = (detectionMode: 'WRIST' | 'PINCH' | 'WRIST AND PINCH' | null = null, runOnStart: boolean = false) => {
   const { config } = useConfig();
@@ -175,7 +261,7 @@ const useDetection = (detectionMode: 'WRIST' | 'PINCH' | 'WRIST AND PINCH' | nul
   const [error, setError] = useState<string | null>(null);
 
   const startDetecting = useCallback(() => {
-    console.log("[INFO] Starting Landmark Detection")
+    console.log('[INFO] Starting Landmark Detection');
     isDetecting.current = true;
   }, []);
 
@@ -195,7 +281,7 @@ const useDetection = (detectionMode: 'WRIST' | 'PINCH' | 'WRIST AND PINCH' | nul
       return;
     }
     const video = videoRef.current;
-    const wristDetector = wristDetectorRef.current;
+    // const wristDetector = wristDetectorRef.current;
     const pinchDetector = pinchDetectorRef.current;
     if (video.videoWidth === 0 || video.videoHeight === 0) {
       animationFrameId.current = requestAnimationFrame(performDetectionLoop);
@@ -203,18 +289,24 @@ const useDetection = (detectionMode: 'WRIST' | 'PINCH' | 'WRIST AND PINCH' | nul
     }
 
     if (isDetecting.current) {
-      if (detectorType.current === 'PINCH') {
-        setPinchDetection(detectPinch(pinchDetector, video, testbedWidth, testbedHeight, factor));
-      } else if (detectorType.current === 'WRIST') {
-        setWristDetection(detectWrists(wristDetector, video, testbedWidth, testbedHeight));
-      } else if (detectorType.current === 'WRIST AND PINCH') {
-        setWristDetection(detectWrists(wristDetector, video, testbedWidth, testbedHeight));
-        setPinchDetection(detectPinch(pinchDetector, video, testbedWidth, testbedHeight, factor));
-      }
+      const { pinch, wrist } = detectPinchAndWrist(pinchDetector, video, testbedWidth, testbedHeight, factor);
+      setPinchDetection(pinch);
+      setWristDetection(wrist);
+      // if (detectorType.current === 'PINCH') {
+      //   setPinchDetection(detectPinch(pinchDetector, video, testbedWidth, testbedHeight, factor));
+      // } else if (detectorType.current === 'WRIST') {
+      //   setWristDetection(detectWrists(wristDetector, video, testbedWidth, testbedHeight));
+      // } else if (detectorType.current === 'WRIST AND PINCH') {
+      //   // setWristDetection(detectWrists(wristDetector, video, testbedWidth, testbedHeight));
+      //   // setPinchDetection(detectPinch(pinchDetector, video, testbedWidth, testbedHeight, factor));
+      //   const { pinch, wrist } = detectPinchAndWrist(pinchDetector, video, testbedWidth, testbedHeight, factor);
+      //   setPinchDetection(pinch);
+      //   setWristDetection(wrist);
+      // }
     }
 
     animationFrameId.current = requestAnimationFrame(performDetectionLoop);
-  }, [detectorType, testbedHeight, testbedWidth, isDetecting, factor]);
+  }, [testbedHeight, testbedWidth, isDetecting, factor]);
 
   const startWebcam = useCallback(async () => {
     if (loading || error) return;

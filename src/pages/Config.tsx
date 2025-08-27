@@ -47,7 +47,7 @@ const Config = () => {
 
   return (
     <div className="w-screen h-screen flex items-center justify-center select-none">
-      <div className="w-[360px] md:w-[420px] bg-white rounded-2xl shadow border border-gray-200 p-4 flex flex-col items-center gap-4">
+      <div className="w-[360px] md:w-[420px] max-h-[90vh] bg-white rounded-2xl shadow border border-gray-200 p-4 flex flex-col items-center gap-4">
         <h1 className="text-2xl font-bold text-gray-900">Configurations</h1>
 
         <div className="w-full border border-gray-100 rounded-xl bg-gray-50 p-2 max-h-[90vh] overflow-auto flex flex-col gap-4">

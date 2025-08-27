@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { encodeBase64 } from '../utils/encoder';
 
 const Home = () => {
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -10,10 +11,11 @@ const Home = () => {
     if (!file) return;
     if (!file.name.toLowerCase().endsWith('.json')) return;
     const text = await file.text();
-    const encoded = encodeURIComponent(text);
+    const encoded = encodeBase64(text);
+    console.log(encoded);
 
     const participantId = prompt('Enter Participant ID:');
-    window.location.hash = `#/study?data=${encoded}&participantId=${participantId}`;
+    window.location.hash = `#/study?participantId=${participantId}&data=${encoded}`;
   };
 
   const go = (hash: string) => {
