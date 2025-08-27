@@ -9,19 +9,23 @@ import type { Font } from 'p5';
 import { uid } from 'uid/single';
 import useDetection from '../hooks/useMediaPipeHandDetection';
 import { decodeBase64 } from '../utils/encoder';
+import { distance } from '../utils/math';
 
 const sketch: Sketch = (p5) => {
   let w = 400;
   let h = 300;
   let markerDiameter = 10;
-  let moveThreshold = 15;
   let worldPPI = 24;
-  let pts: Pos[] = [];
 
-  let leftWrist: { x: number; y: number } | null = null;
-  let rightWrist: { x: number; y: number } | null = null;
+  let wristPos: { left: Pos | null; right: Pos | null } = { left: null, right: null };
 
   let f: Font;
+
+  let task: Task | null = null;
+  let markers: Pos[] = [];
+  let distanceThreshold = 15;
+
+  let currentTarget: number = -1;
 
   p5.preload = () => {
     f = p5.loadFont('./fonts/sf-ui-display-bold.otf');
@@ -36,66 +40,101 @@ const sketch: Sketch = (p5) => {
   p5.updateWithProps = (props: {
     frameWidth?: number;
     frameHeight?: number;
-    moveThreshold?: number;
     markerDiameter?: number;
     worldPPI?: number;
-    markers?: Pos[];
-    leftWrist?: Pos | null;
-    rightWrist?: Pos | null;
+    task?: Task | null;
+    currentTarget?: number | null;
+    wristPos?: { left: Pos | null; right: Pos | null };
   }) => {
     if (typeof props.frameWidth === 'number') w = props.frameWidth;
     if (typeof props.frameHeight === 'number') h = props.frameHeight;
-    if (typeof props.moveThreshold === 'number') moveThreshold = props.moveThreshold;
     if (typeof props.markerDiameter === 'number') markerDiameter = props.markerDiameter;
-    if (Array.isArray(props.markers)) pts = props.markers;
     if (typeof props.worldPPI === 'number') worldPPI = props.worldPPI;
 
-    leftWrist = props.leftWrist ?? null;
-    rightWrist = props.rightWrist ?? null;
+    if (props.task) {
+      task = props.task;
+      markers = props.task.markers;
+      distanceThreshold = props.task.distanceThreshold;
+    } else {
+      task = null;
+      markers = [];
+      distanceThreshold = 15;
+    }
+
+    currentTarget = typeof props.currentTarget === 'number' ? props.currentTarget : -1;
+    if (props.wristPos) wristPos = props.wristPos;
 
     if (p5.width !== w || p5.height !== h) p5.resizeCanvas(w, h);
   };
 
   p5.draw = () => {
     p5.clear();
+    if (!task) return;
 
+    if (task.type === 'MOVE') drawMarkers();
+    drawWrist();
+  };
+
+  const drawMarkers = () => {
     p5.noFill();
     p5.stroke(255);
     p5.strokeWeight(2);
-    for (let i = 1; i < pts.length; i++) {
-      const px = pts[i - 1].x * MM_TO_INCH * worldPPI;
-      const py = pts[i - 1].y * MM_TO_INCH * worldPPI;
-      const cx = pts[i].x * MM_TO_INCH * worldPPI;
-      const cy = pts[i].y * MM_TO_INCH * worldPPI;
-      p5.line(px, py, cx, cy);
-    }
-    for (let i = 0; i < pts.length; i++) {
-      const x = pts[i].x * MM_TO_INCH * worldPPI;
-      const y = pts[i].y * MM_TO_INCH * worldPPI;
-      p5.fill(255);
+
+    for (let i = 0; i < markers.length; i++) {
+      const cx = markers[i].x * MM_TO_INCH * worldPPI;
+      const cy = markers[i].y * MM_TO_INCH * worldPPI;
+
+      // Draw Markers
+      if (i === currentTarget) p5.fill(0, 255, 0, 200);
+      else if (i < currentTarget) p5.fill(0, 0, 255, 32);
+      else p5.fill(255);
       p5.noStroke();
-      p5.circle(x, y, markerDiameter);
+      p5.circle(cx, cy, markerDiameter);
+
+      // Draw Threshold
+      if (i >= currentTarget) {
+        if (i === currentTarget) {
+          p5.stroke(255, 0, 0, 200);
+          p5.strokeWeight(4);
+        } else {
+          p5.stroke(255, 255, 255);
+          p5.strokeWeight(1);
+        }
+        p5.noFill();
+        p5.circle(cx, cy, distanceThreshold * MM_TO_INCH * worldPPI);
+      }
+
+      // Draw Lines
+      if (i === currentTarget) p5.stroke(255, 0, 0);
+      else if (i < currentTarget) p5.stroke(0, 0, 255, 32);
+      else p5.stroke(255);
+      p5.strokeWeight(i === currentTarget ? 2 : 1);
+      if (i > 0) {
+        const px = markers[i - 1].x * MM_TO_INCH * worldPPI;
+        const py = markers[i - 1].y * MM_TO_INCH * worldPPI;
+        p5.line(cx, cy, px, py);
+      }
+
+      // Draw Marker Labels
       p5.fill(0);
       p5.textAlign(p5.CENTER, p5.CENTER);
       p5.textSize(12);
-      p5.text(String(i + 1), x, y);
-      p5.stroke(255);
-      p5.strokeWeight(1);
-      p5.noFill();
-      p5.circle(x, y, moveThreshold * MM_TO_INCH * worldPPI);
+      p5.text(String(i + 1), cx, cy);
     }
+  };
 
-    const dot = Math.max(10, Math.min(20, markerDiameter * 0.9));
-    if (leftWrist) {
-      p5.noStroke();
-      p5.fill(0, 180, 255);
-      p5.circle(leftWrist.x, leftWrist.y, dot);
-    }
-    if (rightWrist) {
-      p5.noStroke();
-      p5.fill(255, 200, 0);
-      p5.circle(rightWrist.x, rightWrist.y, dot);
-    }
+  const drawWrist = () => {
+    p5.noStroke();
+
+    p5.fill(0, 0, 255, 128);
+    if (wristPos.left) p5.circle(wristPos.left.x, wristPos.left.y, 12);
+    if (wristPos.right) p5.circle(wristPos.right.x, wristPos.right.y, 12);
+
+    p5.fill(255);
+    p5.textAlign(p5.CENTER, p5.CENTER);
+    p5.textSize(6);
+    if (wristPos.left) p5.text('L', wristPos.left.x, wristPos.left.y);
+    if (wristPos.right) p5.text('R', wristPos.right.x, wristPos.right.y);
   };
 };
 
@@ -107,22 +146,24 @@ const Study = () => {
   const testbedHeight = testbedHeightMM * factor;
   const markerDiameter = markerDiameterMM * factor;
 
-  const { videoRef, error, loading, wristDetection, startWebcam } = useDetection('WRIST');
-  const wrists = useMemo(() => {
-    return {
-      left: wristDetection?.leftWrist,
-      right: wristDetection?.rightWrist,
-    };
-  }, [wristDetection]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { videoRef, error, loading, wristDetection, pinchDetection, startWebcam } = useDetection('WRIST AND PINCH', true);
+  // const { pinchPos, indexPinch, middlePinch } = pinchDetection;
+  const { leftWrist, rightWrist } = wristDetection;
 
   const [participantId, setParticipantId] = useState<string>('');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isTaskCorrupt, setIsTaskCorrupt] = useState(false);
-  const currentTask: Task | null = useMemo(() => (tasks.length > 0 ? tasks[0] : null), [tasks]);
 
-  const [currentTaskIndex, setCurrentTaskIndex] = useState<number>(0);
-  const [currentTrial, setCurrentTrial] = useState<number>(1);
-  const [currentRepetition, setCurrentRepetition] = useState<number>(1);
+  const [currentTaskIndex, setCurrentTaskIndex] = useState<number | null>(null);
+  const [currentTrial, setCurrentTrial] = useState<number | null>(null);
+  const [currentRepetition, setCurrentRepetition] = useState<number | null>(null);
+
+  const [currentTarget, setCurrentTarget] = useState<number | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [currentHoldPos, setCurrentHoldPos] = useState<Pos | null>(null);
+
+  const currentTask: Task | null = useMemo(() => (currentTaskIndex !== null && tasks.length > currentTaskIndex ? tasks[currentTaskIndex] : null), [tasks, currentTaskIndex]);
 
   useEffect(() => {
     const hash = window.location.hash;
@@ -131,13 +172,20 @@ const Study = () => {
     const pId = params.get('participantId');
     if (encoded) {
       try {
-        // const decoded = decodeURIComponent(encoded);
         const decoded = decodeBase64(encoded);
         const parsed = JSON.parse(decoded);
         if (Array.isArray(parsed)) {
           setTasks(parsed);
-          setIsTaskCorrupt(false);
           setParticipantId(pId || 'P-' + uid(5));
+
+          // Initializing Task
+          if (parsed.length === 0) setIsTaskCorrupt(true);
+          else {
+            setCurrentTaskIndex(0);
+            setCurrentTrial(0);
+            setCurrentRepetition(0);
+            setIsTaskCorrupt(false);
+          }
         }
       } catch {
         setIsTaskCorrupt(true);
@@ -151,6 +199,40 @@ const Study = () => {
 
   const goHome = () => {
     window.location.hash = '#/';
+  };
+
+  // TASK INITIALIZER
+  useEffect(() => {
+    if (currentTaskIndex === null) return;
+    if (currentTaskIndex === tasks.length) {
+      endStudy();
+      return;
+    }
+    const task = tasks[currentTaskIndex];
+    if (task.type === 'MOVE') setCurrentTarget(0);
+    else if (task.type === 'HOLD') setCurrentHoldPos(null);
+  }, [tasks, currentTaskIndex]);
+
+  useEffect(() => {
+    if (currentTaskIndex === null) return;
+    if (currentTask === null) return;
+    if (currentTarget === null) return;
+
+    const activeWrist = currentTask.hand === 'Left' ? leftWrist : rightWrist;
+    if (activeWrist === null) return;
+
+    const d = distance(activeWrist.x, activeWrist.y, currentTask.markers[currentTarget].x, currentTask.markers[currentTarget].y);
+    if (d < currentTask.distanceThreshold) {
+      if (currentTarget < currentTask.markers.length - 1) {
+        setCurrentTarget(currentTarget + 1);
+      } else {
+        setCurrentTaskIndex(currentTaskIndex + 1);
+      }
+    }
+  }, [currentTask, currentTarget, leftWrist, rightWrist, currentTaskIndex]);
+
+  const endStudy = () => {
+    // TODO: Implement end study logic
   };
 
   return (
@@ -168,7 +250,7 @@ const Study = () => {
         </div>
 
         <div className="flex flex-row gap-2">
-          <div className="flex flex-row p-2 bg-white rounded-lg shadow gap-3 border border-gray-100 grow justify-center">
+          <div className="flex flex-row p-2 bg-white rounded-lg shadow gap-3 border border-gray-100 justify-center">
             <div className="flex flex-col items-center justify-between">
               <label className="text-sm font-bold text-gray-600">Status</label>
               <span className="px-2 py-1 text-center rounded font-semibold text-xl">Ready</span>
@@ -182,32 +264,33 @@ const Study = () => {
             </div>
           </div>
 
-          <div className="flex flex-row p-2 bg-white rounded-lg shadow gap-3 border border-gray-100 ">
+          <div className="flex flex-row p-2 bg-white rounded-lg shadow gap-3 border border-gray-100 grow justify-between">
             <div className="flex flex-col items-center justify-between">
               <label className="text-sm font-bold text-gray-600">Task</label>
-              <span className="px-2 py-1 text-center rounded font-semibold text-xl">{currentTaskIndex + 1 + ' / ' + String(tasks.length)}</span>
+              <span className="px-2 py-1 text-center rounded font-semibold text-xl">{currentTaskIndex !== null && currentTaskIndex + 1 + ' / ' + String(tasks.length)}</span>
             </div>
 
-            <div className="flex flex-col h-full items-center justify-center">
+            <div className="flex flex-col h-full items-center justify-center grow">
               <label className="text-sm font-bold text-gray-600">Instruction</label>
-              <span className="w-48 px-2 py-1 text-center rounded font-semibold text-md">Move Hand to Target</span>
-            </div>
-
-            <div className="flex flex-col items-center justify-between">
-              <label className="text-sm font-bold text-gray-600">Use Hand</label>
-              <span className="px-2 py-1 text-center rounded font-semibold text-xl">{currentTask?.hand ?? '-'}</span>
+              <span className="px-2 py-1 text-center rounded font-semibold text-lg">
+                Move <span className="font-bold text-red-800 border p-1 rounded">{currentTask?.hand} Hand</span> to Target
+              </span>
             </div>
           </div>
 
           <div className="flex flex-row p-2 bg-white rounded-lg shadow gap-3 border border-gray-100 ">
             <div className="flex flex-col items-center justify-between">
               <label className="text-sm font-bold text-gray-600">Trials</label>
-              <span className="px-2 py-1 text-center rounded font-semibold text-xl">{currentTask ? currentTrial + ' / ' + String(currentTask.trials) : '-'}</span>
+              <span className="px-2 py-1 text-center rounded font-semibold text-xl">
+                {currentTask && currentTrial !== null ? currentTrial + 1 + ' / ' + String(currentTask.trials) : '-'}
+              </span>
             </div>
 
             <div className="flex flex-col items-center justify-between">
               <label className="text-sm font-bold text-gray-600">Repetitions</label>
-              <span className="px-2 py-1 text-center rounded font-semibold text-xl">{currentTask ? currentRepetition + ' / ' + String(currentTask.repetitions) : '-'}</span>
+              <span className="px-2 py-1 text-center rounded font-semibold text-xl">
+                {currentTask && currentRepetition !== null ? currentRepetition + 1 + ' / ' + String(currentTask.repetitions) : '-'}
+              </span>
             </div>
           </div>
         </div>
@@ -227,14 +310,13 @@ const Study = () => {
                 sketch={sketch}
                 frameWidth={testbedWidth}
                 frameHeight={testbedHeight}
-                moveThreshold={currentTask?.distanceThreshold ?? 15}
                 devicePPI={devicePPI}
-                markers={currentTask?.markers ?? []}
                 devicePixelRatio={devicePixelRatio}
                 markerDiameter={markerDiameter}
-                leftWrist={wrists.left}
                 worldPPI={worldPPI}
-                rightWrist={wrists.right}
+                wristPos={{ left: leftWrist, right: rightWrist }}
+                task={currentTask}
+                currentTarget={currentTarget}
               />
             </div>
           )}
