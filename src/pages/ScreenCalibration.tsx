@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CREDIT_CARD_HEIGHT_INCH, CREDIT_CARD_WIDTH_INCH, DOLLAR_BILL_HEIGHT_INCH, DOLLAR_BILL_WIDTH_INCH, MM_TO_INCH } from '../utils/constants';
 import p5 from 'p5';
 import type { CalibrationTools } from '../types/config';
+import { go } from '../utils/navigation';
 
 const sketch: Sketch = (p5) => {
   let width = 200;
@@ -212,7 +213,7 @@ const ScreenCalibration = () => {
       } else if (e.key === '-' || e.key === '_') {
         setDevicePPI(devicePPI - 1);
       } else if (e.key === 'Enter') {
-        window.location.hash = '#/';
+        go('#/');
       }
     };
 
@@ -291,7 +292,7 @@ const ScreenCalibration = () => {
 
       <button
         className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"
-        onClick={() => (window.location.hash = '#/')}
+        onClick={() => go('#/')}
       >
         Done
       </button>

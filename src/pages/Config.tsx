@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useConfig } from '../utils/context';
 import { defaultConfig } from '../utils/constants';
+import { go } from '../utils/navigation';
 
 const Config = () => {
   const {
@@ -23,10 +24,6 @@ const Config = () => {
     const v = s.replace(/[^0-9.]/g, '');
     return v === '' ? 0 : Number(v);
   }, []);
-
-  const goHome = () => {
-    window.location.hash = '#/';
-  };
 
   const resetParams = () => {
     if (confirm('Are you sure you want to reset all parameters to their default values?')) {
@@ -195,7 +192,7 @@ const Config = () => {
           </button>
 
           <button
-            onClick={goHome}
+            onClick={() => go('#/')}
             className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-gray-100 text-gray-900 hover:bg-gray-800 hover:text-white font-bold cursor-pointer"
           >
             Done

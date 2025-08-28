@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { encodeBase64 } from '../utils/encoder';
+import { go } from '../utils/navigation';
 
 const Home = () => {
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -15,11 +16,7 @@ const Home = () => {
     console.log(encoded);
 
     const participantId = prompt('Enter Participant ID:');
-    window.location.hash = `#/study?participantId=${participantId}&data=${encoded}`;
-  };
-
-  const go = (hash: string) => {
-    window.location.hash = hash;
+    go(`#/study?participantId=${participantId}&data=${encoded}`);
   };
 
   return (

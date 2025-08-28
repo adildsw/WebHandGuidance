@@ -3,13 +3,15 @@ import { ReactP5Wrapper } from '@p5-wrapper/react';
 import type { Sketch } from '@p5-wrapper/react';
 import type { Pos, Task } from '../types/task';
 import { useConfig } from '../utils/context';
-import { MM_TO_INCH } from '../utils/constants';
+import { INCH_TO_MM, MM_TO_INCH } from '../utils/constants';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import type { Font } from 'p5';
 import { uid } from 'uid/single';
 import useDetection from '../hooks/useMediaPipeHandDetection';
 import { decodeBase64 } from '../utils/encoder';
 import { distance } from '../utils/math';
+import type { DataCollection, DataCollectionRaw } from '../types/datacollection';
+import { go } from '../utils/navigation';
 
 const sketch: Sketch = (p5) => {
   let w = 400;
@@ -27,6 +29,7 @@ const sketch: Sketch = (p5) => {
 
   let currentTarget: number = -1;
   let isRepeating: boolean = false;
+  let isTaskRunning: boolean = false;
 
   p5.preload = () => {
     f = p5.loadFont('./fonts/sf-ui-display-bold.otf');
@@ -47,6 +50,7 @@ const sketch: Sketch = (p5) => {
     currentTarget?: number | null;
     wristPos?: { left: Pos | null; right: Pos | null };
     currentRepetition?: number | null;
+    isTaskRunning?: boolean;
   }) => {
     if (typeof props.frameWidth === 'number') w = props.frameWidth;
     if (typeof props.frameHeight === 'number') h = props.frameHeight;
@@ -68,6 +72,7 @@ const sketch: Sketch = (p5) => {
     distanceThreshold = props.task.distanceThreshold;
     currentTarget = typeof props.currentTarget === 'number' ? props.currentTarget : -1;
     isRepeating = typeof props.currentRepetition === 'number' ? props.currentRepetition < task.repetitions - 1 : false;
+    isTaskRunning = typeof props.isTaskRunning === 'boolean' ? props.isTaskRunning : false;
   };
 
   p5.draw = () => {
@@ -132,21 +137,24 @@ const sketch: Sketch = (p5) => {
 
     // Wrist Marker
     p5.fill(0, 0, 255, 128);
-    if (wristPos.left) p5.circle(wristPos.left.x, wristPos.left.y, 12);
-    if (wristPos.right) p5.circle(wristPos.right.x, wristPos.right.y, 12);
+    if (wristPos.left && task?.hand === 'Left') p5.circle(wristPos.left.x, wristPos.left.y, 12);
+    if (wristPos.right && task?.hand === 'Right') p5.circle(wristPos.right.x, wristPos.right.y, 12);
 
     // Wrist Label
     p5.fill(255);
     p5.textAlign(p5.CENTER, p5.CENTER);
     p5.textSize(6);
-    if (wristPos.left) p5.text('L', wristPos.left.x, wristPos.left.y);
-    if (wristPos.right) p5.text('R', wristPos.right.x, wristPos.right.y);
+    if (wristPos.left && task?.hand === 'Left') p5.text('L', wristPos.left.x, wristPos.left.y);
+    if (wristPos.right && task?.hand === 'Right') p5.text('R', wristPos.right.x, wristPos.right.y);
 
     // Wrist to Target Line
+    if (!isTaskRunning) return;
     p5.strokeWeight(2);
     p5.stroke(255, 0, 0, 128);
-    if (wristPos.left) p5.line(wristPos.left.x, wristPos.left.y, markers[currentTarget].x * MM_TO_INCH * worldPPI, markers[currentTarget].y * MM_TO_INCH * worldPPI);
-    if (wristPos.right) p5.line(wristPos.right.x, wristPos.right.y, markers[currentTarget].x * MM_TO_INCH * worldPPI, markers[currentTarget].y * MM_TO_INCH * worldPPI);
+    if (wristPos.left && task?.hand === 'Left')
+      p5.line(wristPos.left.x, wristPos.left.y, markers[currentTarget].x * MM_TO_INCH * worldPPI, markers[currentTarget].y * MM_TO_INCH * worldPPI);
+    if (wristPos.right && task?.hand === 'Right')
+      p5.line(wristPos.right.x, wristPos.right.y, markers[currentTarget].x * MM_TO_INCH * worldPPI, markers[currentTarget].y * MM_TO_INCH * worldPPI);
   };
 };
 
@@ -158,9 +166,7 @@ const Study = () => {
   const testbedHeight = testbedHeightMM * factor * MM_TO_INCH;
   const markerDiameter = markerDiameterMM * factor * MM_TO_INCH;
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { videoRef, error, loading, wristDetection, pinchDetection, startWebcam } = useDetection(true);
-  // const { pinchPos, indexPinch, middlePinch } = pinchDetection;
+  const { videoRef, error, loading, wristDetection, startWebcam } = useDetection(true);
   const { leftWrist, rightWrist } = wristDetection;
 
   const [participantId, setParticipantId] = useState<string>('');
@@ -170,12 +176,23 @@ const Study = () => {
   const [currentTaskIndex, setCurrentTaskIndex] = useState<number | null>(null);
   const [currentTrial, setCurrentTrial] = useState<number | null>(null);
   const [currentRepetition, setCurrentRepetition] = useState<number | null>(null);
+  const currentTask: Task | null = useMemo(() => (currentTaskIndex !== null && tasks.length > currentTaskIndex ? tasks[currentTaskIndex] : null), [tasks, currentTaskIndex]);
 
   const [currentTarget, setCurrentTarget] = useState<number | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [currentHoldPos, setCurrentHoldPos] = useState<Pos | null>(null);
+  const [taskStartTime, setTaskStartTime] = useState<number | null>(null);
 
-  const currentTask: Task | null = useMemo(() => (currentTaskIndex !== null && tasks.length > currentTaskIndex ? tasks[currentTaskIndex] : null), [tasks, currentTaskIndex]);
+  const isTaskRunning = useMemo<boolean>(() => {
+    if (taskStartTime !== null) return true;
+    return false;
+  }, [taskStartTime]);
+  const isStudyComplete = useMemo<boolean>(() => currentTaskIndex !== null && tasks !== null && currentTaskIndex === tasks.length, [currentTaskIndex, tasks]);
+
+  const data: DataCollection[] = [];
+  const rawData: DataCollectionRaw[] = [];
+
+  const goHome = () => {
+    if (window.confirm('Are you sure you want to return to the home page?')) go('#/');
+  };
 
   useEffect(() => {
     const hash = window.location.hash;
@@ -209,21 +226,13 @@ const Study = () => {
     startWebcam();
   }, [startWebcam]);
 
-  const goHome = () => {
-    window.location.hash = '#/';
-  };
-
   // TASK INITIALIZER
   useEffect(() => {
     if (currentTaskIndex === null) return;
-    if (currentTaskIndex === tasks.length) {
-      endStudy();
-      return;
-    }
-    const task = tasks[currentTaskIndex];
-    if (task.type === 'MOVE') setCurrentTarget(0);
-    else if (task.type === 'HOLD') setCurrentHoldPos(null);
-  }, [tasks, currentTaskIndex]);
+    if (isStudyComplete) return;
+    setCurrentTarget(0);
+    setTaskStartTime(null);
+  }, [tasks, currentTaskIndex, currentTrial, isStudyComplete]);
 
   useEffect(() => {
     if (currentTaskIndex === null) return;
@@ -231,20 +240,23 @@ const Study = () => {
     if (currentTarget === null) return;
     if (currentRepetition === null) return;
     if (currentTrial === null) return;
+    if (isStudyComplete) return;
 
     const { type, hand, markers, distanceThreshold, trials, repetitions } = currentTask;
 
     const activeWrist = hand === 'Left' ? { ...leftWrist } : { ...rightWrist };
     if (activeWrist.x === undefined || activeWrist.y === undefined) return;
 
-    const ax = activeWrist.x;
-    const ay = activeWrist.y;
-    const cx = markers[currentTarget].x * MM_TO_INCH * worldPPI;
-    const cy = markers[currentTarget].y * MM_TO_INCH * worldPPI;
-    const dt = distanceThreshold * MM_TO_INCH * worldPPI;
+    const ax = (activeWrist.x * INCH_TO_MM) / worldPPI;
+    const ay = (activeWrist.y * INCH_TO_MM) / worldPPI;
+    const cx = markers[currentTarget].x;
+    const cy = markers[currentTarget].y;
+    const dt = distanceThreshold;
 
     const d = distance(ax, ay, cx, cy);
     if (d > dt / 2) return;
+
+    if (taskStartTime === null) setTaskStartTime(Date.now());
 
     if (type === 'MOVE') {
       if (currentTarget < markers.length - 1) {
@@ -263,11 +275,28 @@ const Study = () => {
         setCurrentTarget(0);
       }
     }
-  }, [currentTask, currentTarget, leftWrist, rightWrist, currentTaskIndex, currentRepetition, currentTrial, worldPPI]);
+  }, [currentTask, currentTarget, leftWrist, rightWrist, currentTaskIndex, currentRepetition, currentTrial, worldPPI, taskStartTime, isStudyComplete]);
 
-  const endStudy = () => {
-    // TODO: Implement end study logic
-  };
+  if (!isStudyComplete)
+    return (
+      <div className="w-screen h-screen flex gap-6 flex-col items-center justify-center select-none">
+        <div className="flex flex-col gap-2 items-center justify-center">
+          <h1 className="text-2xl font-bold">Study Complete</h1>
+          <p className="text-gray-600">Thank you for participating!</p>
+          <div className="flex flex-row gap-2">
+            <button className="px-4 py-3 rounded-lg bg-white border border-gray-300 text-gray-900 hover:bg-gray-100 cursor-pointer">
+              <FontAwesomeIcon icon="download" className="mr-2" />
+              Download Data
+            </button>
+
+            <button className="px-4 py-3 rounded-lg bg-gray-200 text-gray-900 font-bold hover:bg-gray-800 hover:text-white cursor-pointer" onClick={goHome}>
+              <FontAwesomeIcon icon="home" className="mr-2" />
+              Home
+            </button>
+          </div>
+        </div>
+      </div>
+    );
 
   return (
     <div className="w-screen h-screen flex gap-6 flex-col items-center justify-center select-none">
@@ -287,23 +316,18 @@ const Study = () => {
           <div className="flex flex-row p-2 bg-white rounded-lg shadow gap-3 border border-gray-100 justify-center">
             <div className="flex flex-col items-center justify-between">
               <label className="text-sm font-bold text-gray-600">Status</label>
-              <span className="px-2 py-1 text-center rounded font-semibold text-xl">Ready</span>
+              <span className="w-42 px-2 py-1 text-center rounded font-semibold text-xl">{isTaskRunning ? 'Task Running' : 'Ready to Start'}</span>
             </div>
           </div>
 
           <div className="flex flex-row p-2 bg-white rounded-lg shadow gap-3 border border-gray-100 ">
             <div className="flex flex-col items-center justify-between">
-              <label className="text-sm font-bold text-gray-600">Participant ID</label>
+              <label className="text-sm font-bold text-gray-600">User ID</label>
               <span className="px-2 py-1 text-center rounded font-semibold text-xl">{participantId}</span>
             </div>
           </div>
 
           <div className="flex flex-row p-2 bg-white rounded-lg shadow gap-3 border border-gray-100 grow justify-between">
-            <div className="flex flex-col items-center justify-between">
-              <label className="text-sm font-bold text-gray-600">Task</label>
-              <span className="px-2 py-1 text-center rounded font-semibold text-xl">{currentTaskIndex !== null && currentTaskIndex + 1 + ' / ' + String(tasks.length)}</span>
-            </div>
-
             <div className="flex flex-col h-full items-center justify-center grow">
               <label className="text-sm font-bold text-gray-600">Instruction</label>
               <span className="px-2 py-1 text-center rounded font-semibold text-lg">
@@ -313,6 +337,10 @@ const Study = () => {
           </div>
 
           <div className="flex flex-row p-2 bg-white rounded-lg shadow gap-3 border border-gray-100 ">
+            <div className="flex flex-col items-center justify-between">
+              <label className="text-sm font-bold text-gray-600">Task</label>
+              <span className="px-2 py-1 text-center rounded font-semibold text-xl">{currentTaskIndex !== null && currentTaskIndex + 1 + ' / ' + String(tasks.length)}</span>
+            </div>
             <div className="flex flex-col items-center justify-between">
               <label className="text-sm font-bold text-gray-600">Trials</label>
               <span className="px-2 py-1 text-center rounded font-semibold text-xl">
@@ -352,13 +380,31 @@ const Study = () => {
                 task={currentTask}
                 currentTarget={currentTarget}
                 currentRepetition={currentRepetition}
+                isTaskRunning={isTaskRunning}
               />
             </div>
           )}
         </div>
 
         <span className="text-center text-md text-gray-500">
-          Press <kbd className="bg-gray-200 py-1 font-bold px-2 rounded">Space</kbd> to Begin Task
+          {!isTaskRunning && (
+            <>
+              <kbd className="bg-gray-200 py-1 font-bold px-2 rounded">Move {currentTask?.hand} Hand</kbd> Inside the{' '}
+              <kbd className="bg-red-200 py-1 font-bold px-2 rounded">Red Circle</kbd> to Begin Task
+            </>
+          )}
+          {isTaskRunning && currentTask?.type === 'MOVE' && (
+            <>
+              Follow the <kbd className="bg-red-200 py-1 font-bold px-2 rounded">Red Circle</kbd> with Your{' '}
+              <kbd className="bg-gray-200 py-1 font-bold px-2 rounded">{currentTask?.hand} Hand</kbd>
+            </>
+          )}
+          {isTaskRunning && currentTask?.type === 'HOLD' && (
+            <>
+              Keep Your <kbd className="bg-gray-200 py-1 font-bold px-2 rounded">{currentTask?.hand} Hand</kbd> Inside the{' '}
+              <kbd className="bg-red-200 py-1 font-bold px-2 rounded">Red Circle</kbd>
+            </>
+          )}
         </span>
       </div>
     </div>

@@ -8,6 +8,7 @@ import { LETTER_HEIGHT_INCH, MM_TO_INCH } from '../utils/constants';
 import { distance } from '../utils/math';
 import useDetection from '../hooks/useMediaPipeHandDetection';
 import type { Pos } from '../types/task';
+import { go } from '../utils/navigation';
 
 const sketch: Sketch = (p5) => {
   let width = 200;
@@ -238,7 +239,7 @@ const CameraCalibration = () => {
         </button>
         <button
           className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"
-          onClick={() => (window.location.hash = '#/')}
+          onClick={() => go('#/')}
         >
           Done
         </button>
