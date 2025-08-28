@@ -1,10 +1,11 @@
-export type DataCollection = {
+export type CollectedData = {
   time_sec: number;
+  participant_id: string;
   task_tag: string;
+  task_type: 'HOLD' | 'MOVE';
   task_idx: number;
   trial_idx: number;
   repetition_idx: number;
-  task_type: 'HOLD' | 'MOVE';
   target_idx: number;
   target_x_mm: number;
   target_y_mm: number;
@@ -16,13 +17,14 @@ export type DataCollection = {
   target_dist_mm: number;
 };
 
-export type DataCollectionRaw = {
+export type CollectedRawData = {
   time_sec: number;
+  participant_id: string;
   task_tag: string;
+  task_type: 'HOLD' | 'MOVE';
   task_idx: number;
   trial_idx: number;
   repetition_idx: number;
-  task_type: 'HOLD' | 'MOVE';
   target_idx: number;
   target_x_px: number;
   target_y_px: number;

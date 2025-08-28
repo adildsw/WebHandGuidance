@@ -10,8 +10,9 @@ import { uid } from 'uid/single';
 import useDetection from '../hooks/useMediaPipeHandDetection';
 import { decodeBase64 } from '../utils/encoder';
 import { distance } from '../utils/math';
-import type { DataCollection, DataCollectionRaw } from '../types/datacollection';
+import type { CollectedData, CollectedRawData } from '../types/datacollection';
 import { go } from '../utils/navigation';
+import { downloadZip, toCSV } from '../utils/datacollection';
 
 const sketch: Sketch = (p5) => {
   let w = 400;
@@ -187,11 +188,19 @@ const Study = () => {
   }, [taskStartTime]);
   const isStudyComplete = useMemo<boolean>(() => currentTaskIndex !== null && tasks !== null && currentTaskIndex === tasks.length, [currentTaskIndex, tasks]);
 
-  const data: DataCollection[] = [];
-  const rawData: DataCollectionRaw[] = [];
+  const [collectedData, setCollectedData] = useState<CollectedData[]>([]);
+  const [collectedRawData, setCollectedRawData] = useState<CollectedRawData[]>([]);
+  const [isDataSaved, setIsDataSaved] = useState<boolean>(false);
 
   const goHome = () => {
-    if (window.confirm('Are you sure you want to return to the home page?')) go('#/');
+    if (isDataSaved || window.confirm('Are you sure you want to return to the home page?')) go('#/');
+  };
+
+  const saveDataAsCSV = () => {
+    const dataCsv = toCSV<CollectedData>(collectedData, Object.keys(collectedData[0]) as (keyof CollectedData)[]);
+    const rawDataCsv = toCSV<CollectedRawData>(collectedRawData, Object.keys(collectedRawData[0]) as (keyof CollectedRawData)[]);
+    downloadZip("handguidance_" + participantId, dataCsv, rawDataCsv, JSON.stringify(tasks, null, 2));
+    setIsDataSaved(true);
   };
 
   useEffect(() => {
@@ -254,6 +263,51 @@ const Study = () => {
     const dt = distanceThreshold;
 
     const d = distance(ax, ay, cx, cy);
+    if (taskStartTime !== null) {
+      const elapsed = Date.now() - taskStartTime;
+      const dataInstance: CollectedData = {
+        time_sec: elapsed / 1000,
+        participant_id: participantId,
+        task_tag: currentTask.tag,
+        task_type: currentTask.type,
+        task_idx: currentTaskIndex,
+        trial_idx: currentTrial,
+        repetition_idx: currentRepetition,
+        target_idx: currentTarget,
+        target_x_mm: cx,
+        target_y_mm: cy,
+        target_threshold_mm: dt,
+        user_left_x_mm: ax,
+        user_left_y_mm: ay,
+        user_right_x_mm: ax,
+        user_right_y_mm: ay,
+        target_dist_mm: d,
+      };
+      const rawDataInstance: CollectedRawData = {
+        time_sec: elapsed / 1000,
+        participant_id: participantId,
+        task_tag: currentTask.tag,
+        task_type: currentTask.type,
+        task_idx: currentTaskIndex,
+        trial_idx: currentTrial,
+        repetition_idx: currentRepetition,
+        target_idx: currentTarget,
+        target_x_px: cx * MM_TO_INCH * worldPPI,
+        target_y_px: cy * MM_TO_INCH * worldPPI,
+        target_threshold_px: dt * MM_TO_INCH * worldPPI,
+        user_left_x_px: ax * MM_TO_INCH * worldPPI,
+        user_left_y_px: ay * MM_TO_INCH * worldPPI,
+        user_right_x_px: ax * MM_TO_INCH * worldPPI,
+        user_right_y_px: ay * MM_TO_INCH * worldPPI,
+        target_dist_px: d * MM_TO_INCH * worldPPI,
+        world_ppi: worldPPI,
+        scaling_factor: MM_TO_INCH * worldPPI,
+      };
+      setCollectedData((prev) => [...prev, dataInstance]);
+      setCollectedRawData((prev) => [...prev, rawDataInstance]);
+    }
+
+    // Facilitating Task Progression
     if (d > dt / 2) return;
 
     if (taskStartTime === null) setTaskStartTime(Date.now());
@@ -275,16 +329,16 @@ const Study = () => {
         setCurrentTarget(0);
       }
     }
-  }, [currentTask, currentTarget, leftWrist, rightWrist, currentTaskIndex, currentRepetition, currentTrial, worldPPI, taskStartTime, isStudyComplete]);
+  }, [currentTask, currentTarget, leftWrist, rightWrist, currentTaskIndex, currentRepetition, currentTrial, worldPPI, taskStartTime, isStudyComplete, participantId]);
 
-  if (!isStudyComplete)
+  if (isStudyComplete)
     return (
       <div className="w-screen h-screen flex gap-6 flex-col items-center justify-center select-none">
         <div className="flex flex-col gap-2 items-center justify-center">
           <h1 className="text-2xl font-bold">Study Complete</h1>
           <p className="text-gray-600">Thank you for participating!</p>
           <div className="flex flex-row gap-2">
-            <button className="px-4 py-3 rounded-lg bg-white border border-gray-300 text-gray-900 hover:bg-gray-100 cursor-pointer">
+            <button className="px-4 py-3 rounded-lg bg-white border border-gray-300 text-gray-900 hover:bg-gray-100 cursor-pointer" onClick={saveDataAsCSV}>
               <FontAwesomeIcon icon="download" className="mr-2" />
               Download Data
             </button>

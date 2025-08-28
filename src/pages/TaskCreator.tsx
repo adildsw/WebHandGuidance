@@ -8,6 +8,7 @@ import { INCH_TO_MM, MM_TO_INCH } from '../utils/constants';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import type { Font } from 'p5';
 import useDetection from '../hooks/useMediaPipeHandDetection';
+import { go } from '../utils/navigation';
 
 const sketch: Sketch = (p5) => {
   let w = 400;
@@ -229,9 +230,7 @@ const TaskCreator = () => {
   };
 
   const returnToHome = () => {
-    if (!isModified || window.confirm('You have unsaved changes. Do you want to discard them?')) {
-      window.location.hash = '#/';
-    }
+    if (!isModified || window.confirm('You have unsaved changes. Do you want to discard them?')) go('#/');
   };
 
   /**
