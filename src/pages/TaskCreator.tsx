@@ -518,10 +518,11 @@ const TaskCreator = () => {
             <div className="flex flex-col items-center justify-between">
               <label className="text-sm font-bold text-gray-600">Trials</label>
               <input
-                className="w-16 px-2 py-1 rounded border border-gray-300 text-center"
+                className={`w-16 px-2 py-1 rounded border border-gray-300 text-center ${tasks[currentIndex].type === 'HOLD' ? 'opacity-50 cursor-not-allowed' : ''}`}
                 inputMode="numeric"
                 pattern="[0-9]*"
                 value={String(tasks[currentIndex].trials)}
+                disabled={tasks[currentIndex].type === 'HOLD'}
                 onChange={(e) => {
                   const v = e.target.value.replace(/[^0-9]/g, '');
                   const n = v === '' ? 0 : Number(v);

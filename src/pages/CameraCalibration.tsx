@@ -208,7 +208,7 @@ const CameraCalibration = () => {
             ) : !calibrationReady.left || !calibrationReady.right ? (
               <p className="text-gray-500 text-md">Pinch using your middle finger to begin calibration.</p>
             ) : (
-              <p className="text-red-500 text-md font-bold">Please hold steady for {Math.round((CALIBRATION_TIMER - calibrationProgress * CALIBRATION_TIMER) / 1000)} seconds</p>
+              <p className="text-red-500 text-md font-bold">Please hold steady for {Math.floor((CALIBRATION_TIMER - calibrationProgress * CALIBRATION_TIMER) / 1000)} seconds</p>
             )}
           </div>
         )}

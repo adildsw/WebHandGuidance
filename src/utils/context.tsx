@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { CalibrationTools, Config, ConfigContextType } from '../types/config';
 import type { Task } from '../types/task';
@@ -71,18 +71,18 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     setConfigState((prev) => ({ ...prev, defaultStartDuration: duration }));
   };
 
-  const generateDefaultTask = useCallback((type: 'MOVE' | 'HOLD' = config.defaultTaskType): Task => {
+  const generateDefaultTask = (type: 'MOVE' | 'HOLD' = config.defaultTaskType): Task => {
     return {
       tag: 'task-' + uid(5),
       hand: config.defaultHand,
-      trials: config.defaultTrials,
+      trials: type === 'MOVE' ? config.defaultTrials : 1,
       repetitions: type === 'MOVE' ? config.defaultRepetitions : 1,
       distanceThreshold: config.defaultDistanceThreshold,
       holdDuration: config.defaultHoldDuration,
       type: type,
-      markers: [{x: 0, y: 0}],
+      markers: [{ x: 0, y: 0 }],
     };
-  }, []);
+  };
 
   useEffect(() => {
     localStorage.setItem('appConfig', JSON.stringify(config));

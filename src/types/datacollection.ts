@@ -3,6 +3,7 @@ export type CollectedData = {
   participant_id: string;
   task_tag: string;
   task_type: 'HOLD' | 'MOVE';
+  user_hand: 'Left' | 'Right';
   task_idx: number;
   trial_idx: number;
   repetition_idx: number;
@@ -22,6 +23,7 @@ export type CollectedRawData = {
   participant_id: string;
   task_tag: string;
   task_type: 'HOLD' | 'MOVE';
+  user_hand: 'Left' | 'Right';
   task_idx: number;
   trial_idx: number;
   repetition_idx: number;

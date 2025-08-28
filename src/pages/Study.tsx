@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ReactP5Wrapper } from '@p5-wrapper/react';
 import type { Sketch } from '@p5-wrapper/react';
 import type { Pos, Task } from '../types/task';
@@ -31,6 +31,7 @@ const sketch: Sketch = (p5) => {
   let currentTarget: number = -1;
   let isRepeating: boolean = false;
   let isTaskRunning: boolean = false;
+  let holdProgress: number = 0;
 
   p5.preload = () => {
     f = p5.loadFont('./fonts/sf-ui-display-bold.otf');
@@ -52,6 +53,7 @@ const sketch: Sketch = (p5) => {
     wristPos?: { left: Pos | null; right: Pos | null };
     currentRepetition?: number | null;
     isTaskRunning?: boolean;
+    holdProgress?: number;
   }) => {
     if (typeof props.frameWidth === 'number') w = props.frameWidth;
     if (typeof props.frameHeight === 'number') h = props.frameHeight;
@@ -74,6 +76,7 @@ const sketch: Sketch = (p5) => {
     currentTarget = typeof props.currentTarget === 'number' ? props.currentTarget : -1;
     isRepeating = typeof props.currentRepetition === 'number' ? props.currentRepetition < task.repetitions - 1 : false;
     isTaskRunning = typeof props.isTaskRunning === 'boolean' ? props.isTaskRunning : false;
+    holdProgress = typeof props.holdProgress === 'number' ? props.holdProgress : 0;
   };
 
   p5.draw = () => {
@@ -81,7 +84,41 @@ const sketch: Sketch = (p5) => {
     if (!task) return;
 
     if (task.type === 'MOVE') drawMarkers();
+    else if (task.type === 'HOLD') drawHoldMarker();
     drawWrist();
+  };
+
+  const drawHoldMarker = () => {
+    if (currentTarget === -1) return;
+    if (task === null) return;
+
+    const activeWrist = wristPos[task.hand === 'Left' ? 'left' : 'right'];
+    const isInsideTarget =
+      activeWrist &&
+      distance((activeWrist.x * INCH_TO_MM) / worldPPI, (activeWrist.y * INCH_TO_MM) / worldPPI, markers[currentTarget].x, markers[currentTarget].y) < distanceThreshold / 2;
+
+    const cPos: Pos = { x: markers[currentTarget].x * MM_TO_INCH * worldPPI, y: markers[currentTarget].y * MM_TO_INCH * worldPPI };
+    p5.noStroke();
+    if (isInsideTarget) p5.fill(0, 255, 0, 128);
+    else p5.fill(255, 0, 0, 128);
+    p5.circle(cPos.x, cPos.y, markerDiameter);
+
+    p5.strokeWeight(2);
+    if (isInsideTarget) {
+      p5.stroke(0, 255, 0);
+      p5.fill(0, 255, 0, 32);
+    } else {
+      p5.stroke(255, 0, 0);
+      p5.fill(255, 0, 0, 32);
+    }
+    p5.circle(cPos.x, cPos.y, distanceThreshold * MM_TO_INCH * worldPPI);
+
+    // Draw arc to show progress around marker
+    p5.noFill();
+    p5.strokeWeight(4);
+    p5.stroke(255);
+    p5.arc(cPos.x, cPos.y, 1.2 * distanceThreshold * MM_TO_INCH * worldPPI, 1.2 * distanceThreshold * MM_TO_INCH * worldPPI, -p5.HALF_PI, -p5.HALF_PI + p5.TWO_PI * holdProgress);
+
   };
 
   const drawMarkers = () => {
@@ -181,6 +218,12 @@ const Study = () => {
 
   const [currentTarget, setCurrentTarget] = useState<number | null>(null);
   const [taskStartTime, setTaskStartTime] = useState<number | null>(null);
+  const holdProgress = (() => {
+    if (!taskStartTime) return 0;
+    const elapsed = Date.now() - taskStartTime;
+    const percent = Math.min(elapsed / (currentTask?.holdDuration || 1), 1);
+    return percent;
+  })();
 
   const isTaskRunning = useMemo<boolean>(() => {
     if (taskStartTime !== null) return true;
@@ -199,7 +242,7 @@ const Study = () => {
   const saveDataAsCSV = () => {
     const dataCsv = toCSV<CollectedData>(collectedData, Object.keys(collectedData[0]) as (keyof CollectedData)[]);
     const rawDataCsv = toCSV<CollectedRawData>(collectedRawData, Object.keys(collectedRawData[0]) as (keyof CollectedRawData)[]);
-    downloadZip("handguidance_" + participantId, dataCsv, rawDataCsv, JSON.stringify(tasks, null, 2));
+    downloadZip('handguidance_' + participantId, dataCsv, rawDataCsv, JSON.stringify(tasks, null, 2));
     setIsDataSaved(true);
   };
 
@@ -243,6 +286,31 @@ const Study = () => {
     setTaskStartTime(null);
   }, [tasks, currentTaskIndex, currentTrial, isStudyComplete]);
 
+  const progressTask = useCallback(() => {
+    if (currentTask === null) return;
+    if (currentTarget === null) return;
+    if (currentRepetition === null) return;
+    if (currentTrial === null) return;
+    if (currentTaskIndex === null) return;
+
+    const { markers, repetitions, trials } = currentTask;
+    if (currentTarget < markers.length - 1) {
+      setCurrentTarget(currentTarget + 1);
+    } else if (currentRepetition < repetitions - 1) {
+      setCurrentRepetition(currentRepetition + 1);
+      setCurrentTarget(0);
+    } else if (currentTrial < trials - 1) {
+      setCurrentTrial(currentTrial + 1);
+      setCurrentRepetition(0);
+      setCurrentTarget(0);
+    } else {
+      setCurrentTaskIndex(currentTaskIndex + 1);
+      setCurrentTrial(0);
+      setCurrentRepetition(0);
+      setCurrentTarget(0);
+    }
+  }, [currentTarget, currentRepetition, currentTrial, currentTaskIndex, currentTask]);
+
   useEffect(() => {
     if (currentTaskIndex === null) return;
     if (currentTask === null) return;
@@ -251,7 +319,7 @@ const Study = () => {
     if (currentTrial === null) return;
     if (isStudyComplete) return;
 
-    const { type, hand, markers, distanceThreshold, trials, repetitions } = currentTask;
+    const { type, hand, markers, distanceThreshold } = currentTask;
 
     const activeWrist = hand === 'Left' ? { ...leftWrist } : { ...rightWrist };
     if (activeWrist.x === undefined || activeWrist.y === undefined) return;
@@ -270,6 +338,7 @@ const Study = () => {
         participant_id: participantId,
         task_tag: currentTask.tag,
         task_type: currentTask.type,
+        user_hand: hand,
         task_idx: currentTaskIndex,
         trial_idx: currentTrial,
         repetition_idx: currentRepetition,
@@ -288,6 +357,7 @@ const Study = () => {
         participant_id: participantId,
         task_tag: currentTask.tag,
         task_type: currentTask.type,
+        user_hand: hand,
         task_idx: currentTaskIndex,
         trial_idx: currentTrial,
         repetition_idx: currentRepetition,
@@ -310,26 +380,12 @@ const Study = () => {
     // Facilitating Task Progression
     if (d > dt / 2) return;
 
-    if (taskStartTime === null) setTaskStartTime(Date.now());
-
-    if (type === 'MOVE') {
-      if (currentTarget < markers.length - 1) {
-        setCurrentTarget(currentTarget + 1);
-      } else if (currentRepetition < repetitions - 1) {
-        setCurrentRepetition(currentRepetition + 1);
-        setCurrentTarget(0);
-      } else if (currentTrial < trials - 1) {
-        setCurrentTrial(currentTrial + 1);
-        setCurrentRepetition(0);
-        setCurrentTarget(0);
-      } else {
-        setCurrentTaskIndex(currentTaskIndex + 1);
-        setCurrentTrial(0);
-        setCurrentRepetition(0);
-        setCurrentTarget(0);
-      }
+    if (taskStartTime === null) {
+      setTaskStartTime(Date.now());
+      if (type === 'HOLD') setTimeout(() => progressTask(), currentTask.holdDuration);
     }
-  }, [currentTask, currentTarget, leftWrist, rightWrist, currentTaskIndex, currentRepetition, currentTrial, worldPPI, taskStartTime, isStudyComplete, participantId]);
+    if (type === 'MOVE') progressTask();
+  }, [currentTask, currentTarget, leftWrist, rightWrist, currentTaskIndex, currentRepetition, currentTrial, worldPPI, taskStartTime, isStudyComplete, participantId, progressTask]);
 
   if (isStudyComplete)
     return (
@@ -385,7 +441,15 @@ const Study = () => {
             <div className="flex flex-col h-full items-center justify-center grow">
               <label className="text-sm font-bold text-gray-600">Instruction</label>
               <span className="px-2 py-1 text-center rounded font-semibold text-lg">
-                Move <span className="font-bold text-red-800 border p-1 rounded">{currentTask?.hand} Hand</span> to Target
+                {currentTask?.type === 'MOVE' ? (
+                  <>
+                    <span className="font-bold text-blue-800">Move</span> <span className="font-bold text-red-800 border p-1 rounded">{currentTask?.hand} Hand</span> to Target
+                  </>
+                ) : (
+                  <>
+                    <span className="font-bold text-blue-800">Hold</span> <span className="font-bold text-red-800 border p-1 rounded">{currentTask?.hand} Hand</span> Inside Target
+                  </>
+                )}
               </span>
             </div>
           </div>
@@ -435,6 +499,7 @@ const Study = () => {
                 currentTarget={currentTarget}
                 currentRepetition={currentRepetition}
                 isTaskRunning={isTaskRunning}
+                holdProgress={holdProgress}
               />
             </div>
           )}
@@ -455,8 +520,9 @@ const Study = () => {
           )}
           {isTaskRunning && currentTask?.type === 'HOLD' && (
             <>
-              Keep Your <kbd className="bg-gray-200 py-1 font-bold px-2 rounded">{currentTask?.hand} Hand</kbd> Inside the{' '}
-              <kbd className="bg-red-200 py-1 font-bold px-2 rounded">Red Circle</kbd>
+              Keep Your <kbd className="bg-gray-200 py-1 font-bold px-2 rounded">{currentTask?.hand} Hand</kbd> Steady Inside the{' '}
+              <kbd className="bg-red-200 py-1 font-bold px-2 rounded">Red Circle</kbd> for{' '}
+              <span className="font-bold text-red-600">{Math.ceil(((1 - holdProgress) * (currentTask?.holdDuration || 1)) / 1000)} more seconds</span>
             </>
           )}
         </span>
