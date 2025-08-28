@@ -312,7 +312,7 @@ const TaskCreator = () => {
 
   const onContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
-    let { x, y } = getMousePos(e);
+    const { x, y } = getMousePos(e);
     const idx = findHoverIndex(x, y);
     if (idx !== null && tasks[currentIndex].markers.length > 1) {
       setTasks((prev) => {

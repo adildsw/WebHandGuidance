@@ -3,7 +3,7 @@ import { ReactP5Wrapper } from '@p5-wrapper/react';
 import type { Sketch } from '@p5-wrapper/react';
 import type { Pos, Task } from '../types/task';
 import { useConfig } from '../utils/context';
-import { INCH_TO_MM, MM_TO_INCH } from '../utils/constants';
+import { MM_TO_INCH } from '../utils/constants';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import type { Font } from 'p5';
 import { uid } from 'uid/single';
@@ -26,6 +26,7 @@ const sketch: Sketch = (p5) => {
   let distanceThreshold = 15;
 
   let currentTarget: number = -1;
+  let isRepeating: boolean = false;
 
   p5.preload = () => {
     f = p5.loadFont('./fonts/sf-ui-display-bold.otf');
@@ -45,26 +46,28 @@ const sketch: Sketch = (p5) => {
     task?: Task | null;
     currentTarget?: number | null;
     wristPos?: { left: Pos | null; right: Pos | null };
+    currentRepetition?: number | null;
   }) => {
     if (typeof props.frameWidth === 'number') w = props.frameWidth;
     if (typeof props.frameHeight === 'number') h = props.frameHeight;
     if (typeof props.markerDiameter === 'number') markerDiameter = props.markerDiameter;
     if (typeof props.worldPPI === 'number') worldPPI = props.worldPPI;
+    if (p5.width !== w || p5.height !== h) p5.resizeCanvas(w, h);
 
-    if (props.task) {
-      task = props.task;
-      markers = props.task.markers;
-      distanceThreshold = props.task.distanceThreshold;
-    } else {
+    if (props.wristPos) wristPos = props.wristPos;
+
+    if (props.task === null || props.task === undefined) {
       task = null;
       markers = [];
       distanceThreshold = 15;
+      return;
     }
 
+    task = props.task;
+    markers = props.task.markers;
+    distanceThreshold = props.task.distanceThreshold;
     currentTarget = typeof props.currentTarget === 'number' ? props.currentTarget : -1;
-    if (props.wristPos) wristPos = props.wristPos;
-
-    if (p5.width !== w || p5.height !== h) p5.resizeCanvas(w, h);
+    isRepeating = typeof props.currentRepetition === 'number' ? props.currentRepetition < task.repetitions - 1 : false;
   };
 
   p5.draw = () => {
@@ -80,62 +83,70 @@ const sketch: Sketch = (p5) => {
     p5.stroke(255);
     p5.strokeWeight(2);
 
-    for (let i = currentTarget; i < Math.min(markers.length, currentTarget + 2); i++) {
-      const cx = markers[i].x * MM_TO_INCH * worldPPI;
-      const cy = markers[i].y * MM_TO_INCH * worldPPI;
+    // Current Target
+    const cPos: Pos = { x: markers[currentTarget].x * MM_TO_INCH * worldPPI, y: markers[currentTarget].y * MM_TO_INCH * worldPPI };
 
-      // Draw Markers
-      if (i === currentTarget) p5.fill(0, 255, 0, 200);
-      else if (i < currentTarget) p5.fill(0, 0, 255, 32);
-      else p5.fill(255);
+    // Next Target
+    let nPos: Pos | null = null;
+    if (currentTarget < markers.length - 1) nPos = { x: markers[currentTarget + 1].x * MM_TO_INCH * worldPPI, y: markers[currentTarget + 1].y * MM_TO_INCH * worldPPI };
+    else if (isRepeating) nPos = { x: markers[0].x * MM_TO_INCH * worldPPI, y: markers[0].y * MM_TO_INCH * worldPPI };
+
+    // Current Marker
+    p5.noStroke();
+    p5.fill(0, 255, 0, 200);
+    p5.circle(cPos.x, cPos.y, markerDiameter);
+
+    // Current Marker Threshold
+    p5.noFill();
+    p5.stroke(255, 0, 0);
+    p5.strokeWeight(2);
+    p5.circle(cPos.x, cPos.y, distanceThreshold * MM_TO_INCH * worldPPI);
+
+    // Current Marker Label
+    p5.fill(255);
+    p5.textAlign(p5.CENTER, p5.CENTER);
+    p5.textSize(12);
+    p5.text(String(currentTarget + 1), cPos.x, cPos.y);
+
+    if (nPos) {
+      // Next Marker
       p5.noStroke();
-      p5.circle(cx, cy, markerDiameter);
+      p5.fill(255, 255, 255, 64);
+      p5.circle(nPos.x, nPos.y, markerDiameter);
 
-      // Draw Threshold
-      if (i >= currentTarget) {
-        if (i === currentTarget) {
-          p5.stroke(255, 0, 0, 200);
-          p5.strokeWeight(4);
-        } else {
-          p5.stroke(255, 255, 255);
-          p5.strokeWeight(1);
-        }
-        p5.noFill();
-        // p5.circle(cx, cy, distanceThreshold);
-        p5.circle(cx, cy, distanceThreshold * MM_TO_INCH * worldPPI);
-      }
-
-      // Draw Lines
-      // if (i === currentTarget) p5.stroke(255, 0, 0);
-      // else if (i < currentTarget) p5.stroke(0, 0, 255, 32);
-      p5.stroke(255);
-      p5.strokeWeight(i === currentTarget ? 2 : 1);
-      if (i > 0) {
-        const px = markers[i - 1].x * MM_TO_INCH * worldPPI;
-        const py = markers[i - 1].y * MM_TO_INCH * worldPPI;
-        p5.line(cx, cy, px, py);
-      }
-
-      // Draw Marker Labels
-      p5.fill(0);
+      // Label
+      p5.fill(255);
       p5.textAlign(p5.CENTER, p5.CENTER);
       p5.textSize(12);
-      p5.text(String(i + 1), cx, cy);
+      p5.text(String(currentTarget + 2), nPos.x, nPos.y);
+
+      // Line
+      p5.stroke(255, 255, 255, 64);
+      p5.strokeWeight(2);
+      p5.line(cPos.x, cPos.y, nPos.x, nPos.y);
     }
   };
 
   const drawWrist = () => {
     p5.noStroke();
 
+    // Wrist Marker
     p5.fill(0, 0, 255, 128);
     if (wristPos.left) p5.circle(wristPos.left.x, wristPos.left.y, 12);
     if (wristPos.right) p5.circle(wristPos.right.x, wristPos.right.y, 12);
 
+    // Wrist Label
     p5.fill(255);
     p5.textAlign(p5.CENTER, p5.CENTER);
     p5.textSize(6);
     if (wristPos.left) p5.text('L', wristPos.left.x, wristPos.left.y);
     if (wristPos.right) p5.text('R', wristPos.right.x, wristPos.right.y);
+
+    // Wrist to Target Line
+    p5.strokeWeight(2);
+    p5.stroke(255, 0, 0, 128);
+    if (wristPos.left) p5.line(wristPos.left.x, wristPos.left.y, markers[currentTarget].x * MM_TO_INCH * worldPPI, markers[currentTarget].y * MM_TO_INCH * worldPPI);
+    if (wristPos.right) p5.line(wristPos.right.x, wristPos.right.y, markers[currentTarget].x * MM_TO_INCH * worldPPI, markers[currentTarget].y * MM_TO_INCH * worldPPI);
   };
 };
 
@@ -252,7 +263,7 @@ const Study = () => {
         setCurrentTarget(0);
       }
     }
-  }, [currentTask, currentTarget, leftWrist, rightWrist, currentTaskIndex]);
+  }, [currentTask, currentTarget, leftWrist, rightWrist, currentTaskIndex, currentRepetition, currentTrial, worldPPI]);
 
   const endStudy = () => {
     // TODO: Implement end study logic
@@ -340,6 +351,7 @@ const Study = () => {
                 wristPos={{ left: leftWrist, right: rightWrist }}
                 task={currentTask}
                 currentTarget={currentTarget}
+                currentRepetition={currentRepetition}
               />
             </div>
           )}

@@ -103,7 +103,7 @@ const CameraCalibration = () => {
   const testbedWidth = testbedWidthMM * MM_TO_INCH * factor;
   const testbedHeight = testbedHeightMM * MM_TO_INCH * factor;
 
-  const { videoRef, pinchDetection, loading, error, startWebcam } = useDetection('PINCH', true);
+  const { videoRef, pinchDetection, loading, error, startWebcam } = useDetection(true);
   const [calibrationStartTime, setCalibrationStartTime] = useState<number | null>(null);
   const [isCalibrated, setIsCalibrated] = useState(false);
   const timerRef = useRef<number | null>(null);
