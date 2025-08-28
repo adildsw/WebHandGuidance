@@ -14,6 +14,9 @@ import type { CollectedData, CollectedRawData } from '../types/datacollection';
 import { go } from '../utils/navigation';
 import { downloadZip, toCSV } from '../utils/datacollection';
 
+const CLICK_SOUND = new Audio('./audio/click.mp3');
+const BEEP_SOUND = new Audio('./audio/beep.mp3');
+
 const sketch: Sketch = (p5) => {
   let w = 400;
   let h = 300;
@@ -296,18 +299,22 @@ const Study = () => {
     const { markers, repetitions, trials } = currentTask;
     if (currentTarget < markers.length - 1) {
       setCurrentTarget(currentTarget + 1);
+      CLICK_SOUND.play();
     } else if (currentRepetition < repetitions - 1) {
       setCurrentRepetition(currentRepetition + 1);
       setCurrentTarget(0);
+      CLICK_SOUND.play();
     } else if (currentTrial < trials - 1) {
       setCurrentTrial(currentTrial + 1);
       setCurrentRepetition(0);
       setCurrentTarget(0);
+      BEEP_SOUND.play();
     } else {
       setCurrentTaskIndex(currentTaskIndex + 1);
       setCurrentTrial(0);
       setCurrentRepetition(0);
       setCurrentTarget(0);
+      BEEP_SOUND.play();
     }
   }, [currentTarget, currentRepetition, currentTrial, currentTaskIndex, currentTask]);
 
