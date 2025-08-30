@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef, CSSProperties } from 'react';
+import React, { useEffect, useRef, type CSSProperties } from 'react';
 
 interface ParallaxBackgroundProps {
     strength?: number;

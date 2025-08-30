@@ -2,15 +2,15 @@ import { HashRouter, Route, Routes } from 'react-router-dom';
 import ScreenCalibration from './pages/ScreenCalibration';
 import { ConfigProvider } from './utils/context';
 import TaskCreator from './pages/TaskCreator';
-import ParallaxBackground from './extras/ParallaxBackground';
+import ParallaxBackground from './components/ParallaxBackground';
 import Config from './pages/Config';
 import Home from './pages/Home';
 import { library } from '@fortawesome/fontawesome-svg-core';
-import { faChevronLeft, faChevronRight, faDownload, faFile, faFolderOpen, faHome, faPlus, faRedo, faSave, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faChevronLeft, faChevronRight, faDownload, faFile, faFolderOpen, faHome, faPlus, faRedo, faSave, faTrash, faUpRightAndDownLeftFromCenter } from '@fortawesome/free-solid-svg-icons';
 import Study from './pages/Study';
 import CameraCalibration from './pages/CameraCalibration';
 
-library.add(faHome, faSave, faFile, faChevronLeft, faChevronRight, faPlus, faTrash, faRedo, faFolderOpen, faDownload);
+library.add(faHome, faSave, faFile, faChevronLeft, faChevronRight, faPlus, faTrash, faRedo, faFolderOpen, faDownload, faUpRightAndDownLeftFromCenter);
 
 const App = () => {
   return (

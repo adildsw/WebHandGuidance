@@ -607,12 +607,12 @@ const TaskCreator = () => {
 
         {/* Camera Feed */}
         <div
-          className="md:col-span-3 rounded-lg shadow-lg bg-gray-100 overflow-hidden flex items-center justify-center relative"
+          className="md:col-span-3 bg-gray-100 flex items-center justify-center relative"
           style={{ width: `${testbedWidth}px`, height: `${testbedHeight}px` }}
         >
           <div
             ref={overlayRef}
-            className="absolute inset-0"
+            className="absolute inset-0 overflow-hidden rounded-lg shadow-lg"
             onMouseMove={onMouseMove}
             onMouseDown={onMouseDown}
             onMouseUp={onMouseUp}

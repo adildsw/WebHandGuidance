@@ -9,6 +9,7 @@ import { distance } from '../utils/math';
 import useDetection from '../hooks/useMediaPipeHandDetection';
 import type { Pos } from '../types/task';
 import { go } from '../utils/navigation';
+import Resizer from '../components/Resizer';
 
 const sketch: Sketch = (p5) => {
   let width = 200;
@@ -177,10 +178,10 @@ const CameraCalibration = () => {
 
       {/* Camera Feed */}
       <div
-        className="md:col-span-3 rounded-lg shadow-lg bg-gray-100 overflow-hidden flex items-center justify-center relative"
+        className="md:col-span-3 bg-gray-100 flex items-center justify-center relative"
         style={{ width: `${testbedWidth}px`, height: `${testbedHeight}px` }}
       >
-        <div ref={overlayRef} className="absolute inset-0">
+        <div ref={overlayRef} className="absolute inset-0 overflow-hidden rounded-lg shadow-lg">
           {!loading && !error && <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />}
           {!isCalibrated && (
             <div className="absolute inset-0">
@@ -198,6 +199,7 @@ const CameraCalibration = () => {
             </div>
           )}
         </div>
+        {!isCalibrated && <Resizer />}
       </div>
 
       <div className="flex flex-col text-center">

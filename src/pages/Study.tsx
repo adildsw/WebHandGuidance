@@ -121,7 +121,6 @@ const sketch: Sketch = (p5) => {
     p5.strokeWeight(4);
     p5.stroke(255);
     p5.arc(cPos.x, cPos.y, 1.2 * distanceThreshold * MM_TO_INCH * worldPPI, 1.2 * distanceThreshold * MM_TO_INCH * worldPPI, -p5.HALF_PI, -p5.HALF_PI + p5.TWO_PI * holdProgress);
-
   };
 
   const drawMarkers = () => {
@@ -482,34 +481,33 @@ const Study = () => {
           </div>
         </div>
 
-        <div
-          className="md:col-span-3 rounded-lg shadow-lg bg-gray-100 overflow-hidden flex items-center justify-center relative"
-          style={{ width: `${testbedWidth}px`, height: `${testbedHeight}px` }}
-        >
-          {!error && !loading && (
-            <video ref={videoRef} muted playsInline className={`absolute inset-0 w-full h-full object-cover ${isTaskCorrupt && 'blur'}`} style={{ transform: 'scaleX(-1)' }} />
-          )}
-          {isTaskCorrupt ? (
-            <span className="text-red-600 bg-white border p-2 font-bold text-gray-500 z-9">[ERROR] Corrupt Task Data</span>
-          ) : (
-            <div className="absolute inset-0">
-              <ReactP5Wrapper
-                sketch={sketch}
-                frameWidth={testbedWidth}
-                frameHeight={testbedHeight}
-                devicePPI={devicePPI}
-                devicePixelRatio={devicePixelRatio}
-                markerDiameter={markerDiameter}
-                worldPPI={worldPPI}
-                wristPos={{ left: leftWrist, right: rightWrist }}
-                task={currentTask}
-                currentTarget={currentTarget}
-                currentRepetition={currentRepetition}
-                isTaskRunning={isTaskRunning}
-                holdProgress={holdProgress}
-              />
-            </div>
-          )}
+        <div className="md:col-span-3 bg-gray-100 flex items-center justify-center relative" style={{ width: `${testbedWidth}px`, height: `${testbedHeight}px` }}>
+          <div className="absolute inset-0 overflow-hidden rounded-lg shadow-lg">
+            {!error && !loading && (
+              <video ref={videoRef} muted playsInline className={`absolute inset-0 w-full h-full object-cover ${isTaskCorrupt && 'blur'}`} style={{ transform: 'scaleX(-1)' }} />
+            )}
+            {isTaskCorrupt ? (
+              <span className="text-red-600 bg-white border p-2 font-bold text-gray-500 z-9">[ERROR] Corrupt Task Data</span>
+            ) : (
+              <div className="absolute inset-0">
+                <ReactP5Wrapper
+                  sketch={sketch}
+                  frameWidth={testbedWidth}
+                  frameHeight={testbedHeight}
+                  devicePPI={devicePPI}
+                  devicePixelRatio={devicePixelRatio}
+                  markerDiameter={markerDiameter}
+                  worldPPI={worldPPI}
+                  wristPos={{ left: leftWrist, right: rightWrist }}
+                  task={currentTask}
+                  currentTarget={currentTarget}
+                  currentRepetition={currentRepetition}
+                  isTaskRunning={isTaskRunning}
+                  holdProgress={holdProgress}
+                />
+              </div>
+            )}
+          </div>
         </div>
 
         <span className="text-center text-md text-gray-500">
