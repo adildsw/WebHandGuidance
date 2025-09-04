@@ -2,8 +2,6 @@
 
 **WebHandGuidance** is a web‑based testbed for designing and running camera‑tracked hand navigation studies consisting of move and hold tasks. It lets designers share study links directly with participants and automatically generates downloadable tracking data from completed tasks.
 
----
-
 ## Running the System
 
 The simplest way to run WebHandGuidance is to go to:  
@@ -32,7 +30,6 @@ If the build and launch succeed, you should see the following homepage:
 
 ![Homepage](./public/assets/homepage.jpeg)
 
----
 
 ## System Overview & Instructions
 
@@ -62,8 +59,6 @@ Camera calibration establishes how pixel distances map to real-world distances f
 
 ![Camera Calibration Pinch](./public/assets/camera_calibration_pinch.jpeg)
 
----
-
 ### 2) Designing Study Tasks
 
 The testbed supports two hand guidance task types: **Move Task** and **Hold Task**.
@@ -84,8 +79,6 @@ The marker can be dragged to specify the hold position. The **distance threshold
 
 For each task, handedness can be specified. Multiple tasks can be added within a single study design. When ready, save the study from the top bar as a **JSON** file (it can be reloaded later for edits).
 
----
-
 ### 3) Performing Tasks
 
 There are two ways to start a study:
@@ -101,3 +94,9 @@ Once the task is loaded, they appear sequentially, and the data recording starts
 Upon completion, the results can be downloaded as a **results package** containing recorded hand positions, target positions, and task metadata.
 
 ![Download Results](./public/assets/download_page.jpeg)
+
+## Contribution
+We welcome contributions to this project! If you have suggestions for improvements or new features, please submit an issue or pull request.
+
+## License (GPL)
+This project is licensed under the GNU General Public License v3.0.
