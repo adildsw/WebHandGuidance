@@ -9,6 +9,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import type { Font } from 'p5';
 import useDetection from '../hooks/useMediaPipeHandDetection';
 import { go } from '../utils/navigation';
+import toast from 'react-hot-toast';
+import { encodeBase64 } from '../utils/encoder';
 
 const sketch: Sketch = (p5) => {
   let w = 400;
@@ -362,6 +364,24 @@ const TaskCreator = () => {
     setCurrentIndex(idx);
   };
 
+  const getStudyLink = () => {
+    const encoded = encodeBase64(JSON.stringify(tasks));
+    const currentWebsiteBeforeHash = window.location.href.split('#')[0];
+    return `${currentWebsiteBeforeHash}#/study?data=${encoded}`;
+  }
+
+  const copyStudyLink = () => {
+    const encodedLink = getStudyLink();
+    navigator.clipboard.writeText(encodedLink);
+    toast.success("Study Link Copied to Clipboard!", {
+      position: 'bottom-center',
+      icon: '📋',
+      style: {
+        border: '1px solid #ccc',
+      }
+    });
+  };
+
   const disablePrev = currentIndex <= 0;
   const atLast = currentIndex === tasks.length - 1 || tasks.length === 0;
   const plusDisabled = tasks[currentIndex].markers.length < 3;
@@ -386,10 +406,10 @@ const TaskCreator = () => {
               className=" rounded border border-gray-300 px-1 py-1 ml-2 text-sm italic shrink-1"
             />
 
-            <button className={`px-2 py-2 rounded text-lg bg-gray-300 cursor-pointer hover:bg-gray-600 hover:text-white items-center flex gap-1 font-bold`} onClick={newStudyTask}>
+            <button title="Create New Study Task" className={`px-2 py-2 rounded text-lg bg-gray-300 cursor-pointer hover:bg-gray-600 hover:text-white items-center flex gap-1 font-bold`} onClick={newStudyTask}>
               <FontAwesomeIcon icon="file" />
             </button>
-            <label className="px-2 py-2 rounded text-lg bg-gray-300 cursor-pointer hover:bg-gray-600 hover:text-white items-center flex gap-1 font-bold">
+            <label title="Open Study Task" className="px-2 py-2 rounded text-lg bg-gray-300 cursor-pointer hover:bg-gray-600 hover:text-white items-center flex gap-1 font-bold">
               <FontAwesomeIcon icon="folder-open" />
               <input
                 type="file"
@@ -404,10 +424,13 @@ const TaskCreator = () => {
                 className="hidden"
               />
             </label>
-            <button className={`px-3 py-2 rounded text-lg bg-gray-300 cursor-pointer hover:bg-gray-600 hover:text-white items-center flex gap-1 font-bold`} onClick={saveStudyTask}>
+            <button title="Copy Study Link" className={`px-3 py-2 rounded text-lg bg-gray-300 cursor-pointer hover:bg-gray-600 hover:text-white items-center flex gap-1 font-bold`} onClick={copyStudyLink}>
+              <FontAwesomeIcon icon="link" />
+            </button>
+            <button title="Save Study" className={`px-3 py-2 rounded text-lg bg-gray-300 cursor-pointer hover:bg-gray-600 hover:text-white items-center flex gap-1 font-bold`} onClick={saveStudyTask}>
               <FontAwesomeIcon icon="save" />
             </button>
-            <button className={`px-3 py-2 rounded text-lg bg-gray-300 cursor-pointer hover:bg-gray-600 hover:text-white items-center flex gap-1 font-bold`} onClick={returnToHome}>
+            <button title="Return To Home" className={`px-3 py-2 rounded text-lg bg-gray-300 cursor-pointer hover:bg-gray-600 hover:text-white items-center flex gap-1 font-bold`} onClick={returnToHome}>
               <FontAwesomeIcon icon="home" />
             </button>
           </div>

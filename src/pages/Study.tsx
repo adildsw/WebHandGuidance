@@ -252,7 +252,10 @@ const Study = () => {
     const hash = window.location.hash;
     const params = new URLSearchParams(hash.split('?')[1]);
     const encoded = params.get('data');
-    const pId = params.get('participantId');
+    let pId = params.get('participantId');
+
+    if (!pId) pId = window.prompt('Enter Participant ID:');
+
     if (encoded) {
       try {
         const decoded = decodeBase64(encoded);
@@ -392,6 +395,14 @@ const Study = () => {
     }
     if (type === 'MOVE') progressTask();
   }, [currentTask, currentTarget, leftWrist, rightWrist, currentTaskIndex, currentRepetition, currentTrial, worldPPI, taskStartTime, isStudyComplete, participantId, progressTask]);
+
+  if (participantId === '') {
+    return (
+      <div className="w-screen h-screen flex gap-6 flex-col items-center justify-center select-none">
+        <p className="text-lg">Waiting for Participant ID...</p>
+      </div>
+    );
+  }
 
   if (isStudyComplete)
     return (

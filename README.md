@@ -4,12 +4,14 @@
 
 ## Running the System
 
-The simplest way to run WebHandGuidance is to go to:  
-👉 [adildsw.github.io/WebHandGuidance](https://adildsw.github.io/WebHandGuidance)
+The simplest way to run WebHandGuidance is to go to: [adildsw.github.io/WebHandGuidance](https://adildsw.github.io/WebHandGuidance)
 
-Alternatively, if you want to build from source:
+Alternatively, if you want to build from source, you can follow the steps below.
 
-**Prerequisites:** Node.js and npm must be installed.
+---
+
+**Prerequisites:** 
+Ensure that you have Node.js and npm installed on your machine.
 
 1. Clone this repository:
    ```bash
@@ -31,7 +33,7 @@ If the build and launch succeed, you should see the following homepage:
 ![Homepage](./public/assets/homepage.jpeg)
 
 
-## System Overview & Instructions
+## System Overview
 
 ### 1) System Calibration
 
@@ -55,7 +57,7 @@ Camera calibration establishes how pixel distances map to real-world distances f
 
 ![Camera Calibration](./public/assets/camera_calibration.jpeg)
 
-- Then pinch with the middle finger as well to start calibration. Hold steady until the progress bar completes (~3 seconds). Once finished, parameters are saved for subsequent sessions.
+- Once in position, pinch with the middle finger as well to start calibration. Hold steady until the progress bar completes (~3 seconds). Once complete, the calibrated parameters are saved for subsequent sessions.
 
 ![Camera Calibration Pinch](./public/assets/camera_calibration_pinch.jpeg)
 
