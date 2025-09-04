@@ -98,5 +98,5 @@ Upon completion, the results can be downloaded as a **results package** containi
 ## Contribution
 We welcome contributions to this project! If you have suggestions for improvements or new features, please submit an issue or pull request.
 
-## License (GPL)
+## License
 This project is licensed under the GNU General Public License v3.0.
