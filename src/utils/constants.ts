@@ -26,6 +26,7 @@ export const defaultConfig: Config = {
   devicePPI: 109,
   devicePixelRatio: typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1,
   calibrationTool: 'RULER',
+  comPort: null,
   worldPPI: 24,
   markerDiameterMM: 5,
   testbedWidthMM: 160,
