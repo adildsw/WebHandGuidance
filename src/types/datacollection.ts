@@ -1,4 +1,5 @@
 export type CollectedData = {
+  unix_timestamp: number;
   time_sec: number;
   participant_id: string;
   task_tag: string;
@@ -19,6 +20,7 @@ export type CollectedData = {
 };
 
 export type CollectedRawData = {
+  unix_timestamp: number;
   time_sec: number;
   participant_id: string;
   task_tag: string;
@@ -38,4 +40,19 @@ export type CollectedRawData = {
   target_dist_px: number;
   world_ppi: number;
   scaling_factor: number;
+};
+
+export type CollectedIMUData = {
+  unix_timestamp: number;
+  time_sec: number;
+  participant_id: string;
+  task_tag: string;
+  task_type: 'HOLD' | 'MOVE';
+  task_idx: number;
+  trial_idx: number;
+  repetition_idx: number;
+  target_idx: number;
+  ax: number | null;
+  ay: number | null;
+  az: number | null;
 };

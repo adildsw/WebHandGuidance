@@ -6,10 +6,6 @@ export type Config = {
   devicePPI: number;
   devicePixelRatio: number;
   worldPPI: number;
-  comPort: {
-    usbVendorId: any;
-    usbProductId: any;
-  } | null;
   calibrationTool: CalibrationTools;
   markerDiameterMM: number;
   testbedWidthMM: number;
@@ -27,7 +23,6 @@ export type ConfigContextType = {
   config: Config;
   setDevicePPI: (ppi: number) => void;
   setWorldPPI: (ppi: number) => void;
-  setComPort: (port: { usbVendorId: any; usbProductId: any } | null) => void;
   setCalibrationTool: (tool: CalibrationTools) => void;
   setMarkerDiameter: (diameter: number) => void;
   setTestbedWidth: (width: number) => void;

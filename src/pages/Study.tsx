@@ -10,9 +10,10 @@ import { uid } from 'uid/single';
 import useDetection from '../hooks/useMediaPipeHandDetection';
 import { decodeBase64 } from '../utils/encoder';
 import { distance } from '../utils/math';
-import type { CollectedData, CollectedRawData } from '../types/datacollection';
+import type { CollectedData, CollectedIMUData, CollectedRawData } from '../types/datacollection';
 import { go } from '../utils/navigation';
 import { downloadZip, toCSV } from '../utils/datacollection';
+import type { useWebSerial } from '../hooks/useWebSerial';
 
 const CLICK_SOUND = new Audio('./audio/click.mp3');
 const BEEP_SOUND = new Audio('./audio/beep.mp3');
@@ -136,6 +137,11 @@ const sketch: Sketch = (p5) => {
     if (currentTarget < markers.length - 1) nPos = { x: markers[currentTarget + 1].x * MM_TO_INCH * worldPPI, y: markers[currentTarget + 1].y * MM_TO_INCH * worldPPI };
     else if (isRepeating) nPos = { x: markers[0].x * MM_TO_INCH * worldPPI, y: markers[0].y * MM_TO_INCH * worldPPI };
 
+    // Previous Target
+    let pPos: Pos | null = null;
+    if (currentTarget > 0) pPos = { x: markers[currentTarget - 1].x * MM_TO_INCH * worldPPI, y: markers[currentTarget - 1].y * MM_TO_INCH * worldPPI };
+    else if (isRepeating) pPos = { x: markers[markers.length - 1].x * MM_TO_INCH * worldPPI, y: markers[markers.length - 1].y * MM_TO_INCH * worldPPI };
+
     // Current Marker
     p5.noStroke();
     p5.fill(0, 255, 0, 200);
@@ -153,23 +159,44 @@ const sketch: Sketch = (p5) => {
     p5.textSize(12);
     p5.text(String(currentTarget + 1), cPos.x, cPos.y);
 
-    if (nPos) {
-      // Next Marker
+    [nPos, pPos].forEach((pos, idx) => {
+      if (!pos) return;
+
+      // Marker
       p5.noStroke();
       p5.fill(255, 255, 255, 64);
-      p5.circle(nPos.x, nPos.y, markerDiameter);
+      p5.circle(pos.x, pos.y, markerDiameter);
 
       // Label
       p5.fill(255);
       p5.textAlign(p5.CENTER, p5.CENTER);
       p5.textSize(12);
-      p5.text(String(currentTarget + 2), nPos.x, nPos.y);
+      if (idx == 0) p5.text(String(currentTarget + 1 + idx), pos.x, pos.y);
+      else p5.text(String(currentTarget + 1 - 1), pos.x, pos.y);
 
       // Line
       p5.stroke(255, 255, 255, 64);
       p5.strokeWeight(2);
-      p5.line(cPos.x, cPos.y, nPos.x, nPos.y);
-    }
+      p5.line(cPos.x, cPos.y, pos.x, pos.y);
+    });
+
+    // if (nPos) {
+    //   // Next Marker
+    //   p5.noStroke();
+    //   p5.fill(255, 255, 255, 64);
+    //   p5.circle(nPos.x, nPos.y, markerDiameter);
+
+    //   // Label
+    //   p5.fill(255);
+    //   p5.textAlign(p5.CENTER, p5.CENTER);
+    //   p5.textSize(12);
+    //   p5.text(String(currentTarget + 2), nPos.x, nPos.y);
+
+    //   // Line
+    //   p5.stroke(255, 255, 255, 64);
+    //   p5.strokeWeight(2);
+    //   p5.line(cPos.x, cPos.y, nPos.x, nPos.y);
+    // }
   };
 
   const drawWrist = () => {
@@ -198,13 +225,17 @@ const sketch: Sketch = (p5) => {
   };
 };
 
-const Study = () => {
+const Study = ({ webSerial }: { webSerial: ReturnType<typeof useWebSerial> }) => {
   const { config } = useConfig();
   const { devicePPI, worldPPI, devicePixelRatio, testbedWidthMM, testbedHeightMM, markerDiameterMM } = config;
   const factor = devicePPI / devicePixelRatio;
   const testbedWidth = testbedWidthMM * factor * MM_TO_INCH;
   const testbedHeight = testbedHeightMM * factor * MM_TO_INCH;
   const markerDiameter = markerDiameterMM * factor * MM_TO_INCH;
+
+  const { latestImuVal } = webSerial;
+
+  const { writeDirection, isConnected } = webSerial;
 
   const { videoRef, error, loading, wristDetection, startWebcam } = useDetection(true);
   const { leftWrist, rightWrist } = wristDetection;
@@ -235,6 +266,7 @@ const Study = () => {
 
   const [collectedData, setCollectedData] = useState<CollectedData[]>([]);
   const [collectedRawData, setCollectedRawData] = useState<CollectedRawData[]>([]);
+  const [collectedIMUData, setCollectedIMUData] = useState<CollectedIMUData[]>([]);
   const [isDataSaved, setIsDataSaved] = useState<boolean>(false);
 
   const goHome = () => {
@@ -244,7 +276,8 @@ const Study = () => {
   const saveDataAsCSV = () => {
     const dataCsv = toCSV<CollectedData>(collectedData, Object.keys(collectedData[0]) as (keyof CollectedData)[]);
     const rawDataCsv = toCSV<CollectedRawData>(collectedRawData, Object.keys(collectedRawData[0]) as (keyof CollectedRawData)[]);
-    downloadZip('handguidance_' + participantId, dataCsv, rawDataCsv, JSON.stringify(tasks, null, 2));
+    const imuDataCsv = collectedIMUData.length > 0 ? toCSV<CollectedIMUData>(collectedIMUData, Object.keys(collectedIMUData[0]) as (keyof CollectedIMUData)[]) : null;
+    downloadZip('handguidance_' + (collectedIMUData.length > 0 ? 'imutrial_' : '') + participantId, dataCsv, rawDataCsv, imuDataCsv, JSON.stringify(tasks, null, 2));
     setIsDataSaved(true);
   };
 
@@ -339,10 +372,20 @@ const Study = () => {
     const cy = markers[currentTarget].y;
     const dt = distanceThreshold;
 
+    if (isConnected) {
+      const dx = cx - ax;
+      const dy = cy - ay;
+      const vx = (Math.sign(dx) * Math.min(Math.max(Math.abs(dx) - distanceThreshold / 2, 0), 1.5 * distanceThreshold)) / (1.5 * distanceThreshold);
+      const vy = (Math.sign(dy) * Math.min(Math.max(Math.abs(dy) - distanceThreshold / 2, 0), 1.5 * distanceThreshold)) / (1.5 * distanceThreshold);
+      writeDirection(vx, vy);
+    }
+
     const d = distance(ax, ay, cx, cy);
     if (taskStartTime !== null) {
-      const elapsed = Date.now() - taskStartTime;
+      const unixTimestamp = Date.now();
+      const elapsed = unixTimestamp - taskStartTime;
       const dataInstance: CollectedData = {
+        unix_timestamp: unixTimestamp,
         time_sec: elapsed / 1000,
         participant_id: participantId,
         task_tag: currentTask.tag,
@@ -362,6 +405,7 @@ const Study = () => {
         target_dist_mm: d,
       };
       const rawDataInstance: CollectedRawData = {
+        unix_timestamp: unixTimestamp,
         time_sec: elapsed / 1000,
         participant_id: participantId,
         task_tag: currentTask.tag,
@@ -382,6 +426,23 @@ const Study = () => {
         world_ppi: worldPPI,
         scaling_factor: MM_TO_INCH * worldPPI,
       };
+      if (isConnected) {
+        const imuDataInstance: CollectedIMUData = {
+          unix_timestamp: unixTimestamp,
+          time_sec: elapsed / 1000,
+          participant_id: participantId,
+          task_tag: currentTask.tag,
+          task_type: currentTask.type,
+          task_idx: currentTaskIndex,
+          trial_idx: currentTrial,
+          repetition_idx: currentRepetition,
+          target_idx: currentTarget,
+          ax: latestImuVal?.ax ?? null,
+          ay: latestImuVal?.ay ?? null,
+          az: latestImuVal?.az ?? null,
+        };
+        setCollectedIMUData((prev) => [...prev, imuDataInstance]);
+      }
       setCollectedData((prev) => [...prev, dataInstance]);
       setCollectedRawData((prev) => [...prev, rawDataInstance]);
     }
@@ -394,7 +455,23 @@ const Study = () => {
       if (type === 'HOLD') setTimeout(() => progressTask(), currentTask.holdDuration);
     }
     if (type === 'MOVE') progressTask();
-  }, [currentTask, currentTarget, leftWrist, rightWrist, currentTaskIndex, currentRepetition, currentTrial, worldPPI, taskStartTime, isStudyComplete, participantId, progressTask]);
+  }, [
+    writeDirection,
+    currentTask,
+    currentTarget,
+    leftWrist,
+    rightWrist,
+    currentTaskIndex,
+    currentRepetition,
+    currentTrial,
+    worldPPI,
+    taskStartTime,
+    isStudyComplete,
+    participantId,
+    progressTask,
+    latestImuVal,
+    isConnected,
+  ]);
 
   if (participantId === '') {
     return (

@@ -21,11 +21,12 @@ export const toCSV = <T>(rows: T[], keys: (keyof T)[]): string => {
   return csvRows.join('\n');
 };
 
-export const downloadZip = async (filename:string, data: string, rawData: string, taskData: string) => {
+export const downloadZip = async (filename:string, data: string, rawData: string, imuData: string | null, taskData: string) => {
   const zip = new JSZip();
 
   zip.file('data_mm.csv', data);
   zip.file('data_px.csv', rawData);
+  if (imuData) zip.file('imu_data.csv', imuData);
   zip.file('task.json', taskData);
 
   const content = await zip.generateAsync({ type: 'blob' });

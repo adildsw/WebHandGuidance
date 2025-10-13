@@ -9,7 +9,6 @@ import { distance } from '../utils/math';
 import useDetection from '../hooks/useMediaPipeHandDetection';
 import type { Pos } from '../types/task';
 import { go } from '../utils/navigation';
-import Resizer from '../components/Resizer';
 
 const sketch: Sketch = (p5) => {
   let width = 200;
@@ -199,7 +198,6 @@ const CameraCalibration = () => {
             </div>
           )}
         </div>
-        {!isCalibrated && <Resizer />}
       </div>
 
       <div className="flex flex-col text-center">
