@@ -24,11 +24,27 @@ import CameraCalibration from './pages/CameraCalibration';
 import { Toaster } from 'react-hot-toast';
 import SerialConnector from './components/SerialConnector';
 import { useWebSerial } from './hooks/useWebSerial';
+import NoMobileSupport from './pages/NoMobileSupport';
+import { useEffect, useState } from 'react';
 
 library.add(faLink, faHome, faSave, faFile, faChevronLeft, faChevronRight, faPlus, faTrash, faRedo, faFolderOpen, faDownload, faUpRightAndDownLeftFromCenter);
 
 const App = () => {
   const webSerial = useWebSerial({ baudRate: 115200 });
+  const [isMobile, setIsMobileMode] = useState<boolean>(/Mobi|Android/i.test(navigator.userAgent) || window.innerWidth < 768 || window.innerWidth < window.innerHeight);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobileMode(/Mobi|Android/i.test(navigator.userAgent) || window.innerWidth < 768 || window.innerWidth < window.innerHeight);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
+  if (isMobile) return <NoMobileSupport />;
 
   return (
     <>
