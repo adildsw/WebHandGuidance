@@ -18,6 +18,8 @@ const Config = () => {
     setDefaultTaskType,
     setDefaultHoldDuration,
     setDefaultStartDuration,
+    setMinVibrationThreshold,
+    setMaxVibrationThreshold,
   } = useConfig();
 
   const toNumber = useCallback((s: string) => {
@@ -119,6 +121,28 @@ const Config = () => {
                 pattern="[0-9]*"
                 value={String(config.defaultStartDuration / 1000)}
                 onChange={(e) => setDefaultStartDuration(toNumber(e.target.value) * 1000)}
+              />
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <label className="text-sm text-gray-600">Minimum Vibration Threshold (mm)</label>
+              <input
+                className="w-28 px-2 py-1 text-center rounded border border-gray-300 bg-white"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={String(config.minVibrationThresholdMM)}
+                onChange={(e) => setMinVibrationThreshold(toNumber(e.target.value))}
+              />
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <label className="text-sm text-gray-600">Maximum Vibration Threshold (mm)</label>
+              <input
+                className="w-28 px-2 py-1 text-center rounded border border-gray-300 bg-white"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={String(config.maxVibrationThresholdMM)}
+                onChange={(e) => setMaxVibrationThreshold(toNumber(e.target.value))}
               />
             </div>
           </div>

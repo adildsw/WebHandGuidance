@@ -26,7 +26,6 @@ export const defaultConfig: Config = {
   devicePPI: 109,
   devicePixelRatio: typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1,
   calibrationTool: 'RULER',
-  comPort: null,
   worldPPI: 24,
   markerDiameterMM: 5,
   testbedWidthMM: 160,
@@ -37,6 +36,8 @@ export const defaultConfig: Config = {
   defaultDistanceThreshold: 50,
   defaultHoldDuration: 5000,
   defaultStartDuration: 3000,
+  minVibrationThresholdMM: 50,
+  maxVibrationThresholdMM: 200,
   defaultTaskType: 'MOVE'
 };
 

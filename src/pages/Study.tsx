@@ -3,17 +3,18 @@ import { ReactP5Wrapper } from '@p5-wrapper/react';
 import type { Sketch } from '@p5-wrapper/react';
 import type { Pos, Task } from '../types/task';
 import { useConfig } from '../utils/context';
-import { INCH_TO_MM, MM_TO_INCH } from '../utils/constants';
+import { defaultConfig, INCH_TO_MM, MM_TO_INCH } from '../utils/constants';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import type { Font } from 'p5';
 import { uid } from 'uid/single';
 import useDetection from '../hooks/useMediaPipeHandDetection';
 import { decodeBase64 } from '../utils/encoder';
-import { distance } from '../utils/math';
+import { closestPointOnLine, directionalMap, distance } from '../utils/math';
 import type { CollectedData, CollectedIMUData, CollectedRawData } from '../types/datacollection';
 import { go } from '../utils/navigation';
 import { downloadZip, toCSV } from '../utils/datacollection';
 import type { useWebSerial } from '../hooks/useWebSerial';
+import type { Config } from '../types/config';
 
 const CLICK_SOUND = new Audio('./audio/click.mp3');
 const BEEP_SOUND = new Audio('./audio/beep.mp3');
@@ -24,7 +25,10 @@ const sketch: Sketch = (p5) => {
   let markerDiameter = 10;
   let worldPPI = 24;
 
-  let wristPos: { left: Pos | null; right: Pos | null } = { left: null, right: null };
+  // let wristPos: { left: Pos | null; right: Pos | null } = { left: null, right: null };
+  let activeWristPos: Pos | null = null;
+  let directionPoint: Pos | null = null;
+  let directionPointDistanceMM: number | null = null;
 
   let f: Font;
 
@@ -36,6 +40,8 @@ const sketch: Sketch = (p5) => {
   let isRepeating: boolean = false;
   let isTaskRunning: boolean = false;
   let holdProgress: number = 0;
+
+  let config: Config = defaultConfig;
 
   p5.preload = () => {
     f = p5.loadFont('./fonts/sf-ui-display-bold.otf');
@@ -54,10 +60,13 @@ const sketch: Sketch = (p5) => {
     worldPPI?: number;
     task?: Task | null;
     currentTarget?: number | null;
-    wristPos?: { left: Pos | null; right: Pos | null };
+    activeWristPos?: Pos | null;
     currentRepetition?: number | null;
     isTaskRunning?: boolean;
     holdProgress?: number;
+    directionPoint?: Pos | null;
+    directionPointDistanceMM?: number | null;
+    config?: Config;
   }) => {
     if (typeof props.frameWidth === 'number') w = props.frameWidth;
     if (typeof props.frameHeight === 'number') h = props.frameHeight;
@@ -65,7 +74,7 @@ const sketch: Sketch = (p5) => {
     if (typeof props.worldPPI === 'number') worldPPI = props.worldPPI;
     if (p5.width !== w || p5.height !== h) p5.resizeCanvas(w, h);
 
-    if (props.wristPos) wristPos = props.wristPos;
+    if (props.activeWristPos) activeWristPos = props.activeWristPos;
 
     if (props.task === null || props.task === undefined) {
       task = null;
@@ -81,6 +90,10 @@ const sketch: Sketch = (p5) => {
     isRepeating = typeof props.currentRepetition === 'number' ? props.currentRepetition < task.repetitions - 1 : false;
     isTaskRunning = typeof props.isTaskRunning === 'boolean' ? props.isTaskRunning : false;
     holdProgress = typeof props.holdProgress === 'number' ? props.holdProgress : 0;
+    directionPoint = props.directionPoint || null;
+    directionPointDistanceMM = props.directionPointDistanceMM || null;
+
+    if (props.config) config = props.config;
   };
 
   p5.draw = () => {
@@ -96,10 +109,9 @@ const sketch: Sketch = (p5) => {
     if (currentTarget === -1) return;
     if (task === null) return;
 
-    const activeWrist = wristPos[task.hand === 'Left' ? 'left' : 'right'];
     const isInsideTarget =
-      activeWrist &&
-      distance((activeWrist.x * INCH_TO_MM) / worldPPI, (activeWrist.y * INCH_TO_MM) / worldPPI, markers[currentTarget].x, markers[currentTarget].y) < distanceThreshold / 2;
+      activeWristPos &&
+      distance((activeWristPos.x * INCH_TO_MM) / worldPPI, (activeWristPos.y * INCH_TO_MM) / worldPPI, markers[currentTarget].x, markers[currentTarget].y) < distanceThreshold / 2;
 
     const cPos: Pos = { x: markers[currentTarget].x * MM_TO_INCH * worldPPI, y: markers[currentTarget].y * MM_TO_INCH * worldPPI };
     p5.noStroke();
@@ -179,24 +191,6 @@ const sketch: Sketch = (p5) => {
       p5.strokeWeight(2);
       p5.line(cPos.x, cPos.y, pos.x, pos.y);
     });
-
-    // if (nPos) {
-    //   // Next Marker
-    //   p5.noStroke();
-    //   p5.fill(255, 255, 255, 64);
-    //   p5.circle(nPos.x, nPos.y, markerDiameter);
-
-    //   // Label
-    //   p5.fill(255);
-    //   p5.textAlign(p5.CENTER, p5.CENTER);
-    //   p5.textSize(12);
-    //   p5.text(String(currentTarget + 2), nPos.x, nPos.y);
-
-    //   // Line
-    //   p5.stroke(255, 255, 255, 64);
-    //   p5.strokeWeight(2);
-    //   p5.line(cPos.x, cPos.y, nPos.x, nPos.y);
-    // }
   };
 
   const drawWrist = () => {
@@ -204,24 +198,43 @@ const sketch: Sketch = (p5) => {
 
     // Wrist Marker
     p5.fill(0, 0, 255, 128);
-    if (wristPos.left && task?.hand === 'Left') p5.circle(wristPos.left.x, wristPos.left.y, 12);
-    if (wristPos.right && task?.hand === 'Right') p5.circle(wristPos.right.x, wristPos.right.y, 12);
+    if (activeWristPos) p5.circle(activeWristPos.x, activeWristPos.y, 12);
 
     // Wrist Label
     p5.fill(255);
     p5.textAlign(p5.CENTER, p5.CENTER);
     p5.textSize(6);
-    if (wristPos.left && task?.hand === 'Left') p5.text('L', wristPos.left.x, wristPos.left.y);
-    if (wristPos.right && task?.hand === 'Right') p5.text('R', wristPos.right.x, wristPos.right.y);
+    if (activeWristPos) p5.text(task?.hand === 'Left' ? 'L' : 'R', activeWristPos.x, activeWristPos.y);
 
     // Wrist to Target Line
     if (!isTaskRunning) return;
-    p5.strokeWeight(2);
-    p5.stroke(255, 0, 0, 128);
-    if (wristPos.left && task?.hand === 'Left')
-      p5.line(wristPos.left.x, wristPos.left.y, markers[currentTarget].x * MM_TO_INCH * worldPPI, markers[currentTarget].y * MM_TO_INCH * worldPPI);
-    if (wristPos.right && task?.hand === 'Right')
-      p5.line(wristPos.right.x, wristPos.right.y, markers[currentTarget].x * MM_TO_INCH * worldPPI, markers[currentTarget].y * MM_TO_INCH * worldPPI);
+    if (directionPointDistanceMM !== null && directionPoint && activeWristPos !== null) {
+      const { x, y } = directionPoint;
+      p5.fill(255, 255, 255);
+      p5.noStroke();
+      p5.circle(x * MM_TO_INCH * worldPPI, y * MM_TO_INCH * worldPPI, markerDiameter * 0.3);
+
+      p5.textSize(10);
+      p5.textAlign(p5.CENTER, p5.BOTTOM);
+      p5.fill(255);
+      p5.text(`${directionPointDistanceMM?.toFixed(1)} mm`, x * MM_TO_INCH * worldPPI, y * MM_TO_INCH * worldPPI);
+    
+      // p5.strokeWeight(2);
+      // p5.stroke(255, 0, 0, 128);
+      console.log('directionPointDistanceMM', directionPointDistanceMM, config.minVibrationThresholdMM, config.maxVibrationThresholdMM);
+      if (directionPointDistanceMM < config.minVibrationThresholdMM) {
+        const opacity = p5.map(directionPointDistanceMM, 0, config.minVibrationThresholdMM, 0, 128, true);
+        const lineWidth = p5.map(directionPointDistanceMM, 0, config.minVibrationThresholdMM, 0, 1, true);
+        p5.strokeWeight(lineWidth);
+        p5.stroke(255, 255, 255, opacity);
+      } else {
+        const opacity = p5.map(directionPointDistanceMM, config.minVibrationThresholdMM, config.maxVibrationThresholdMM, 128, 255, true);
+        const lineWidth = p5.map(directionPointDistanceMM, config.minVibrationThresholdMM, config.maxVibrationThresholdMM, 1, 2, true);
+        p5.strokeWeight(lineWidth);
+        p5.stroke(255, 0, 0, opacity);
+      }
+      p5.line(activeWristPos.x, activeWristPos.y, directionPoint.x * MM_TO_INCH * worldPPI, directionPoint.y * MM_TO_INCH * worldPPI);
+    }
   };
 };
 
@@ -248,8 +261,34 @@ const Study = ({ webSerial }: { webSerial: ReturnType<typeof useWebSerial> }) =>
   const [currentTrial, setCurrentTrial] = useState<number | null>(null);
   const [currentRepetition, setCurrentRepetition] = useState<number | null>(null);
   const currentTask: Task | null = useMemo(() => (currentTaskIndex !== null && tasks.length > currentTaskIndex ? tasks[currentTaskIndex] : null), [tasks, currentTaskIndex]);
-
   const [currentTarget, setCurrentTarget] = useState<number | null>(null);
+  const [previousTarget, setPreviousTarget] = useState<number | null>(null);
+
+  const activeWrist = useMemo<Pos | null>(() => {
+    if (currentTask === null) return null;
+    if (currentTask.hand === 'Left') return leftWrist;
+    return rightWrist;
+  }, [currentTask, leftWrist, rightWrist]);
+
+  const directionPoint = useMemo<Pos | null>(() => {
+    if (currentTask === null) return null;
+    if (currentTarget === null) return null;
+    if (currentTask.type === 'HOLD') return currentTask.markers[0];
+    if (currentTarget === null || previousTarget === null) return null;
+    if (activeWrist === null) return null;
+    if (activeWrist.x === undefined || activeWrist.y === undefined) return null;
+    const ax = (activeWrist.x * INCH_TO_MM) / worldPPI;
+    const ay = (activeWrist.y * INCH_TO_MM) / worldPPI;
+    const p1 = currentTask.markers[previousTarget];
+    const p2 = currentTask.markers[currentTarget];
+    return closestPointOnLine(ax, ay, p1.x, p1.y, p2.x, p2.y);
+  }, [currentTask, currentTarget, previousTarget, activeWrist, worldPPI]);
+
+  const directionPointDistanceMM = useMemo<number>(() => {
+    if (directionPoint === null || activeWrist === null) return 0;
+    return distance(directionPoint.x, directionPoint.y, activeWrist.x * INCH_TO_MM / worldPPI, activeWrist.y * INCH_TO_MM / worldPPI);
+  }, [directionPoint, activeWrist, worldPPI]);
+
   const [taskStartTime, setTaskStartTime] = useState<number | null>(null);
   const holdProgress = (() => {
     if (!taskStartTime) return 0;
@@ -321,6 +360,7 @@ const Study = ({ webSerial }: { webSerial: ReturnType<typeof useWebSerial> }) =>
     if (currentTaskIndex === null) return;
     if (isStudyComplete) return;
     setCurrentTarget(0);
+    setPreviousTarget(null);
     setTaskStartTime(null);
   }, [tasks, currentTaskIndex, currentTrial, isStudyComplete]);
 
@@ -333,21 +373,25 @@ const Study = ({ webSerial }: { webSerial: ReturnType<typeof useWebSerial> }) =>
 
     const { markers, repetitions, trials } = currentTask;
     if (currentTarget < markers.length - 1) {
+      setPreviousTarget(currentTarget);
       setCurrentTarget(currentTarget + 1);
       CLICK_SOUND.play();
     } else if (currentRepetition < repetitions - 1) {
       setCurrentRepetition(currentRepetition + 1);
+      setPreviousTarget(currentTarget);
       setCurrentTarget(0);
       CLICK_SOUND.play();
     } else if (currentTrial < trials - 1) {
       setCurrentTrial(currentTrial + 1);
       setCurrentRepetition(0);
+      setPreviousTarget(currentTarget);
       setCurrentTarget(0);
       BEEP_SOUND.play();
     } else {
       setCurrentTaskIndex(currentTaskIndex + 1);
       setCurrentTrial(0);
       setCurrentRepetition(0);
+      setPreviousTarget(null);
       setCurrentTarget(0);
       BEEP_SOUND.play();
     }
@@ -363,20 +407,22 @@ const Study = ({ webSerial }: { webSerial: ReturnType<typeof useWebSerial> }) =>
 
     const { type, hand, markers, distanceThreshold } = currentTask;
 
-    const activeWrist = hand === 'Left' ? { ...leftWrist } : { ...rightWrist };
-    if (activeWrist.x === undefined || activeWrist.y === undefined) return;
+    if (activeWrist === null) return;
 
     const ax = (activeWrist.x * INCH_TO_MM) / worldPPI;
     const ay = (activeWrist.y * INCH_TO_MM) / worldPPI;
     const cx = markers[currentTarget].x;
     const cy = markers[currentTarget].y;
-    const dt = distanceThreshold;
 
-    if (isConnected) {
-      const dx = cx - ax;
-      const dy = cy - ay;
-      const vx = (Math.sign(dx) * Math.min(Math.max(Math.abs(dx) - distanceThreshold / 2, 0), 1.5 * distanceThreshold)) / (1.5 * distanceThreshold);
-      const vy = (Math.sign(dy) * Math.min(Math.max(Math.abs(dy) - distanceThreshold / 2, 0), 1.5 * distanceThreshold)) / (1.5 * distanceThreshold);
+    if (isConnected && directionPoint) {
+      const px = directionPoint.x;
+      const py = directionPoint.y;
+      const dx = px - ax;
+      const dy = py - ay;
+      const vx = directionalMap(dx, config.minVibrationThresholdMM, config.maxVibrationThresholdMM);
+      const vy = directionalMap(dy, config.minVibrationThresholdMM, config.maxVibrationThresholdMM);
+      // const vx = (Math.sign(dx) * Math.min(Math.max(Math.abs(dx) - distanceThreshold / 2, 0), 1.5 * distanceThreshold)) / (1.5 * distanceThreshold);
+      // const vy = (Math.sign(dy) * Math.min(Math.max(Math.abs(dy) - distanceThreshold / 2, 0), 1.5 * distanceThreshold)) / (1.5 * distanceThreshold);
       writeDirection(vx, vy);
     }
 
@@ -397,7 +443,7 @@ const Study = ({ webSerial }: { webSerial: ReturnType<typeof useWebSerial> }) =>
         target_idx: currentTarget,
         target_x_mm: cx,
         target_y_mm: cy,
-        target_threshold_mm: dt,
+        target_threshold_mm: distanceThreshold,
         user_left_x_mm: ax,
         user_left_y_mm: ay,
         user_right_x_mm: ax,
@@ -417,7 +463,7 @@ const Study = ({ webSerial }: { webSerial: ReturnType<typeof useWebSerial> }) =>
         target_idx: currentTarget,
         target_x_px: cx * MM_TO_INCH * worldPPI,
         target_y_px: cy * MM_TO_INCH * worldPPI,
-        target_threshold_px: dt * MM_TO_INCH * worldPPI,
+        target_threshold_px: distanceThreshold * MM_TO_INCH * worldPPI,
         user_left_x_px: ax * MM_TO_INCH * worldPPI,
         user_left_y_px: ay * MM_TO_INCH * worldPPI,
         user_right_x_px: ax * MM_TO_INCH * worldPPI,
@@ -448,7 +494,7 @@ const Study = ({ webSerial }: { webSerial: ReturnType<typeof useWebSerial> }) =>
     }
 
     // Facilitating Task Progression
-    if (d > dt / 2) return;
+    if (d > distanceThreshold / 2) return;
 
     if (taskStartTime === null) {
       setTaskStartTime(Date.now());
@@ -459,8 +505,7 @@ const Study = ({ webSerial }: { webSerial: ReturnType<typeof useWebSerial> }) =>
     writeDirection,
     currentTask,
     currentTarget,
-    leftWrist,
-    rightWrist,
+    activeWrist,
     currentTaskIndex,
     currentRepetition,
     currentTrial,
@@ -471,6 +516,9 @@ const Study = ({ webSerial }: { webSerial: ReturnType<typeof useWebSerial> }) =>
     progressTask,
     latestImuVal,
     isConnected,
+    config.minVibrationThresholdMM,
+    config.maxVibrationThresholdMM,
+    directionPoint,
   ]);
 
   if (participantId === '') {
@@ -586,12 +634,15 @@ const Study = ({ webSerial }: { webSerial: ReturnType<typeof useWebSerial> }) =>
                   devicePixelRatio={devicePixelRatio}
                   markerDiameter={markerDiameter}
                   worldPPI={worldPPI}
-                  wristPos={{ left: leftWrist, right: rightWrist }}
+                  activeWristPos={activeWrist}
                   task={currentTask}
                   currentTarget={currentTarget}
                   currentRepetition={currentRepetition}
                   isTaskRunning={isTaskRunning}
                   holdProgress={holdProgress}
+                  directionPoint={directionPoint}
+                  directionPointDistanceMM={directionPointDistanceMM}
+                  config={config}
                 />
               </div>
             )}

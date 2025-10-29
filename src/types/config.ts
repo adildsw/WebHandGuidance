@@ -16,6 +16,8 @@ export type Config = {
   defaultDistanceThreshold: number;
   defaultHoldDuration: number;
   defaultStartDuration: number;
+  minVibrationThresholdMM: number;
+  maxVibrationThresholdMM: number;
   defaultTaskType: 'MOVE' | 'HOLD';
 };
 
@@ -33,6 +35,8 @@ export type ConfigContextType = {
   setDefaultDistanceThreshold: (threshold: number) => void;
   setDefaultHoldDuration: (duration: number) => void;
   setDefaultStartDuration: (duration: number) => void;
+  setMinVibrationThreshold: (threshold: number) => void;
+  setMaxVibrationThreshold: (threshold: number) => void;
   setDefaultTaskType: (type: 'MOVE' | 'HOLD') => void;
   generateDefaultTask: (type?: 'MOVE' | 'HOLD') => Task;
 };

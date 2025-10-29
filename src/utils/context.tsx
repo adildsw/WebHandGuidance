@@ -71,6 +71,14 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     setConfigState((prev) => ({ ...prev, defaultStartDuration: duration }));
   };
 
+  const setMinVibrationThreshold = (threshold: number) => {
+    setConfigState((prev) => ({ ...prev, minVibrationThresholdMM: threshold }));
+  };
+
+  const setMaxVibrationThreshold = (threshold: number) => {
+    setConfigState((prev) => ({ ...prev, maxVibrationThresholdMM: threshold }));
+  };
+
   const generateDefaultTask = (type: 'MOVE' | 'HOLD' = config.defaultTaskType): Task => {
     return {
       tag: 'task-' + uid(5),
@@ -126,6 +134,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         setDefaultDistanceThreshold,
         setDefaultHoldDuration,
         setDefaultStartDuration,
+        setMinVibrationThreshold,
+        setMaxVibrationThreshold,
         setDefaultTaskType,
         setWorldPPI,
         generateDefaultTask,

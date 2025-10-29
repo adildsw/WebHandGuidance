@@ -384,7 +384,6 @@ const TaskCreator = () => {
 
   const disablePrev = currentIndex <= 0;
   const atLast = currentIndex === tasks.length - 1 || tasks.length === 0;
-  const plusDisabled = tasks[currentIndex].markers.length < 3;
 
   useEffect(() => {
     startWebcam();
@@ -480,10 +479,7 @@ const TaskCreator = () => {
               </button>
               {atLast ? (
                 <button
-                  className={`px-3 py-2 rounded text-lg bg-gray-200 items-center flex gap-1 font-bold ${
-                    plusDisabled && tasks[currentIndex].type !== 'HOLD' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-600 hover:text-white'
-                  }`}
-                  disabled={plusDisabled && tasks[currentIndex].type !== 'HOLD'}
+                  className={`px-3 py-2 rounded text-lg bg-gray-200 items-center flex gap-1 font-bold cursor-pointer hover:bg-gray-600 hover:text-white`}
                   onClick={addTask}
                 >
                   <FontAwesomeIcon icon="plus" />
