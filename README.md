@@ -30,7 +30,7 @@ Ensure that you have Node.js and npm installed on your machine.
 
 If the build and launch succeed, you should see the following homepage:
 
-![Homepage](./public/assets/homepage.jpeg)
+![Homepage](./public/screens/homepage.jpeg)
 
 
 ## System Overview
@@ -46,7 +46,7 @@ Screen calibration aligns the on-screen scale with the physical display to ensur
 
 - Use the on‑screen slider (or `+`/`-` hotkeys) to scale the ruler or credit card/dollar bill outline until it matches the physical object size. This yields a screen PPI value for consistent pixel‑to‑size scaling.
 
-![Screen Calibration](./public/assets/screen_calibration.jpeg)
+![Screen Calibration](./public/screens/screen_calibration.jpeg)
 
 #### Camera Calibration
 Camera calibration establishes how pixel distances map to real-world distances from a fixed viewing position, so that hand movements can be measured in physical units.
@@ -55,11 +55,11 @@ Camera calibration establishes how pixel distances map to real-world distances f
 
 - Stand ~5 feet away from the camera (or the fixed study distance). Pinch a letter‑sized paper horizontally using thumb and index finger while keeping the middle finger away. 
 
-![Camera Calibration](./public/assets/camera_calibration.jpeg)
+![Camera Calibration](./public/screens/camera_calibration.jpeg)
 
 - Once in position, pinch with the middle finger as well to start calibration. Hold steady until the progress bar completes (~3 seconds). Once complete, the calibrated parameters are saved for subsequent sessions.
 
-![Camera Calibration Pinch](./public/assets/camera_calibration_pinch.jpeg)
+![Camera Calibration Pinch](./public/screens/camera_calibration_pinch.jpeg)
 
 ### 2) Designing Study Tasks
 
@@ -70,14 +70,14 @@ The move task is used to measure how well the user can guide their hand through 
 
 Click on the camera view to add markers. Drag markers to reposition them, or right-click to remove. Adjust the distance threshold to specify how close the hand must get for success, and set the number of repetitions and trials for the task.
 
-![Designer Move Task](./public/assets/designer_move_task.jpeg)
+![Designer Move Task](./public/screens/designer_move_task.jpeg)
 
 #### Hold Task
 The hold task is used to measure how steadily the user can maintain their hand at a specific target position for a set duration.
 
 The marker can be dragged to specify the hold position. The **distance threshold** and **hold duration** can be adjusted as needed to configure the hold params.
 
-![Designer Hold Task](./public/assets/designer_hold_task.jpeg)
+![Designer Hold Task](./public/screens/designer_hold_task.jpeg)
 
 For each task, handedness can be specified. Multiple tasks can be added within a single study design. When ready, save the study from the top bar as a **JSON** file (it can be reloaded later for edits).
 
@@ -91,11 +91,11 @@ There are two ways to start a study:
 
 Once the task is loaded, they appear sequentially, and the data recording starts once each task trial is initiated.
 
-![Study Move Task](./public/assets/study_move.jpeg)
+![Study Move Task](./public/screens/study_move.jpeg)
 
 Upon completion, the results can be downloaded as a **results package** containing recorded hand positions, target positions, and task metadata.
 
-![Download Results](./public/assets/download_page.jpeg)
+![Download Results](./public/screens/download_page.jpeg)
 
 ## Contribution
 We welcome contributions to this project! If you have suggestions for improvements or new features, please submit an issue or pull request.

@@ -2,6 +2,13 @@ import type { Task } from "./task";
 
 export type CalibrationTools = 'CREDIT' | 'RULER' | 'DOLLAR';
 
+export type SilhouetteParams = {
+  silY: number;
+  silScaleX: number;
+  silScaleY: number;
+  silCalibrated: boolean;
+};
+
 export type Config = {
   devicePPI: number;
   devicePixelRatio: number;
@@ -19,6 +26,7 @@ export type Config = {
   minVibrationThresholdMM: number;
   maxVibrationThresholdMM: number;
   defaultTaskType: 'MOVE' | 'HOLD';
+  silParams: SilhouetteParams;
 };
 
 export type ConfigContextType = {
@@ -39,4 +47,5 @@ export type ConfigContextType = {
   setMaxVibrationThreshold: (threshold: number) => void;
   setDefaultTaskType: (type: 'MOVE' | 'HOLD') => void;
   generateDefaultTask: (type?: 'MOVE' | 'HOLD') => Task;
+  setSilParams: (params: SilhouetteParams) => void;
 };

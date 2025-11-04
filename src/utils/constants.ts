@@ -38,10 +38,14 @@ export const defaultConfig: Config = {
   defaultStartDuration: 3000,
   minVibrationThresholdMM: 50,
   maxVibrationThresholdMM: 200,
-  defaultTaskType: 'MOVE'
+  defaultTaskType: 'MOVE',
+  silParams: { silY: 0, silScaleX: 1, silScaleY: 1, silCalibrated: false },
 };
 
 export const HAND_LANDMARKER_MODEL_PATH = './models/hand_landmarker.task';
 export const POSE_LANDMARKER_MODEL_PATH = './models/pose_landmarker_lite.task';
 
 export const VISION_TASKS_WASM_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm';
+
+export const SIL_IMG_WIDTH = 1154;
+export const SIL_IMG_HEIGHT = 866;

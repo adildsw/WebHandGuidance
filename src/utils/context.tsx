@@ -79,6 +79,10 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     setConfigState((prev) => ({ ...prev, maxVibrationThresholdMM: threshold }));
   };
 
+  const setSilParams = (params: { silY: number; silScaleX: number; silScaleY: number; silCalibrated: boolean }) => {
+    setConfigState((prev) => ({ ...prev, silParams: params }));
+  };
+
   const generateDefaultTask = (type: 'MOVE' | 'HOLD' = config.defaultTaskType): Task => {
     return {
       tag: 'task-' + uid(5),
@@ -139,6 +143,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         setDefaultTaskType,
         setWorldPPI,
         generateDefaultTask,
+        setSilParams,
       }}
     >
       {children}

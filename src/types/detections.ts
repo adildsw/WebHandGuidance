@@ -1,7 +1,7 @@
 export type Pos = {
   x: number;
   y: number;
-}
+};
 
 export type FingerTips = {
   index: Pos | null;
@@ -14,10 +14,18 @@ export type FingerTips = {
 export type WristDetectionResult = {
   leftWrist: Pos | null;
   rightWrist: Pos | null;
-}
+};
+
+export type HeadShoulderDetectionResult = {
+  nose: Pos | null;
+  leftShoulder: Pos | null;
+  rightShoulder: Pos | null;
+  noseShoulderDistance: number | null;
+  interShoulderDistance: number | null;
+};
 
 export type PinchDetectionResult = {
   pinchPos: { left: Pos | null; right: Pos | null };
   indexPinch: { left: boolean; right: boolean };
   middlePinch: { left: boolean; right: boolean };
-}
+};

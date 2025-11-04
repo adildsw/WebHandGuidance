@@ -1,7 +1,7 @@
-import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
+import { FilesetResolver, HandLandmarker, PoseLandmarker } from '@mediapipe/tasks-vision';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import type { FingerTips, PinchDetectionResult, WristDetectionResult } from '../types/detections';
-import { defaultFingerTips, HAND_LANDMARKER_MODEL_PATH, MM_TO_INCH, VISION_TASKS_WASM_URL } from '../utils/constants';
+import type { FingerTips, HeadShoulderDetectionResult, PinchDetectionResult, WristDetectionResult } from '../types/detections';
+import { defaultFingerTips, HAND_LANDMARKER_MODEL_PATH, MM_TO_INCH, POSE_LANDMARKER_MODEL_PATH, VISION_TASKS_WASM_URL } from '../utils/constants';
 import { distance, mapVideoToTestbed } from '../utils/math';
 import { useConfig } from '../utils/context';
 
@@ -10,10 +10,12 @@ const MIDDLE_PINCH_THRESHOLD = 0.25;
 const PINCH_INDICES: Record<keyof FingerTips, number> = { thumb: 4, index: 8, middle: 12, ring: 16, pinky: 20 };
 const WRIST_INDICES = { wrist1: 0, wrist2: 5, wrist3: 17 };
 
+const HEAD_SHOULDER_INDICES = { nose: 0, leftShoulder: 11, rightShoulder: 12 };
+
 // |-------------------------
 // | MODEL INITIALIZATIONS
 // |-------------------------
-const initHandDetector = async () => {
+const initDetectors = async () => {
   const vision = await FilesetResolver.forVisionTasks(VISION_TASKS_WASM_URL);
   const handDetector = await HandLandmarker.createFromOptions(vision, {
     baseOptions: {
@@ -25,8 +27,18 @@ const initHandDetector = async () => {
     minHandPresenceConfidence: 0.5,
     minTrackingConfidence: 0.5,
   });
+  const poseDetector = await PoseLandmarker.createFromOptions(vision, {
+    baseOptions: {
+      modelAssetPath: POSE_LANDMARKER_MODEL_PATH,
+    },
+    runningMode: 'VIDEO',
+    numPoses: 2,
+    minPoseDetectionConfidence: 0.5,
+    minPosePresenceConfidence: 0.5,
+    minTrackingConfidence: 0.5,
+  });
 
-  return handDetector;
+  return { handDetector, poseDetector };
 };
 
 // |-------------------------
@@ -118,6 +130,44 @@ const detectPinchAndWrist = (detector: HandLandmarker, video: HTMLVideoElement, 
   return { pinch, wrist };
 };
 
+const detectHeadAndShoulders = (detector: PoseLandmarker, video: HTMLVideoElement, testbedWidth: number, testbedHeight: number) => {
+  const headShoulderResult: HeadShoulderDetectionResult = {
+    nose: null,
+    leftShoulder: null,
+    rightShoulder: null,
+    noseShoulderDistance: null,
+    interShoulderDistance: null,
+  };
+
+  try {
+    const detections = detector.detectForVideo(video, performance.now());
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    const nose = detections.landmarks?.[0]?.[HEAD_SHOULDER_INDICES.nose];
+    const leftShoulder = detections.landmarks?.[0]?.[HEAD_SHOULDER_INDICES.leftShoulder];
+    const rightShoulder = detections.landmarks?.[0]?.[HEAD_SHOULDER_INDICES.rightShoulder];
+
+    if (!nose || !leftShoulder || !rightShoulder) return headShoulderResult;
+
+    const nosePt = mapVideoToTestbed((1 - nose.x) * vw, nose.y * vh, vw, vh, testbedWidth, testbedHeight);
+    const leftShoulderPt = mapVideoToTestbed((1 - leftShoulder.x) * vw, leftShoulder.y * vh, vw, vh, testbedWidth, testbedHeight);
+    const rightShoulderPt = mapVideoToTestbed((1 - rightShoulder.x) * vw, rightShoulder.y * vh, vw, vh, testbedWidth, testbedHeight);
+    const noseShoulderDistance = distance(nosePt.x, nosePt.y, nosePt.x, (leftShoulderPt.y + rightShoulderPt.y) / 2);
+    const interShoulderDistance = distance(leftShoulderPt.x, leftShoulderPt.y, rightShoulderPt.x, rightShoulderPt.y);
+    
+    return {
+      nose: nosePt,
+      leftShoulder: leftShoulderPt,
+      rightShoulder: rightShoulderPt,
+      noseShoulderDistance: noseShoulderDistance,
+      interShoulderDistance: interShoulderDistance,
+    };
+  } catch (err) {
+    console.error('Error during head and shoulders detection:', err);
+    return headShoulderResult;
+  }
+};
+
 const useDetection = (runOnStart: boolean = false) => {
   const { config } = useConfig();
   const { devicePPI, devicePixelRatio, testbedHeightMM, testbedWidthMM } = config;
@@ -129,7 +179,7 @@ const useDetection = (runOnStart: boolean = false) => {
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const detectorRef = useRef<HandLandmarker | null>(null);
+  const detectorRef = useRef<{ handDetector: HandLandmarker; poseDetector: PoseLandmarker } | null>(null);
   const animationFrameId = useRef<number | null>(null);
 
   const [pinchDetection, setPinchDetection] = useState<PinchDetectionResult>({
@@ -140,6 +190,13 @@ const useDetection = (runOnStart: boolean = false) => {
   const [wristDetection, setWristDetection] = useState<WristDetectionResult>({
     leftWrist: null,
     rightWrist: null,
+  });
+  const [headShoulderDetection, setHeadShoulderDetection] = useState<HeadShoulderDetectionResult>({
+    nose: null,
+    leftShoulder: null,
+    rightShoulder: null,
+    noseShoulderDistance: null,
+    interShoulderDistance: null,
   });
 
   const [loading, setLoading] = useState(true);
@@ -167,9 +224,11 @@ const useDetection = (runOnStart: boolean = false) => {
     }
 
     if (isDetecting.current) {
-      const { pinch, wrist } = detectPinchAndWrist(detector, video, testbedWidth, testbedHeight, factor);
+      const { pinch, wrist } = detectPinchAndWrist(detector.handDetector, video, testbedWidth, testbedHeight, factor);
+      const headShoulder = detectHeadAndShoulders(detector.poseDetector, video, testbedWidth, testbedHeight);
       setPinchDetection(pinch);
       setWristDetection(wrist);
+      setHeadShoulderDetection(headShoulder);
     }
 
     animationFrameId.current = requestAnimationFrame(performDetectionLoop);
@@ -197,7 +256,7 @@ const useDetection = (runOnStart: boolean = false) => {
     try {
       setLoading(true);
       setError(null);
-      detectorRef.current = await initHandDetector();
+      detectorRef.current = await initDetectors();
       setLoading(false);
     } catch (err) {
       console.error('Failed to initialize Object Detector:', err);
@@ -224,13 +283,14 @@ const useDetection = (runOnStart: boolean = false) => {
       if (videoRef.current) videoRef.current.srcObject = null;
 
       if (detectorRef.current) {
-        detectorRef.current.close();
+        detectorRef.current.poseDetector.close();
+        detectorRef.current.handDetector.close();
         detectorRef.current = null;
       }
     };
     return cleanup;
   }, []);
-  return { videoRef, pinchDetection, wristDetection, loading, error, startWebcam, startDetecting, stopDetecting };
+  return { videoRef, pinchDetection, wristDetection, headShoulderDetection, loading, error, startWebcam, startDetecting, stopDetecting };
 };
 
 export default useDetection;
