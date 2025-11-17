@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import type { CalibrationTools, Config, ConfigContextType } from '../types/config';
+import type { CalibrationTools, Config, ConfigContextType, PolarPos } from '../types/config';
 import type { Task } from '../types/task';
 import { uid } from 'uid/single';
 import { defaultConfig } from './constants';
@@ -83,6 +83,10 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     setConfigState((prev) => ({ ...prev, silParams: params }));
   };
 
+  const setRomCalibrationParams = (params: { leftStretchedRom: PolarPos | null; leftRaisedRom: PolarPos | null; rightStretchedRom: PolarPos | null; rightRaisedRom: PolarPos | null }) => {
+    setConfigState((prev) => ({ ...prev, romCalibrationParams: params }));
+  };
+
   const generateDefaultTask = (type: 'MOVE' | 'HOLD' = config.defaultTaskType): Task => {
     return {
       tag: 'task-' + uid(5),
@@ -144,6 +148,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         setWorldPPI,
         generateDefaultTask,
         setSilParams,
+        setRomCalibrationParams,
       }}
     >
       {children}

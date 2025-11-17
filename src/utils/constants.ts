@@ -40,6 +40,12 @@ export const defaultConfig: Config = {
   maxVibrationThresholdMM: 200,
   defaultTaskType: 'MOVE',
   silParams: { silY: 0, silScaleX: 1, silScaleY: 1, silCalibrated: false },
+  romCalibrationParams: {
+    leftStretchedRom: null,
+    leftRaisedRom: null,
+    rightStretchedRom: null,
+    rightRaisedRom: null,
+  },
 };
 
 export const HAND_LANDMARKER_MODEL_PATH = './models/hand_landmarker.task';

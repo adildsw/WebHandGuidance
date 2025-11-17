@@ -1,3 +1,5 @@
+import type { Pos } from "../types/task";
+
 export const distance = (x1: number, y1: number, x2: number, y2: number) => {
   const dx = x1 - x2;
   const dy = y1 - y2;
@@ -42,4 +44,18 @@ export const directionalMap = (d: number, minT: number, maxT: number) => {
   if (ad <= minT) return 0;
   if (ad >= maxT) return Math.sign(d);
   return Math.sign(d) * (ad - minT) / (maxT - minT);
+};
+
+export const calculatePolar = (p1: Pos, p2: Pos) => {
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+  const radius = Math.sqrt(dx * dx + dy * dy);
+  const angle = Math.atan2(dy, dx);
+  return { angle, radius };
+};
+
+export const polarToCartesian = (radius: number, angle: number, origin: Pos = { x: 0, y: 0 }) => {
+  const x = origin.x + radius * Math.cos(angle);
+  const y = origin.y + radius * Math.sin(angle);
+  return { x, y };
 };

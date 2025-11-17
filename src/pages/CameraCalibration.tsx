@@ -4,12 +4,11 @@ import { useConfig } from '../utils/context';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import p5 from 'p5';
-import { defaultConfig, LETTER_HEIGHT_INCH, MM_TO_INCH, NOSE_Y_OFFSET, SHOULDER_X_OFFSET, SHOULDER_Y_OFFSET, SIL_IMG_HEIGHT, SIL_IMG_WIDTH } from '../utils/constants';
+import { LETTER_HEIGHT_INCH, MM_TO_INCH, NOSE_Y_OFFSET, SHOULDER_X_OFFSET, SHOULDER_Y_OFFSET, SIL_IMG_HEIGHT, SIL_IMG_WIDTH } from '../utils/constants';
 import { distance } from '../utils/math';
 import useDetection from '../hooks/useMediaPipeHandDetection';
 import type { Pos } from '../types/task';
 import { go } from '../utils/navigation';
-import type { HeadShoulderDetectionResult } from '../types/detections';
 import type { SilhouetteParams } from '../types/config';
 
 const sketch: Sketch = (p5) => {
@@ -20,17 +19,11 @@ const sketch: Sketch = (p5) => {
   let pinchReady = { left: false, right: false };
   let calibrationReady = { left: false, right: false };
   let calibrationProgress = 0;
-  let isCalibrated = false;
-
-  let headShoulderDetection: HeadShoulderDetectionResult = { nose: null, leftShoulder: null, rightShoulder: null, interShoulderDistance: null, noseShoulderDistance: null, posErrorX: null, posErrorZ: null, posMessage: 'Uncalibrated' };
 
   let f: p5.Font;
-  let silImg: p5.Image;
-  let silParams: SilhouetteParams = defaultConfig.silParams;
 
   p5.preload = () => {
     f = p5.loadFont('./fonts/sf-ui-display-bold.otf');
-    silImg = p5.loadImage('./assets/standing.png');
   };
 
   p5.setup = () => {
@@ -49,9 +42,6 @@ const sketch: Sketch = (p5) => {
     pinchReady?: { left: boolean; right: boolean };
     calibrationReady?: { left: boolean; right: boolean };
     calibrationProgress?: number;
-    headShoulderDetection?: HeadShoulderDetectionResult;
-    silParams?: SilhouetteParams;
-    isCalibrated?: boolean;
   }) => {
     if (typeof props.frameWidth === 'number') width = props.frameWidth;
     if (typeof props.frameHeight === 'number') height = props.frameHeight;
@@ -61,71 +51,10 @@ const sketch: Sketch = (p5) => {
     pinchReady = props.pinchReady ?? { left: false, right: false };
     calibrationReady = props.calibrationReady ?? { left: false, right: false };
     calibrationProgress = props.calibrationProgress ?? 0;
-    headShoulderDetection = props.headShoulderDetection ?? { nose: null, leftShoulder: null, rightShoulder: null, interShoulderDistance: null, noseShoulderDistance: null, posErrorX: null, posErrorZ: null, posMessage: 'Uncalibrated' };
-    silParams = props.silParams ?? defaultConfig.silParams;
-    isCalibrated = props.isCalibrated ?? false;
-  };
-
-  const drawSilhouette = () => {
-    if (
-      !headShoulderDetection.nose ||
-      !headShoulderDetection.leftShoulder ||
-      !headShoulderDetection.rightShoulder ||
-      !headShoulderDetection.noseShoulderDistance ||
-      !headShoulderDetection.interShoulderDistance ||
-      !headShoulderDetection.posErrorX ||
-      !headShoulderDetection.posErrorZ
-    )
-      return;
-
-    const h = SIL_IMG_HEIGHT * silParams.silScaleY;
-    const w = SIL_IMG_WIDTH * silParams.silScaleX;
-
-    const noseY = silParams.silY + NOSE_Y_OFFSET * h;
-    const shoulderY = silParams.silY + SHOULDER_Y_OFFSET * h;
-    const leftShoulderX = SHOULDER_X_OFFSET * w;
-    const rightShoulderX = -SHOULDER_X_OFFSET * w;
-
-    let imgOpacity = 64;
-    if (Math.abs(headShoulderDetection.posErrorZ) > 0.15) {
-      imgOpacity = p5.map(Math.abs(headShoulderDetection.posErrorZ), 0.15, 0.5, 64, 255, true);
-    } else if (Math.abs(headShoulderDetection.posErrorX) > 0.15) {
-      imgOpacity = p5.map(Math.abs(headShoulderDetection.posErrorX), 0.15, 0.5, 64, 255, true);
-    }
-
-    p5.fill(255, 255, 255);
-    p5.textSize(32);
-    p5.textAlign(p5.CENTER, p5.CENTER);
-    p5.text(headShoulderDetection.posMessage, 0, -height / 2 + 40);
-
-    // Draw Silhouette
-    p5.imageMode(p5.CENTER);
-    p5.tint(255, imgOpacity);
-    p5.image(silImg, 0, silParams.silY, w, h);
-
-    // Silhouette POIs
-    p5.noFill();
-    p5.stroke(255, 255, 255, imgOpacity);
-    p5.strokeWeight(2);
-    p5.circle(0, noseY, 16);
-    p5.circle(leftShoulderX, shoulderY, 16);
-    p5.circle(rightShoulderX, shoulderY, 16);
-
-    // User POIs
-    p5.noStroke();
-    p5.fill(255, 255, 255, imgOpacity);
-    p5.circle(headShoulderDetection.nose.x, headShoulderDetection.nose.y, 8);
-    p5.circle(headShoulderDetection.leftShoulder.x, headShoulderDetection.leftShoulder.y, 8);
-    p5.circle(headShoulderDetection.rightShoulder.x, headShoulderDetection.rightShoulder.y, 8);
   };
 
   p5.draw = () => {
     p5.clear();
-
-    if (isCalibrated) {
-      drawSilhouette();
-      return;
-    }
 
     p5.noStroke();
     p5.fill(0, 0, 0, 128);
@@ -176,10 +105,7 @@ const CameraCalibration = () => {
   const testbedWidth = testbedWidthMM * MM_TO_INCH * factor;
   const testbedHeight = testbedHeightMM * MM_TO_INCH * factor;
 
-  const { videoRef, pinchDetection, headShoulderDetection, loading, error, startWebcam } = useDetection(true);
-  const [calibrationStartTime, setCalibrationStartTime] = useState<number | null>(null);
-  const [isCalibrated, setIsCalibrated] = useState(false);
-  const timerRef = useRef<number | null>(null);
+  const { videoRef, pinchDetection, headShoulderDetection, loading, error, startWebcam, stopWebcam } = useDetection(true);
 
   const overlayRef = useRef<HTMLDivElement | null>(null);
 
@@ -188,6 +114,10 @@ const CameraCalibration = () => {
 
   const pinchReady = pinchDetection.indexPinch;
   const calibrationReady = pinchDetection.middlePinch;
+
+  const [calibrationStartTime, setCalibrationStartTime] = useState<number | null>(null);
+  const [isCalibrated, setIsCalibrated] = useState(false);
+  const timerRef = useRef<number | null>(null);
   const CALIBRATION_TIMER = config.defaultStartDuration;
 
   const calibrationProgress = (() => {
@@ -284,11 +214,6 @@ const CameraCalibration = () => {
               calibrationProgress={calibrationProgress}
               frameWidth={testbedWidth}
               frameHeight={testbedHeight}
-              devicePPI={devicePPI}
-              devicePixelRatio={devicePixelRatio}
-              headShoulderDetection={headShoulderDetection}
-              silParams={silParams}
-              isCalibrated={isCalibrated}
             />
           </div>
         </div>
@@ -331,7 +256,13 @@ const CameraCalibration = () => {
         >
           Recalibrate
         </button>
-        <button className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer" onClick={() => go('#/')}>
+        <button
+          className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"
+          onClick={() => {
+            stopWebcam();
+            go('/home');
+          }}
+        >
           Done
         </button>
       </div>

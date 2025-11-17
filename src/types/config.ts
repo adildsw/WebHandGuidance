@@ -9,6 +9,11 @@ export type SilhouetteParams = {
   silCalibrated: boolean;
 };
 
+export type PolarPos = {
+  radius: number;
+  angle: number;
+};
+
 export type Config = {
   devicePPI: number;
   devicePixelRatio: number;
@@ -27,6 +32,12 @@ export type Config = {
   maxVibrationThresholdMM: number;
   defaultTaskType: 'MOVE' | 'HOLD';
   silParams: SilhouetteParams;
+  romCalibrationParams: {
+    leftStretchedRom: PolarPos | null;
+    leftRaisedRom: PolarPos | null;
+    rightStretchedRom: PolarPos | null;
+    rightRaisedRom: PolarPos | null;
+  }
 };
 
 export type ConfigContextType = {
@@ -48,4 +59,5 @@ export type ConfigContextType = {
   setDefaultTaskType: (type: 'MOVE' | 'HOLD') => void;
   generateDefaultTask: (type?: 'MOVE' | 'HOLD') => Task;
   setSilParams: (params: SilhouetteParams) => void;
+  setRomCalibrationParams: (params: { leftStretchedRom: PolarPos | null; leftRaisedRom: PolarPos | null; rightStretchedRom: PolarPos | null; rightRaisedRom: PolarPos | null }) => void;
 };

@@ -308,6 +308,18 @@ const useDetection = (runOnStart: boolean = false) => {
     }
   }, [loading, error, performDetectionLoop]);
 
+  const stopWebcam = useCallback(() => {
+    stopDetecting();
+    if (animationFrameId.current) {
+      cancelAnimationFrame(animationFrameId.current);
+      animationFrameId.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+  }, [stopDetecting]);
+
   const initializeDetector = useCallback(async () => {
     try {
       setLoading(true);
@@ -346,7 +358,7 @@ const useDetection = (runOnStart: boolean = false) => {
     };
     return cleanup;
   }, []);
-  return { videoRef, pinchDetection, wristDetection, headShoulderDetection, loading, error, startWebcam, startDetecting, stopDetecting };
+  return { videoRef, pinchDetection, wristDetection, headShoulderDetection, loading, error, startWebcam, stopWebcam, startDetecting, stopDetecting };
 };
 
 export default useDetection;
