@@ -26,6 +26,7 @@ import SerialConnector from './components/SerialConnector';
 import { useWebSerial } from './hooks/useWebSerial';
 import NoMobileSupport from './pages/NoMobileSupport';
 import { useEffect, useState } from 'react';
+import RomCalibration from './pages/RomCalibration';
 
 library.add(faLink, faHome, faSave, faFile, faChevronLeft, faChevronRight, faPlus, faTrash, faRedo, faFolderOpen, faDownload, faUpRightAndDownLeftFromCenter);
 
@@ -52,9 +53,11 @@ const App = () => {
         <HashRouter>
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/home" element={<Home />} />
             <Route path="/study" element={<Study webSerial={webSerial} />} />
             <Route path="/screen-calibration" element={<ScreenCalibration />} />
             <Route path="/camera-calibration" element={<CameraCalibration />} />
+            <Route path="/rom-calibration" element={<RomCalibration />} />
             <Route path="/config" element={<Config />} />
             <Route path="/create-study-tasks" element={<TaskCreator />} />
           </Routes>

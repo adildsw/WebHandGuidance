@@ -50,6 +50,10 @@ const Home = () => {
             Calibrate Camera
           </button>
 
+          <button onClick={() => go('#/rom-calibration')} className="w-full px-4 py-3 rounded-lg bg-white border border-gray-300 text-gray-900 hover:bg-gray-100 cursor-pointer">
+            Calibrate ROM
+          </button>
+
           <div className="flex flex-row gap-2 py-2">
             <div className="flex-grow border-t border-gray-300 my-2" />
             <span className="text-xs font-semibold text-center text-gray-600">System</span>

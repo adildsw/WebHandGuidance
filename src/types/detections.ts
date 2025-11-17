@@ -22,6 +22,9 @@ export type HeadShoulderDetectionResult = {
   rightShoulder: Pos | null;
   noseShoulderDistance: number | null;
   interShoulderDistance: number | null;
+  posErrorX: number | null;
+  posErrorZ: number | null;
+  posMessage: string;
 };
 
 export type PinchDetectionResult = {
