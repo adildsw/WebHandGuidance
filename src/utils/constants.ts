@@ -47,5 +47,11 @@ export const POSE_LANDMARKER_MODEL_PATH = './models/pose_landmarker_lite.task';
 
 export const VISION_TASKS_WASM_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm';
 
+// Silhouette Image Dimensions
 export const SIL_IMG_WIDTH = 1154;
-export const SIL_IMG_HEIGHT = 866;
+export const SIL_IMG_HEIGHT = 1043;
+
+// Silhouette Landmark Offsets
+export const NOSE_Y_OFFSET = -0.225;
+export const SHOULDER_Y_OFFSET = -0.125;
+export const SHOULDER_X_OFFSET = 0.065;

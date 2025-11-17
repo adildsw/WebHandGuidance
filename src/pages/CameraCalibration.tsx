@@ -4,17 +4,13 @@ import { useConfig } from '../utils/context';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import p5 from 'p5';
-import { defaultConfig, LETTER_HEIGHT_INCH, MM_TO_INCH, SIL_IMG_HEIGHT, SIL_IMG_WIDTH } from '../utils/constants';
+import { defaultConfig, LETTER_HEIGHT_INCH, MM_TO_INCH, NOSE_Y_OFFSET, SHOULDER_X_OFFSET, SHOULDER_Y_OFFSET, SIL_IMG_HEIGHT, SIL_IMG_WIDTH } from '../utils/constants';
 import { distance } from '../utils/math';
 import useDetection from '../hooks/useMediaPipeHandDetection';
 import type { Pos } from '../types/task';
 import { go } from '../utils/navigation';
 import type { HeadShoulderDetectionResult } from '../types/detections';
 import type { SilhouetteParams } from '../types/config';
-
-const NOSE_Y_OFFSET = -0.375;
-const SHOULDER_Y_OFFSET = -0.265;
-const SHOULDER_X_OFFSET = 0.06;
 
 const sketch: Sketch = (p5) => {
   let width = 200;
@@ -31,14 +27,10 @@ const sketch: Sketch = (p5) => {
   let f: p5.Font;
   let silImg: p5.Image;
   let silParams: SilhouetteParams = defaultConfig.silParams;
-  // const silX = 0;
-  // let silY = 0;
-  // let silScaleX = 1;
-  // let silScaleY = 1;
 
   p5.preload = () => {
     f = p5.loadFont('./fonts/sf-ui-display-bold.otf');
-    silImg = p5.loadImage('./assets/silhouette.png');
+    silImg = p5.loadImage('./assets/standing.png');
   };
 
   p5.setup = () => {
@@ -75,7 +67,6 @@ const sketch: Sketch = (p5) => {
   };
 
   const drawSilhouette = () => {
-    if (!isCalibrated) return;
     if (!headShoulderDetection.nose || !headShoulderDetection.leftShoulder || !headShoulderDetection.rightShoulder || !headShoulderDetection.noseShoulderDistance || !headShoulderDetection.interShoulderDistance) return;
 
     const h = SIL_IMG_HEIGHT * silParams.silScaleY;
