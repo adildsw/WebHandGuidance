@@ -4,6 +4,7 @@
     "target": "es2020",
     "useDefineForClassFields": true,
     "lib": ["es2020", "DOM", "DOM.Iterable"],
+    "types": ["@types/web-bluetooth"],
     "module": "ESNext",
     "skipLibCheck": true,
 

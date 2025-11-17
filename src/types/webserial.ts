@@ -33,3 +33,17 @@ export interface Serial {
 export interface NavigatorSerial extends Navigator {
   serial: Serial;
 }
+
+
+export type ImuVal = {
+  ax: number | null;
+  ay: number | null;
+  az: number | null;
+};
+
+export type VibrationData = {
+  up: number;
+  down: number;
+  left: number;
+  right: number;
+};

@@ -13,7 +13,8 @@ import { closestPointOnLine, directionalMap, distance } from '../utils/math';
 import type { CollectedData, CollectedIMUData, CollectedRawData } from '../types/datacollection';
 import { go } from '../utils/navigation';
 import { downloadZip, toCSV } from '../utils/datacollection';
-import type { useWebSerial } from '../hooks/useWebSerial';
+import type useBle from '../hooks/useBle';
+import type useWebSerial from '../hooks/useWebSerial';
 import type { Config } from '../types/config';
 
 const CLICK_SOUND = new Audio('./audio/click.mp3');
@@ -218,7 +219,7 @@ const sketch: Sketch = (p5) => {
       p5.textAlign(p5.CENTER, p5.BOTTOM);
       p5.fill(255);
       p5.text(`${directionPointDistanceMM?.toFixed(1)} mm`, x * MM_TO_INCH * worldPPI, y * MM_TO_INCH * worldPPI);
-    
+
       // p5.strokeWeight(2);
       // p5.stroke(255, 0, 0, 128);
       console.log('directionPointDistanceMM', directionPointDistanceMM, config.minVibrationThresholdMM, config.maxVibrationThresholdMM);
@@ -238,7 +239,7 @@ const sketch: Sketch = (p5) => {
   };
 };
 
-const Study = ({ webSerial }: { webSerial: ReturnType<typeof useWebSerial> }) => {
+const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>; ble: ReturnType<typeof useBle> }) => {
   const { config } = useConfig();
   const { devicePPI, worldPPI, devicePixelRatio, testbedWidthMM, testbedHeightMM, markerDiameterMM } = config;
   const factor = devicePPI / devicePixelRatio;
@@ -246,9 +247,24 @@ const Study = ({ webSerial }: { webSerial: ReturnType<typeof useWebSerial> }) =>
   const testbedHeight = testbedHeightMM * factor * MM_TO_INCH;
   const markerDiameter = markerDiameterMM * factor * MM_TO_INCH;
 
-  const { latestImuVal } = webSerial;
+  const { latestImuVal: webSerialLatestImuVal, writeDirection: webSerialWriteDirection, isConnected: webSerialIsConnected } = webSerial;
+  const { latestImuVal: bleLatestImuVal, writeDirection: bleWriteDirection, isConnected: bleIsConnected } = ble;
 
-  const { writeDirection, isConnected } = webSerial;
+  const latestImuVal = useMemo(() => {
+    if (bleIsConnected) return bleLatestImuVal;
+    else if (webSerialIsConnected) return webSerialLatestImuVal;
+    else return { ax: null, ay: null, az: null };
+  }, [bleLatestImuVal, webSerialLatestImuVal, bleIsConnected, webSerialIsConnected]);
+
+  const writeDirection = useMemo(() => {
+    if (bleIsConnected) return bleWriteDirection;
+    else if (webSerialIsConnected) return webSerialWriteDirection;
+    else return () => {};
+  }, [bleWriteDirection, webSerialWriteDirection, bleIsConnected, webSerialIsConnected]);
+
+  const isConnected = useMemo(() => {
+    return webSerialIsConnected || bleIsConnected;
+  }, [webSerialIsConnected, bleIsConnected]);
 
   const { videoRef, error, loading, wristDetection, startWebcam } = useDetection(true);
   const { leftWrist, rightWrist } = wristDetection;
@@ -286,7 +302,7 @@ const Study = ({ webSerial }: { webSerial: ReturnType<typeof useWebSerial> }) =>
 
   const directionPointDistanceMM = useMemo<number>(() => {
     if (directionPoint === null || activeWrist === null) return 0;
-    return distance(directionPoint.x, directionPoint.y, activeWrist.x * INCH_TO_MM / worldPPI, activeWrist.y * INCH_TO_MM / worldPPI);
+    return distance(directionPoint.x, directionPoint.y, (activeWrist.x * INCH_TO_MM) / worldPPI, (activeWrist.y * INCH_TO_MM) / worldPPI);
   }, [directionPoint, activeWrist, worldPPI]);
 
   const [taskStartTime, setTaskStartTime] = useState<number | null>(null);

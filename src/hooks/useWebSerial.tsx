@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import type { NavigatorSerial, SerialPort, SerialPortFilter, SerialPortInfo } from '../types/webserial';
+import type { ImuVal, NavigatorSerial, SerialPort, SerialPortFilter, SerialPortInfo, VibrationData } from '../types/webserial';
 
 type UseWebSerialOpts = {
   baudRate: number;
@@ -7,20 +7,7 @@ type UseWebSerialOpts = {
   lineDelimiter?: string;
 };
 
-type ImuVal = {
-  ax: number | null;
-  ay: number | null;
-  az: number | null;
-};
-
-type VibrationData = {
-  up: number;
-  down: number;
-  left: number;
-  right: number;
-};
-
-export const useWebSerial = (opts: UseWebSerialOpts) => {
+const useWebSerial = (opts: UseWebSerialOpts) => {
   const { baudRate, filters, lineDelimiter = '\n' } = opts;
   const [isConnected, setIsConnected] = useState(false);
   const [isSupported, setIsSupported] = useState('serial' in navigator);
@@ -147,3 +134,5 @@ const connect = useCallback(async () => {
     lastVibrationData,
   };
 };
+
+export default useWebSerial;

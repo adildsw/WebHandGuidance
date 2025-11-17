@@ -23,15 +23,17 @@ import Study from './pages/Study';
 import CameraCalibration from './pages/CameraCalibration';
 import { Toaster } from 'react-hot-toast';
 import SerialConnector from './components/SerialConnector';
-import { useWebSerial } from './hooks/useWebSerial';
+import useWebSerial from './hooks/useWebSerial';
 import NoMobileSupport from './pages/NoMobileSupport';
 import { useEffect, useState } from 'react';
 import RomCalibration from './pages/RomCalibration';
+import useBle from './hooks/useBle';
 
 library.add(faLink, faHome, faSave, faFile, faChevronLeft, faChevronRight, faPlus, faTrash, faRedo, faFolderOpen, faDownload, faUpRightAndDownLeftFromCenter);
 
 const App = () => {
   const webSerial = useWebSerial({ baudRate: 115200 });
+  const ble = useBle();
   const [isMobile, setIsMobileMode] = useState<boolean>(/Mobi|Android/i.test(navigator.userAgent) || window.innerWidth < 768 || window.innerWidth < window.innerHeight);
 
   useEffect(() => {
@@ -54,7 +56,7 @@ const App = () => {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/home" element={<Home />} />
-            <Route path="/study" element={<Study webSerial={webSerial} />} />
+            <Route path="/study" element={<Study webSerial={webSerial} ble={ble} />} />
             <Route path="/screen-calibration" element={<ScreenCalibration />} />
             <Route path="/camera-calibration" element={<CameraCalibration />} />
             <Route path="/rom-calibration" element={<RomCalibration />} />
@@ -65,8 +67,8 @@ const App = () => {
       </ConfigProvider>
 
       <Toaster />
-
-      <SerialConnector webSerial={webSerial} />
+      
+      <SerialConnector webSerial={webSerial} ble={ble} />
     </>
   );
 };
