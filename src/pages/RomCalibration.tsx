@@ -2,13 +2,14 @@ import { ReactP5Wrapper, type Sketch } from '@p5-wrapper/react';
 import type p5 from 'p5';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { HeadShoulderDetectionResult } from '../types/detections';
-import { type PolarPos, type SilhouetteParams } from '../types/config';
+import { type SilhouetteParams } from '../types/config';
 import { defaultConfig, MM_TO_INCH, NOSE_Y_OFFSET, SHOULDER_X_OFFSET, SHOULDER_Y_OFFSET, SIL_IMG_HEIGHT, SIL_IMG_WIDTH } from '../utils/constants';
-import type { Pos } from '../types/task';
+import type { PolarPos, Pos } from '../types/task';
 import { useConfig } from '../utils/context';
 import useDetection from '../hooks/useMediaPipeHandDetection';
 import { go } from '../utils/navigation';
 import { calculatePolar, polarToCartesian } from '../utils/math';
+import MediaPlayer from './subpages/MediaPlayer';
 
 type RomCalibrationStages = 'preinit' | 'init' | 'leftStretch' | 'rightStretch' | 'leftRaised' | 'rightRaised' | 'done';
 
@@ -179,7 +180,7 @@ const sketch: Sketch = (p5) => {
       p5.line(headShoulderDetection.leftShoulder.x, headShoulderDetection.leftShoulder.y, leftStretchedPos.x, leftStretchedPos.y);
       p5.circle(leftStretchedPos.x, leftStretchedPos.y, 24);
       p5.circle(headShoulderDetection.leftShoulder.x, headShoulderDetection.leftShoulder.y, 8);
-    } 
+    }
     if (rightStretchedRom && headShoulderDetection.rightShoulder) {
       const rightStretchedPos = polarToCartesian(rightStretchedRom.radius, rightStretchedRom.angle, headShoulderDetection.rightShoulder);
       p5.line(headShoulderDetection.rightShoulder.x, headShoulderDetection.rightShoulder.y, rightStretchedPos.x, rightStretchedPos.y);
@@ -215,7 +216,7 @@ const sketch: Sketch = (p5) => {
       p5.stroke(255);
       p5.strokeWeight(1);
       p5.fill(0, 0, 0, 128);
-      
+
       const leftStretchedPos = polarToCartesian(leftStretchedRom.radius, leftStretchedRom.angle, { x: leftShoulderX, y: shoulderY });
       const leftRaisedPos = polarToCartesian(leftRaisedRom.radius, leftRaisedRom.angle, { x: leftShoulderX, y: shoulderY });
       p5.line(leftShoulderX, shoulderY, leftStretchedPos.x, leftStretchedPos.y);
@@ -241,7 +242,7 @@ const sketch: Sketch = (p5) => {
       p5.circle(leftShoulderX, shoulderY, averageLeftRomRadius * 2 * 0.8);
       p5.circle(rightShoulderX, shoulderY, averageRightRomRadius * 2 * 0.8);
     }
-  }
+  };
 
   p5.draw = () => {
     p5.clear();
@@ -270,6 +271,8 @@ const RomCalibration = () => {
   const factor = devicePPI / devicePixelRatio;
   const testbedWidth = testbedWidthMM * MM_TO_INCH * factor;
   const testbedHeight = testbedHeightMM * MM_TO_INCH * factor;
+
+  const [isTutorialVisible, setIsTutorialVisible] = useState(true);
 
   const overlayRef = useRef<HTMLDivElement | null>(null);
 
@@ -380,8 +383,21 @@ const RomCalibration = () => {
   }, [calibrationStage, leftStretchedRom, leftRaisedRom, rightStretchedRom, rightRaisedRom, setRomCalibrationParams]);
 
   useEffect(() => {
-    startWebcam();
-  }, [startWebcam]);
+    if (isTutorialVisible) stopWebcam();
+    else startWebcam();
+  }, [isTutorialVisible, startWebcam, stopWebcam]);
+
+  if (isTutorialVisible)
+    return (
+      <MediaPlayer
+        mediaUrl="https://webhandguidance.b-cdn.net/rom_calibration_demo_test.mp4"
+        mediaTitle="Range of Motion Calibration Tutorial"
+        mediaSubtitle="This video will demonstrate how to calibrate your range of motion."
+        doneCallback={() => setIsTutorialVisible(false)}
+        doneBtnTitle="Begin Calibration"
+        showHomeBtn
+      />
+    );
 
   return (
     <div className="w-screen h-screen flex gap-4 flex-col items-center justify-center p-16 py-8">
@@ -406,7 +422,9 @@ const RomCalibration = () => {
       {/* Camera Feed */}
       <div className="md:col-span-3 bg-gray-100 flex items-center justify-center relative" style={{ width: `${testbedWidth}px`, height: `${testbedHeight}px` }}>
         <div ref={overlayRef} className="absolute inset-0 overflow-hidden rounded-lg shadow-lg">
-          {videoRef !== null && !loading && !error && <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />}
+          {videoRef !== null && !loading && !error && (
+            <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
+          )}
           <div className="absolute inset-0">
             <ReactP5Wrapper
               sketch={sketch}
@@ -434,6 +452,12 @@ const RomCalibration = () => {
       </div>
 
       <div className="flex flex-row gap-2">
+        <button
+          className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"
+          onClick={() => setIsTutorialVisible(true)}
+        >
+          Replay Video
+        </button>
         {calibrationStage === 'preinit' ? (
           <button
             className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"

@@ -1,4 +1,4 @@
-import type { Task } from "./task";
+import type { PolarPos, Task } from "./task";
 
 export type CalibrationTools = 'CREDIT' | 'RULER' | 'DOLLAR';
 
@@ -7,11 +7,6 @@ export type SilhouetteParams = {
   silScaleX: number;
   silScaleY: number;
   silCalibrated: boolean;
-};
-
-export type PolarPos = {
-  radius: number;
-  angle: number;
 };
 
 export type Config = {
@@ -30,7 +25,7 @@ export type Config = {
   defaultStartDuration: number;
   minVibrationThresholdMM: number;
   maxVibrationThresholdMM: number;
-  defaultTaskType: 'MOVE' | 'HOLD';
+  defaultTaskType: 'MOVE' | 'HOLD' | 'ROM_MOVE' | 'ROM_HOLD' | 'MEDIA';
   silParams: SilhouetteParams;
   romCalibrationParams: {
     leftStretchedRom: PolarPos | null;
@@ -56,8 +51,8 @@ export type ConfigContextType = {
   setDefaultStartDuration: (duration: number) => void;
   setMinVibrationThreshold: (threshold: number) => void;
   setMaxVibrationThreshold: (threshold: number) => void;
-  setDefaultTaskType: (type: 'MOVE' | 'HOLD') => void;
-  generateDefaultTask: (type?: 'MOVE' | 'HOLD') => Task;
+  setDefaultTaskType: (type: 'MOVE' | 'HOLD' | 'ROM_MOVE' | 'ROM_HOLD' | 'MEDIA') => void;
+  generateDefaultTask: (type?: 'MOVE' | 'HOLD' | 'ROM_MOVE' | 'ROM_HOLD' | 'MEDIA') => Task;
   setSilParams: (params: SilhouetteParams) => void;
   setRomCalibrationParams: (params: { leftStretchedRom: PolarPos | null; leftRaisedRom: PolarPos | null; rightStretchedRom: PolarPos | null; rightRaisedRom: PolarPos | null }) => void;
 };

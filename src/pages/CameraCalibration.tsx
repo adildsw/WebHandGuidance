@@ -10,6 +10,7 @@ import useDetection from '../hooks/useMediaPipeHandDetection';
 import type { Pos } from '../types/task';
 import { go } from '../utils/navigation';
 import type { SilhouetteParams } from '../types/config';
+import MediaPlayer from './subpages/MediaPlayer';
 
 const sketch: Sketch = (p5) => {
   let width = 200;
@@ -105,6 +106,8 @@ const CameraCalibration = () => {
   const testbedWidth = testbedWidthMM * MM_TO_INCH * factor;
   const testbedHeight = testbedHeightMM * MM_TO_INCH * factor;
 
+  const [isTutorialVisible, setIsTutorialVisible] = useState(true);
+
   const { videoRef, pinchDetection, headShoulderDetection, loading, error, startWebcam, stopWebcam } = useDetection(true);
 
   const overlayRef = useRef<HTMLDivElement | null>(null);
@@ -177,8 +180,21 @@ const CameraCalibration = () => {
   }, [calibrationReady, setWorldPPI, pinchReady, isCalibrated, getCalculatedSilParams, setSilParams]);
 
   useEffect(() => {
-    startWebcam();
-  }, [startWebcam]);
+    if (isTutorialVisible) stopWebcam();
+    else startWebcam();
+  }, [isTutorialVisible, startWebcam, stopWebcam]);
+
+  if (isTutorialVisible)
+    return (
+      <MediaPlayer
+        mediaUrl="https://webhandguidance.b-cdn.net/camera_calibration_demo_test.mp4"
+        mediaTitle="Camera Calibration Tutorial"
+        mediaSubtitle="This video will demonstrate how to calibrate your camera."
+        doneCallback={() => setIsTutorialVisible(false)}
+        doneBtnTitle="Begin Calibration"
+        showHomeBtn
+      />
+    );
 
   return (
     <div className="w-screen h-screen flex gap-4 flex-col items-center justify-center p-16 py-8">
@@ -246,6 +262,9 @@ const CameraCalibration = () => {
       </div>
 
       <div className="flex flex-row gap-2">
+        <button className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer" onClick={() => setIsTutorialVisible(true)}>
+          Replay Video
+        </button>
         <button
           className={
             `bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded` +
@@ -260,7 +279,7 @@ const CameraCalibration = () => {
           className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"
           onClick={() => {
             stopWebcam();
-            go('/home');
+            go('/');
           }}
         >
           Done

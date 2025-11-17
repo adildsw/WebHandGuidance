@@ -7,6 +7,7 @@ import { CREDIT_CARD_HEIGHT_INCH, CREDIT_CARD_WIDTH_INCH, DOLLAR_BILL_HEIGHT_INC
 import p5 from 'p5';
 import type { CalibrationTools } from '../types/config';
 import { go } from '../utils/navigation';
+import MediaPlayer from './subpages/MediaPlayer'; 
 
 const sketch: Sketch = (p5) => {
   let width = 200;
@@ -30,12 +31,7 @@ const sketch: Sketch = (p5) => {
     p5.resizeCanvas(width, height);
   };
 
-  p5.updateWithProps = (props: {
-    devicePPI?: number;
-    devicePixelRatio?: number;
-    calibrationTool?: CalibrationTools;
-    size?: { width: number; height: number };
-  }) => {
+  p5.updateWithProps = (props: { devicePPI?: number; devicePixelRatio?: number; calibrationTool?: CalibrationTools; size?: { width: number; height: number } }) => {
     if (typeof props.devicePPI === 'number') devicePPI = props.devicePPI;
     if (typeof props.devicePixelRatio === 'number') devicePixelRatio = props.devicePixelRatio;
     if (typeof props.calibrationTool === 'string') calibrationTool = props.calibrationTool;
@@ -189,6 +185,8 @@ const ScreenCalibration = () => {
   const { config, setDevicePPI, setCalibrationTool } = useConfig();
   const { devicePPI, devicePixelRatio, calibrationTool } = config;
 
+  const [isTutorialVisible, setIsTutorialVisible] = useState(true);
+
   const calibrationDivRef = useRef<HTMLDivElement | null>(null);
   const [canvasSize, setCanvasSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
 
@@ -206,7 +204,6 @@ const ScreenCalibration = () => {
   }, []);
 
   useEffect(() => {
-
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === '+' || e.key === '=') {
         setDevicePPI(devicePPI + 1);
@@ -222,6 +219,18 @@ const ScreenCalibration = () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [config, devicePPI, setDevicePPI]);
+
+  if (isTutorialVisible)
+    return (
+      <MediaPlayer
+        mediaUrl="https://webhandguidance.b-cdn.net/screen_calibration_demo_test.mp4"
+        mediaTitle="Screen Calibration Tutorial"
+        mediaSubtitle="This video will demonstrate how to calibrate your screen."
+        doneCallback={() => setIsTutorialVisible(false)}
+        doneBtnTitle="Begin Calibration"
+        showHomeBtn
+      />
+    );
 
   return (
     <div className="w-screen h-screen flex gap-4 flex-col items-center justify-center p-16 py-8">
@@ -290,12 +299,18 @@ const ScreenCalibration = () => {
         </div>
       </div>
 
-      <button
-        className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"
-        onClick={() => go('#/')}
-      >
-        Done
-      </button>
+      <div className="flex flex-row gap-2">
+        <button
+          className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"
+          onClick={() => setIsTutorialVisible(true)}
+        >
+          Replay Video
+        </button>
+
+        <button className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer" onClick={() => go('#/')}>
+          Done
+        </button>
+      </div>
     </div>
   );
 };

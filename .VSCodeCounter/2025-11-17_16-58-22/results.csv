@@ -1,0 +1,42 @@
+"filename", "language", "TypeScript JSX", "TypeScript", "JSON", "JavaScript", "JSON with Comments", "Markdown", "HTML", "C++", "comment", "blank", "total"
+"/Users/adildsw/Workspace/WebHandGuidance/.prettierrc", "JSON", 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 7
+"/Users/adildsw/Workspace/WebHandGuidance/README.md", "Markdown", 0, 0, 0, 0, 0, 62, 0, 0, 0, 43, 105
+"/Users/adildsw/Workspace/WebHandGuidance/eslint.config.js", "JavaScript", 0, 0, 0, 22, 0, 0, 0, 0, 0, 2, 24
+"/Users/adildsw/Workspace/WebHandGuidance/firmware_refs/ble_seed_esp32c3.ino", "C++", 0, 0, 0, 0, 0, 0, 0, 95, 0, 20, 115
+"/Users/adildsw/Workspace/WebHandGuidance/firmware_refs/webserial_arduino_uno.ino", "C++", 0, 0, 0, 0, 0, 0, 0, 87, 10, 27, 124
+"/Users/adildsw/Workspace/WebHandGuidance/index.html", "HTML", 0, 0, 0, 0, 0, 0, 15, 0, 0, 1, 16
+"/Users/adildsw/Workspace/WebHandGuidance/package-lock.json", "JSON", 0, 0, 4813, 0, 0, 0, 0, 0, 0, 1, 4814
+"/Users/adildsw/Workspace/WebHandGuidance/package.json", "JSON", 0, 0, 58, 0, 0, 0, 0, 0, 0, 1, 59
+"/Users/adildsw/Workspace/WebHandGuidance/src/App.tsx", "TypeScript JSX", 72, 0, 0, 0, 0, 0, 0, 0, 0, 11, 83
+"/Users/adildsw/Workspace/WebHandGuidance/src/components/SerialConnector.tsx", "TypeScript JSX", 75, 0, 0, 0, 0, 0, 0, 0, 0, 8, 83
+"/Users/adildsw/Workspace/WebHandGuidance/src/hooks/useBle.tsx", "TypeScript JSX", 57, 0, 0, 0, 0, 0, 0, 0, 0, 14, 71
+"/Users/adildsw/Workspace/WebHandGuidance/src/hooks/useMediaPipeHandDetection.tsx", "TypeScript JSX", 310, 0, 0, 0, 0, 0, 0, 0, 12, 43, 365
+"/Users/adildsw/Workspace/WebHandGuidance/src/hooks/useWebSerial.tsx", "TypeScript JSX", 130, 0, 0, 0, 0, 0, 0, 0, 0, 8, 138
+"/Users/adildsw/Workspace/WebHandGuidance/src/main.tsx", "TypeScript JSX", 10, 0, 0, 0, 0, 0, 0, 0, 0, 2, 12
+"/Users/adildsw/Workspace/WebHandGuidance/src/pages/CameraCalibration.tsx", "TypeScript JSX", 249, 0, 0, 0, 0, 0, 0, 0, 1, 43, 293
+"/Users/adildsw/Workspace/WebHandGuidance/src/pages/Config.tsx", "TypeScript JSX", 207, 0, 0, 0, 0, 0, 0, 0, 0, 22, 229
+"/Users/adildsw/Workspace/WebHandGuidance/src/pages/Home.tsx", "TypeScript JSX", 59, 0, 0, 0, 0, 0, 0, 0, 0, 16, 75
+"/Users/adildsw/Workspace/WebHandGuidance/src/pages/NoMobileSupport.tsx", "TypeScript JSX", 9, 0, 0, 0, 0, 0, 0, 0, 0, 2, 11
+"/Users/adildsw/Workspace/WebHandGuidance/src/pages/RomCalibration.tsx", "TypeScript JSX", 423, 0, 0, 0, 0, 0, 0, 0, 7, 61, 491
+"/Users/adildsw/Workspace/WebHandGuidance/src/pages/ScreenCalibration.tsx", "TypeScript JSX", 273, 0, 0, 0, 0, 0, 0, 0, 6, 40, 319
+"/Users/adildsw/Workspace/WebHandGuidance/src/pages/Study.tsx", "TypeScript JSX", 591, 0, 0, 0, 0, 0, 0, 0, 21, 83, 695
+"/Users/adildsw/Workspace/WebHandGuidance/src/pages/TaskCreator.tsx", "TypeScript JSX", 571, 0, 0, 0, 0, 0, 0, 0, 148, 67, 786
+"/Users/adildsw/Workspace/WebHandGuidance/src/pages/subpages/MediaPlayer.tsx", "TypeScript JSX", 67, 0, 0, 0, 0, 0, 0, 0, 1, 10, 78
+"/Users/adildsw/Workspace/WebHandGuidance/src/pages/subpages/MoveTaskDesigner.tsx", "TypeScript JSX", 176, 0, 0, 0, 0, 0, 0, 0, 3, 11, 190
+"/Users/adildsw/Workspace/WebHandGuidance/src/types/config.ts", "TypeScript", 0, 54, 0, 0, 0, 0, 0, 0, 0, 4, 58
+"/Users/adildsw/Workspace/WebHandGuidance/src/types/datacollection.ts", "TypeScript", 0, 56, 0, 0, 0, 0, 0, 0, 0, 2, 58
+"/Users/adildsw/Workspace/WebHandGuidance/src/types/detections.ts", "TypeScript", 0, 30, 0, 0, 0, 0, 0, 0, 0, 4, 34
+"/Users/adildsw/Workspace/WebHandGuidance/src/types/fonts.d.ts", "TypeScript", 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2
+"/Users/adildsw/Workspace/WebHandGuidance/src/types/task.ts", "TypeScript", 0, 50, 0, 0, 0, 0, 0, 0, 0, 8, 58
+"/Users/adildsw/Workspace/WebHandGuidance/src/types/webserial.ts", "TypeScript", 0, 41, 0, 0, 0, 0, 0, 0, 0, 8, 49
+"/Users/adildsw/Workspace/WebHandGuidance/src/utils/constants.ts", "TypeScript", 0, 51, 0, 0, 0, 0, 0, 0, 2, 10, 63
+"/Users/adildsw/Workspace/WebHandGuidance/src/utils/context.tsx", "TypeScript JSX", 171, 0, 0, 0, 0, 0, 0, 0, 2, 31, 204
+"/Users/adildsw/Workspace/WebHandGuidance/src/utils/datacollection.ts", "TypeScript", 0, 29, 0, 0, 0, 0, 0, 0, 0, 7, 36
+"/Users/adildsw/Workspace/WebHandGuidance/src/utils/encoder.ts", "TypeScript", 0, 16, 0, 0, 0, 0, 0, 0, 0, 1, 17
+"/Users/adildsw/Workspace/WebHandGuidance/src/utils/math.ts", "TypeScript", 0, 55, 0, 0, 0, 0, 0, 0, 0, 6, 61
+"/Users/adildsw/Workspace/WebHandGuidance/src/utils/navigation.ts", "TypeScript", 0, 3, 0, 0, 0, 0, 0, 0, 0, 1, 4
+"/Users/adildsw/Workspace/WebHandGuidance/tsconfig.app.json", "JSON", 0, 0, 24, 0, 0, 0, 0, 0, 2, 3, 29
+"/Users/adildsw/Workspace/WebHandGuidance/tsconfig.json", "JSON with Comments", 0, 0, 0, 0, 7, 0, 0, 0, 0, 1, 8
+"/Users/adildsw/Workspace/WebHandGuidance/tsconfig.node.json", "JSON", 0, 0, 21, 0, 0, 0, 0, 0, 2, 3, 26
+"/Users/adildsw/Workspace/WebHandGuidance/vite.config.js", "JavaScript", 0, 0, 0, 7, 0, 0, 0, 0, 1, 2, 10
+"Total", "-", 3450, 386, 4923, 29, 7, 62, 15, 182, 218, 628, 9900

@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import type { CalibrationTools, Config, ConfigContextType, PolarPos } from '../types/config';
-import type { Task } from '../types/task';
+import type { CalibrationTools, Config, ConfigContextType } from '../types/config';
+import type { HoldTaskPayload, MoveTaskPayload, PolarPos, ROMHoldTaskPayload, ROMMoveTaskPayload, Task } from '../types/task';
 import { uid } from 'uid/single';
 import { defaultConfig } from './constants';
 
@@ -63,7 +63,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     setConfigState((prev) => ({ ...prev, defaultHoldDuration: duration }));
   };
 
-  const setDefaultTaskType = (type: 'MOVE' | 'HOLD') => {
+  const setDefaultTaskType = (type: 'MOVE' | 'HOLD' | 'ROM_HOLD' | 'ROM_MOVE' | 'MEDIA') => {
     setConfigState((prev) => ({ ...prev, defaultTaskType: type }));
   };
 
@@ -87,16 +87,55 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     setConfigState((prev) => ({ ...prev, romCalibrationParams: params }));
   };
 
-  const generateDefaultTask = (type: 'MOVE' | 'HOLD' = config.defaultTaskType): Task => {
+  const defaultMoveTaskPayload: MoveTaskPayload = {
+    hand: config.defaultHand,
+    repitions: config.defaultRepetitions,
+    trials: config.defaultTrials,
+    markers: [{ x: 0, y: 0 }],
+    distanceThreshold: config.defaultDistanceThreshold,
+  };
+
+  const defaultHoldTaskPayload: HoldTaskPayload = {
+    hand: config.defaultHand,
+    repitions: config.defaultRepetitions,
+    trials: 1,
+    markers: [{ x: 0, y: 0 }],
+    distanceThreshold: config.defaultDistanceThreshold,
+    holdDuration: config.defaultHoldDuration,
+  };
+
+  const defaultROMMoveTaskPayload: ROMMoveTaskPayload = {
+    hand: config.defaultHand,
+    repitions: config.defaultRepetitions,
+    trials: config.defaultTrials,
+    markers: [{ radius: 0, angle: 0 }],
+    distanceThreshold: config.defaultDistanceThreshold,
+  };
+
+  const defaultROMHoldTaskPayload: ROMHoldTaskPayload = {
+    hand: config.defaultHand,
+    repitions: config.defaultRepetitions,
+    trials: 1,
+    markers: [{ radius: 0, angle: 0 }],
+    distanceThreshold: config.defaultDistanceThreshold,
+    holdDuration: config.defaultHoldDuration,
+  };
+
+  const mediaPayload = {
+    mediaUrl: 'https://webhandguidance.b-cdn.net/task_video_1_demo_test.mp4',
+    mediaTitle: 'Sample Video Title',
+    mediaSubtitle: 'Same Video Subtitle',
+  };
+
+  const generateDefaultTask = (type: 'MOVE' | 'HOLD' | 'ROM_MOVE' | 'ROM_HOLD' | 'MEDIA' = config.defaultTaskType): Task => {
     return {
       tag: 'task-' + uid(5),
-      hand: config.defaultHand,
-      trials: type === 'MOVE' ? config.defaultTrials : 1,
-      repetitions: type === 'MOVE' ? config.defaultRepetitions : 1,
-      distanceThreshold: config.defaultDistanceThreshold,
-      holdDuration: config.defaultHoldDuration,
       type: type,
-      markers: [{ x: 0, y: 0 }],
+      movePayload: defaultMoveTaskPayload,
+      holdPayload: defaultHoldTaskPayload,
+      romMovePayload: defaultROMMoveTaskPayload,
+      romHoldPayload: defaultROMHoldTaskPayload,
+      mediaPayload: mediaPayload,
     };
   };
 

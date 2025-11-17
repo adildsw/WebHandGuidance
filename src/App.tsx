@@ -6,8 +6,10 @@ import Config from './pages/Config';
 import Home from './pages/Home';
 import { library } from '@fortawesome/fontawesome-svg-core';
 import {
+  faChevronDown,
   faChevronLeft,
   faChevronRight,
+  faChevronUp,
   faDownload,
   faFile,
   faFolderOpen,
@@ -28,8 +30,9 @@ import NoMobileSupport from './pages/NoMobileSupport';
 import { useEffect, useState } from 'react';
 import RomCalibration from './pages/RomCalibration';
 import useBle from './hooks/useBle';
+import MediaPlayer from './pages/subpages/MediaPlayer';
 
-library.add(faLink, faHome, faSave, faFile, faChevronLeft, faChevronRight, faPlus, faTrash, faRedo, faFolderOpen, faDownload, faUpRightAndDownLeftFromCenter);
+library.add(faChevronUp, faChevronDown, faLink, faHome, faSave, faFile, faChevronLeft, faChevronRight, faPlus, faTrash, faRedo, faFolderOpen, faDownload, faUpRightAndDownLeftFromCenter);
 
 const App = () => {
   const webSerial = useWebSerial({ baudRate: 115200 });
@@ -62,6 +65,9 @@ const App = () => {
             <Route path="/rom-calibration" element={<RomCalibration />} />
             <Route path="/config" element={<Config />} />
             <Route path="/create-study-tasks" element={<TaskCreator />} />
+            
+            <Route path="/videotest" element={<MediaPlayer mediaUrl='https://webhandguidance.b-cdn.net/rom_calibration_demo_test.mp4' mediaTitle='Test Video' mediaSubtitle='This is a test video' doneBtnTitle='Begin Calibration' />} />
+            <Route path="imgtest" element={<MediaPlayer mediaUrl='https://webhandguidance.b-cdn.net/first_message_image_test.png' mediaTitle='Test Image' mediaSubtitle='This is a test image' />} />
           </Routes>
         </HashRouter>
       </ConfigProvider>

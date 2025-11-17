@@ -1,34 +1,58 @@
 export type Pos = { x: number; y: number };
 
-export type Task = {
-  tag: string;
-  hand: 'Left' | 'Right';
-  distanceThreshold: number;
-  trials: number;
+export type Handedness = 'Left' | 'Right';
+
+export type PolarPos = {
+  radius: number;
+  angle: number;
+};
+
+export type MoveTaskPayload = {
+  hand: Handedness;
   repetitions: number;
-  type: 'MOVE' | 'HOLD';
+  trials: number;
   markers: Pos[];
+  distanceThreshold: number;
+};
+
+export type HoldTaskPayload = {
+  hand: Handedness;
+  repetitions: number;
+  trials: number;
+  markers: Pos[];
+  distanceThreshold: number;
   holdDuration: number;
 };
 
-// export interface MoveTask extends BaseTask {
-//   type: 'MOVE';
-//   markers: Pos[];
-// }
+export type ROMMoveTaskPayload = {
+  hand: Handedness;
+  repetitions: number;
+  trials: number;
+  markers: PolarPos[];
+  distanceThreshold: number;
+};
 
-// export interface HoldTask extends BaseTask {
-//   type: 'HOLD';
-//   duration: number;
-// }
+export type ROMHoldTaskPayload = {
+  hand: Handedness;
+  repetitions: number;
+  trials: number;
+  markers: PolarPos[];
+  distanceThreshold: number;
+  holdDuration: number;
+};
 
-// export type Task = MoveTask | HoldTask;
+export type MediaTaskPayload = {
+  mediaUrl: string;
+  mediaTitle: string;
+  mediaSubtitle: string;
+};
 
-// export type Task = {
-//   tag: string;
-//   hand: 'Left' | 'Right';
-//   distanceThreshold: number;
-
-//   trials: number;
-//   repetitions: number;
-//   markers: Pos[];
-// };
+export type Task = {
+  tag: string;
+  type: 'MOVE' | 'HOLD' | 'ROM_MOVE' | 'ROM_HOLD' | 'MEDIA';
+  movePayload: MoveTaskPayload;
+  holdPayload: HoldTaskPayload;
+  romMovePayload: ROMMoveTaskPayload;
+  romHoldPayload: ROMHoldTaskPayload;
+  mediaPayload: MediaTaskPayload;
+};
