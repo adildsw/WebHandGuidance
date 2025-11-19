@@ -62,7 +62,7 @@ const sketch: Sketch = (p5) => {
   const drawMarkers = () => {
     p5.noFill();
     p5.stroke(255);
-    p5.strokeWeight(2);
+    p5.strokeWeight(4);
     for (let i = 1; i < pts.length; i++) {
       const px = pts[i - 1].x * MM_TO_INCH * worldPPI;
       const py = pts[i - 1].y * MM_TO_INCH * worldPPI;
