@@ -8,7 +8,7 @@ import type { PolarPos, Pos } from '../types/task';
 import { useConfig } from '../utils/context';
 import useDetection from '../hooks/useMediaPipeHandDetection';
 import { go } from '../utils/navigation';
-import { calculatePolar, polarToCartesian } from '../utils/math';
+import { cartesianToPolar, polarToCartesian } from '../utils/math';
 import MediaPlayer from '../components/MediaPlayer';
 
 type RomCalibrationStages = 'preinit' | 'init' | 'leftStretch' | 'rightStretch' | 'leftRaised' | 'rightRaised' | 'done';
@@ -56,6 +56,7 @@ const sketch: Sketch = (p5) => {
   let leftRaisedRom: PolarPos | null = null;
   let rightRaisedRom: PolarPos | null = null;
   let romCalibrationParams: { leftRadius: number; rightRadius: number } | null = null;
+  let romSafeMargin = 0.85;
 
   // Silhouette Params
   let silH = SIL_IMG_HEIGHT * silParams.silScaleY;
@@ -96,6 +97,7 @@ const sketch: Sketch = (p5) => {
     leftRaisedRom?: PolarPos | null;
     rightRaisedRom?: PolarPos | null;
     romCalibrationParams?: { leftRadius: number; rightRadius: number } | null;
+    romSafeMargin?: number;
   }) => {
     if (typeof props.frameWidth === 'number') width = props.frameWidth;
     if (typeof props.frameHeight === 'number') height = props.frameHeight;
@@ -121,6 +123,7 @@ const sketch: Sketch = (p5) => {
     leftRaisedRom = props.leftRaisedRom ?? null;
     rightRaisedRom = props.rightRaisedRom ?? null;
     romCalibrationParams = props.romCalibrationParams ?? null;
+    romSafeMargin = props.romSafeMargin ?? 0.85;
 
     silParams = props.silParams ?? defaultConfig.silParams;
     silH = SIL_IMG_HEIGHT * silParams.silScaleY;
@@ -225,8 +228,8 @@ const sketch: Sketch = (p5) => {
 
     p5.fill(0, 255, 0, 32);
     p5.stroke(0);
-    p5.circle(leftShoulderX, shoulderY, romCalibrationParams.leftRadius * 2 * 0.8);
-    p5.circle(rightShoulderX, shoulderY, romCalibrationParams.rightRadius * 2 * 0.8);
+    p5.circle(leftShoulderX, shoulderY, romCalibrationParams.leftRadius * 2 * romSafeMargin);
+    p5.circle(rightShoulderX, shoulderY, romCalibrationParams.rightRadius * 2 * romSafeMargin);
   };
 
   p5.draw = () => {
@@ -259,7 +262,7 @@ const sketch: Sketch = (p5) => {
 
 const RomCalibration = () => {
   const { config, setRomCalibrationParams } = useConfig();
-  const { devicePPI, devicePixelRatio, testbedHeightMM, testbedWidthMM, silParams, romCalibrationParams } = config;
+  const { devicePPI, devicePixelRatio, testbedHeightMM, testbedWidthMM, silParams, romCalibrationParams, romSafeMargin } = config;
   const factor = devicePPI / devicePixelRatio;
   const testbedWidth = testbedWidthMM * MM_TO_INCH * factor;
   const testbedHeight = testbedHeightMM * MM_TO_INCH * factor;
@@ -284,8 +287,8 @@ const RomCalibration = () => {
   const leftRomRef = useRef<PolarPos | null>(null);
   const rightRomRef = useRef<PolarPos | null>(null);
   useEffect(() => {
-    if (pinchPos.left && headShoulderDetection.leftShoulder) leftRomRef.current = calculatePolar(headShoulderDetection.leftShoulder, pinchPos.left);
-    if (pinchPos.right && headShoulderDetection.rightShoulder) rightRomRef.current = calculatePolar(headShoulderDetection.rightShoulder, pinchPos.right);
+    if (pinchPos.left && headShoulderDetection.leftShoulder) leftRomRef.current = cartesianToPolar(headShoulderDetection.leftShoulder, pinchPos.left);
+    if (pinchPos.right && headShoulderDetection.rightShoulder) rightRomRef.current = cartesianToPolar(headShoulderDetection.rightShoulder, pinchPos.right);
   }, [pinchPos, headShoulderDetection]);
 
   const [calibrationStage, setCalibrationStage] = useState<RomCalibrationStages>('preinit');
@@ -427,6 +430,7 @@ const RomCalibration = () => {
               rightStretchedRom={rightStretchedRom}
               rightRaisedRom={rightRaisedRom}
               romCalibrationParams={romCalibrationParams}
+              romSafeMargin={romSafeMargin}
             />
           </div>
         </div>

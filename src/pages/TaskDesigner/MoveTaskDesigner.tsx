@@ -51,6 +51,7 @@ const sketch: Sketch = (p5) => {
     if (typeof props.worldPPI === 'number') worldPPI = props.worldPPI;
     if (Array.isArray(props.markers)) pts = props.markers;
     if (p5.width !== w || p5.height !== h) p5.resizeCanvas(w, h);
+    console.log("Yes");
   };
 
   p5.draw = () => {

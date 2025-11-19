@@ -87,17 +87,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     setConfigState((prev) => ({ ...prev, romCalibrationParams: params }));
   };
 
-  // const setRomCalibrationParams = (params: { leftStretchedRom: PolarPos | null; leftRaisedRom: PolarPos | null; rightStretchedRom: PolarPos | null; rightRaisedRom: PolarPos | null }) => {
-  //   setConfigState((prev) => ({ ...prev, romCalibrationParams: params }));
-  // };
-
-  // const defaultMoveTaskPayload: MoveTaskPayload = {
-  //   hand: config.defaultHand,
-  //   repetitions: config.defaultRepetitions,
-  //   trials: config.defaultTrials,
-  //   markers: [{ x: 0, y: 0 }],
-  //   distanceThreshold: config.defaultDistanceThreshold,
-  // };
+  const setRomSafeMargin = (margin: number) => {
+    setConfigState((prev) => ({ ...prev, romSafeMargin: margin }));
+  };
 
   const generateDefaultMoveTaskPayload = (): MoveTaskPayload => ({
     hand: config.defaultHand,
@@ -106,15 +98,6 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     markers: [{ x: 0, y: 0 }],
     distanceThreshold: config.defaultDistanceThreshold,
   });
-
-  // const defaultHoldTaskPayload: HoldTaskPayload = {
-  //   hand: config.defaultHand,
-  //   repetitions: config.defaultRepetitions,
-  //   trials: 1,
-  //   markers: [{ x: 0, y: 0 }],
-  //   distanceThreshold: config.defaultDistanceThreshold,
-  //   holdDuration: config.defaultHoldDuration,
-  // };
 
   const generateDefaultHoldTaskPayload = (): HoldTaskPayload => ({
     hand: config.defaultHand,
@@ -210,6 +193,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         generateDefaultTask,
         setSilParams,
         setRomCalibrationParams,
+        setRomSafeMargin,
       }}
     >
       {children}

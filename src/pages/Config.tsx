@@ -20,6 +20,7 @@ const Config = () => {
     setDefaultStartDuration,
     setMinVibrationThreshold,
     setMaxVibrationThreshold,
+    setRomSafeMargin
   } = useConfig();
 
   const toNumber = useCallback((s: string) => {
@@ -41,6 +42,9 @@ const Config = () => {
       setDefaultTaskType(defaultConfig.defaultTaskType);
       setDefaultStartDuration(defaultConfig.defaultStartDuration);
       setDefaultHoldDuration(defaultConfig.defaultHoldDuration);
+      setMinVibrationThreshold(defaultConfig.minVibrationThresholdMM);
+      setMaxVibrationThreshold(defaultConfig.maxVibrationThresholdMM);
+      setRomSafeMargin(defaultConfig.romSafeMargin);
     }
   };
 
@@ -144,6 +148,20 @@ const Config = () => {
                 value={String(config.maxVibrationThresholdMM)}
                 onChange={(e) => setMaxVibrationThreshold(toNumber(e.target.value))}
               />
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <label className="text-sm text-gray-600">ROM Safe Margin</label>
+              {/* slider between 0 and 1 */}
+              <input
+                type="range"
+                min="0.5"
+                max="1"
+                step="0.01"
+                value={String(config.romSafeMargin)}
+                onChange={(e) => setRomSafeMargin(toNumber(e.target.value))}
+              />
+              <label className='text-right w-32 text-sm text-gray-400'>{(config.romSafeMargin * 100).toFixed(0)} % ROM</label>
             </div>
           </div>
 

@@ -58,3 +58,5 @@ export type Task = {
   romHoldPayload: ROMHoldTaskPayload;
   mediaPayload: MediaTaskPayload;
 };
+
+export type TaskTemplate = 'CUSTOM' | 'RANDOM' | 'LAT_RAISE' | 'ROUND_RAISE' | 'FULL_CIRCLE' | 'SHOULDER_PRESS' | 'ACROSS_CHEST';

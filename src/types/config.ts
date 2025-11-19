@@ -33,12 +33,7 @@ export type Config = {
   defaultTaskType: 'MOVE' | 'HOLD' | 'ROM_MOVE' | 'ROM_HOLD' | 'MEDIA';
   silParams: SilhouetteParams;
   romCalibrationParams: RomCalibrationParams | null;
-  // romCalibrationParams: {
-  //   leftStretchedRom: PolarPos | null;
-  //   leftRaisedRom: PolarPos | null;
-  //   rightStretchedRom: PolarPos | null;
-  //   rightRaisedRom: PolarPos | null;
-  // }
+  romSafeMargin: number;
 };
 
 export type ConfigContextType = {
@@ -60,6 +55,6 @@ export type ConfigContextType = {
   setDefaultTaskType: (type: 'MOVE' | 'HOLD' | 'ROM_MOVE' | 'ROM_HOLD' | 'MEDIA') => void;
   generateDefaultTask: (type?: 'MOVE' | 'HOLD' | 'ROM_MOVE' | 'ROM_HOLD' | 'MEDIA') => Task;
   setSilParams: (params: SilhouetteParams) => void;
-  // setRomCalibrationParams: (params: { leftStretchedRom: PolarPos | null; leftRaisedRom: PolarPos | null; rightStretchedRom: PolarPos | null; rightRaisedRom: PolarPos | null }) => void;
   setRomCalibrationParams: (params: RomCalibrationParams | null) => void;
+  setRomSafeMargin: (margin: number) => void;
 };

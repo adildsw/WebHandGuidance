@@ -36,14 +36,15 @@ const sketch: Sketch = (p5) => {
   let silW = SIL_IMG_WIDTH * silParams.silScaleX;
   let noseY = silParams.silY + NOSE_Y_OFFSET * silH;
   let shoulderY = silParams.silY + SHOULDER_Y_OFFSET * silH;
-  let leftShoulderX = SHOULDER_X_OFFSET * silW;
-  let rightShoulderX = -SHOULDER_X_OFFSET * silW;
+  let leftShoulderX = -SHOULDER_X_OFFSET * silW;
+  let rightShoulderX = SHOULDER_X_OFFSET * silW;
   let silOpacity = 255;
 
   // ROM Params
   let romCalibrationParams: RomCalibrationParams | null = null;
   let isROMVisible = true;
   let isSilhouetteVisible = true;
+  let romSafeMargin = 0.85;
 
   p5.preload = () => {
     f = p5.loadFont('./fonts/sf-ui-display-bold.otf');
@@ -68,6 +69,7 @@ const sketch: Sketch = (p5) => {
     romCalibrationParams?: RomCalibrationParams | null;
     isSilhouetteVisible?: boolean;
     isROMVisible?: boolean;
+    romSafeMargin?: number;
   }) => {
     if (typeof props.frameWidth === 'number') width = props.frameWidth;
     if (typeof props.frameHeight === 'number') height = props.frameHeight;
@@ -100,6 +102,7 @@ const sketch: Sketch = (p5) => {
     romCalibrationParams = props.romCalibrationParams === undefined ? null : props.romCalibrationParams;
     isROMVisible = props.isROMVisible ?? false;
     isSilhouetteVisible = props.isSilhouetteVisible ?? true;
+    romSafeMargin = props.romSafeMargin ?? 0.85;
   };
 
   const drawSilhouette = () => {
@@ -163,8 +166,8 @@ const sketch: Sketch = (p5) => {
 
     p5.fill(0, 255, 0, 32);
     p5.stroke(0);
-    p5.circle(leftShoulderX, shoulderY, romCalibrationParams.leftRadius * 2 * 0.8);
-    p5.circle(rightShoulderX, shoulderY, romCalibrationParams.rightRadius * 2 * 0.8);
+    p5.circle(leftShoulderX, shoulderY, romCalibrationParams.leftRadius * 2 * romSafeMargin);
+    p5.circle(rightShoulderX, shoulderY, romCalibrationParams.rightRadius * 2 * romSafeMargin);
   };
   
 
@@ -185,7 +188,7 @@ const sketch: Sketch = (p5) => {
 
 const SilhouetteVisualizer = () => {
   const { config } = useConfig();
-  const { devicePPI, devicePixelRatio, testbedHeightMM, testbedWidthMM, silParams, romCalibrationParams } = config;
+  const { devicePPI, devicePixelRatio, testbedHeightMM, testbedWidthMM, silParams, romCalibrationParams, romSafeMargin } = config;
   const factor = devicePPI / devicePixelRatio;
   const testbedWidth = testbedWidthMM * MM_TO_INCH * factor;
   const testbedHeight = testbedHeightMM * MM_TO_INCH * factor;
@@ -230,6 +233,7 @@ const SilhouetteVisualizer = () => {
               isSilhouetteVisible={isSilhouetteVisible}
               isROMVisible={isROMVisible}
               romCalibrationParams={romCalibrationParams}
+              romSafeMargin={romSafeMargin}
             />
           </div>
         </div>

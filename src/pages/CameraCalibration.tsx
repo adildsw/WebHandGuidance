@@ -140,8 +140,8 @@ const CameraCalibration = () => {
 
     const noseY = NOSE_Y_OFFSET * h;
     const shoulderY = SHOULDER_Y_OFFSET * h;
-    const leftShoulderX = SHOULDER_X_OFFSET * w;
-    const rightShoulderX = -SHOULDER_X_OFFSET * w;
+    const leftShoulderX = -SHOULDER_X_OFFSET * w;
+    const rightShoulderX = SHOULDER_X_OFFSET * w;
 
     if (!headShoulderDetection.interShoulderDistance || !headShoulderDetection.noseShoulderDistance) return silParams;
     const silInterShoulderDistance = distance(leftShoulderX, shoulderY, rightShoulderX, shoulderY);

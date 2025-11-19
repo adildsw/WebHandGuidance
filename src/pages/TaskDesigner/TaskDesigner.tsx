@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 import { encodeBase64 } from '../../utils/encoder';
 import MoveTaskDesigner from './MoveTaskDesigner';
 import MediaTaskDesigner from './MediaTaskDesigner';
+import RomMoveTaskDesigner from './RomMoveTaskDesigner';
 
 const TaskDesigner = () => {
   const { config, generateDefaultTask } = useConfig();
@@ -40,7 +41,6 @@ const TaskDesigner = () => {
   };
 
   const modifyCurrentTask = (newTask: Task) => {
-    console.log('MODIFYING TASK AT IDX', currentIndex, tasks);
     setTasks((prev) => {
       const newTasks = [...prev];
       newTasks[currentIndex] = newTask;
@@ -196,12 +196,15 @@ const TaskDesigner = () => {
                       if (!inX || !inY) setHoverIndex(null);
                     }}
                     className={
-                      'flex flex-col py-2 mb-2 rounded text-center font-semibold ' +
+                      'flex flex-col mb-2 rounded text-center font-semibold border border-gray-300 overflow-hidden ' +
                       (i === currentIndex ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-400 cursor-pointer')
                     }
                     onClick={() => setCurrentIndex(i)}
                   >
-                    <span>{task.type}</span>
+                    <div className="bg-gray-800 rounded-t flex flex-col gap-1">
+                      <span className="text-white text-sm">Task #{i + 1}</span>
+                    </div>
+                    <span className="text-sm">{task.type}</span>
                     <span className="text-xs font-light overflow-hidden">{task.tag}</span>
                   </div>
                 </div>
@@ -378,6 +381,7 @@ const TaskDesigner = () => {
 
           {/* Task Designer */}
           {['MOVE', 'HOLD'].includes(taskType) && <MoveTaskDesigner task={tasks[currentIndex]} modifyTask={modifyCurrentTask} detectionProp={detection} />}
+          {['ROM_MOVE', 'ROM_HOLD'].includes(taskType) && <RomMoveTaskDesigner task={tasks[currentIndex]} modifyTask={modifyCurrentTask} detectionProp={detection} />}
           {taskType === 'MEDIA' && <MediaTaskDesigner task={tasks[currentIndex]} modifyTask={modifyCurrentTask} />}
         </div>
       </div>
