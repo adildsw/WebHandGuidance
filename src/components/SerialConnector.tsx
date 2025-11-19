@@ -29,7 +29,7 @@ const SerialConnector = ({ webSerial, ble }: { webSerial: ReturnType<typeof useW
             }}
             className={`${
               !bleIsSupported ? 'cursor-not-allowed' : 'cursor-pointer'
-            } text-gray-400 text-sm font-bold p-1 border border-gray-300 rounded-lg hover:bg-gray-50 hover:text-gray-600 hover:border-gray-600`}
+            } text-gray-400 text-md font-semibold p-1 border border-gray-300 rounded-lg hover:bg-gray-50 hover:text-gray-600 hover:border-gray-600`}
           >
             {bleIsSupported ? 'Connect BLE' : 'BLE Not Supported'}
           </span>
@@ -42,7 +42,7 @@ const SerialConnector = ({ webSerial, ble }: { webSerial: ReturnType<typeof useW
             }}
             className={`${
               !webSerialIsSupported ? 'cursor-not-allowed' : 'cursor-pointer'
-            } text-gray-400 text-sm font-bold p-1 border border-gray-300 rounded-lg hover:bg-gray-50 hover:text-gray-600 hover:border-gray-600`}
+            } text-gray-400 text-md font-semibold p-1 border border-gray-300 rounded-lg hover:bg-gray-50 hover:text-gray-600 hover:border-gray-600`}
           >
             {webSerialIsSupported ? 'Connect USB' : 'Web Serial Not Supported'}
           </span>
