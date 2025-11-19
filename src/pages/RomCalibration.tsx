@@ -7,7 +7,7 @@ import { defaultConfig, MM_TO_INCH, NOSE_Y_OFFSET, SHOULDER_X_OFFSET, SHOULDER_Y
 import type { PolarPos, Pos } from '../types/task';
 import { useConfig } from '../utils/context';
 import useDetection from '../hooks/useMediaPipeHandDetection';
-import { go } from '../utils/navigation';
+import { forceRoot } from '../utils/navigation';
 import { cartesianToPolar, polarToCartesian } from '../utils/math';
 import MediaPlayer from '../components/MediaPlayer';
 
@@ -251,11 +251,6 @@ const sketch: Sketch = (p5) => {
       drawRomCircles();
     }
 
-    if (calibrationStage === 'preinit') {
-      drawSilhouette();
-      drawRomCircles();
-    }
-
     drawUserPinch();
   };
 };
@@ -266,6 +261,8 @@ const RomCalibration = () => {
   const factor = devicePPI / devicePixelRatio;
   const testbedWidth = testbedWidthMM * MM_TO_INCH * factor;
   const testbedHeight = testbedHeightMM * MM_TO_INCH * factor;
+
+  const [areWeDone, setAreWeDone] = useState(false);
 
   const [isTutorialVisible, setIsTutorialVisible] = useState(true);
 
@@ -415,24 +412,26 @@ const RomCalibration = () => {
           {videoRef !== null && !loading && !error && (
             <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
           )}
-          <div className="absolute inset-0">
-            <ReactP5Wrapper
-              sketch={sketch}
-              pinchPos={pinchPos}
-              frameWidth={testbedWidth}
-              frameHeight={testbedHeight}
-              headShoulderDetection={headShoulderDetection}
-              silParams={silParams}
-              isCalibrated={isCalibrated}
-              calibrationStage={calibrationStage}
-              leftStretchedRom={leftStretchedRom}
-              leftRaisedRom={leftRaisedRom}
-              rightStretchedRom={rightStretchedRom}
-              rightRaisedRom={rightRaisedRom}
-              romCalibrationParams={romCalibrationParams}
-              romSafeMargin={romSafeMargin}
-            />
-          </div>
+          {!areWeDone && (
+            <div className="absolute inset-0">
+              <ReactP5Wrapper
+                sketch={sketch}
+                pinchPos={pinchPos}
+                frameWidth={testbedWidth}
+                frameHeight={testbedHeight}
+                headShoulderDetection={headShoulderDetection}
+                silParams={silParams}
+                isCalibrated={isCalibrated}
+                calibrationStage={calibrationStage}
+                leftStretchedRom={leftStretchedRom}
+                leftRaisedRom={leftRaisedRom}
+                rightStretchedRom={rightStretchedRom}
+                rightRaisedRom={rightRaisedRom}
+                romCalibrationParams={romCalibrationParams}
+                romSafeMargin={romSafeMargin}
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -469,7 +468,9 @@ const RomCalibration = () => {
           className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"
           onClick={() => {
             stopWebcam();
-            go('/home');
+            setAreWeDone(true);
+            // go('/');
+            forceRoot();
           }}
         >
           Done

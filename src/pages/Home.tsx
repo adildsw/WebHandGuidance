@@ -1,8 +1,10 @@
 import { useRef } from 'react';
 import { encodeBase64 } from '../utils/encoder';
 import { go } from '../utils/navigation';
+import { useConfig } from '../utils/context';
 
 const Home = () => {
+  const { config } = useConfig();
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const openFile = () => fileRef.current?.click();
@@ -19,6 +21,11 @@ const Home = () => {
     go(`#/study?participantId=${participantId}&data=${encoded}`);
   };
 
+  const isCameraCalibrated = config.silParams.silCalibrated;
+  const isROMCalibrated = config.romCalibrationParams !== null;
+
+  console.log(isCameraCalibrated, isROMCalibrated);
+
   return (
     <div className="w-screen h-screen flex items-center justify-center select-none">
       <div className="w-[360px] md:w-[420px] bg-white rounded-2xl shadow border border-gray-200 p-6 flex flex-col items-center gap-6">
@@ -28,11 +35,29 @@ const Home = () => {
         </h1>
 
         <div className="w-full flex flex-col gap-3">
-          <button onClick={openFile} className="w-full px-4 py-3 rounded-lg bg-gray-200 text-gray-900 font-bold hover:bg-gray-800 hover:text-white cursor-pointer">
+          <button
+            disabled={!isCameraCalibrated || !isROMCalibrated}
+            onClick={openFile}
+            className={
+              `w-full px-4 py-3 rounded-lg text-gray-900` +
+              (!isCameraCalibrated || !isROMCalibrated
+                ? ' opacity-50 cursor-not-allowed hover:bg-gray-200 hover:text-gray-900 bg-gray-200'
+                : ' hover:bg-gray-800 hover:text-white cursor-pointer bg-white border border-gray-300')
+            }
+          >
             Start Study
           </button>
 
-          <button onClick={() => go('#/create-study-tasks')} className="w-full px-4 py-3 rounded-lg bg-white border border-gray-300 text-gray-900 hover:bg-gray-100 cursor-pointer">
+          <button
+            disabled={!isCameraCalibrated || !isROMCalibrated}
+            onClick={() => go('#/create-study-tasks')}
+            className={
+              `w-full px-4 py-3 rounded-lg text-gray-900` +
+              (!isCameraCalibrated || !isROMCalibrated
+                ? ' opacity-50 cursor-not-allowed hover:bg-gray-200 hover:text-gray-900 bg-gray-200'
+                : ' hover:bg-gray-800 hover:text-white cursor-pointer bg-white border border-gray-300')
+            }
+          >
             Create Tasks
           </button>
 
@@ -50,7 +75,16 @@ const Home = () => {
             Calibrate Camera
           </button>
 
-          <button onClick={() => go('#/rom-calibration')} className="w-full px-4 py-3 rounded-lg bg-white border border-gray-300 text-gray-900 hover:bg-gray-100 cursor-pointer">
+          <button
+            disabled={!isCameraCalibrated}
+            onClick={() => go('#/rom-calibration')}
+            className={
+              `w-full px-4 py-3 rounded-lg text-gray-900` +
+              (!isCameraCalibrated
+                ? ' opacity-50 cursor-not-allowed hover:bg-gray-200 hover:text-gray-900 bg-gray-200'
+                : ' hover:bg-gray-800 hover:text-white cursor-pointer bg-white border border-gray-300')
+            }
+          >
             Calibrate ROM
           </button>
 
@@ -64,6 +98,8 @@ const Home = () => {
             Settings
           </button>
         </div>
+        {!isCameraCalibrated && <span className="text-sm text-gray-400 text-center">Please calibrate the camera to proceed</span>}
+        {!isROMCalibrated && isCameraCalibrated && <span className="text-sm text-gray-400 text-center">Please calibrate the ROM to proceed</span>}
 
         <input ref={fileRef} type="file" accept=".json,application/json" onChange={onFileChange} className="hidden" />
       </div>

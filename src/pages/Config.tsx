@@ -20,6 +20,8 @@ const Config = () => {
     setDefaultStartDuration,
     setMinVibrationThreshold,
     setMaxVibrationThreshold,
+    setSilParams,
+    setRomCalibrationParams,
     setRomSafeMargin
   } = useConfig();
 
@@ -44,6 +46,8 @@ const Config = () => {
       setDefaultHoldDuration(defaultConfig.defaultHoldDuration);
       setMinVibrationThreshold(defaultConfig.minVibrationThresholdMM);
       setMaxVibrationThreshold(defaultConfig.maxVibrationThresholdMM);
+      setSilParams(defaultConfig.silParams);
+      setRomCalibrationParams(defaultConfig.romCalibrationParams);
       setRomSafeMargin(defaultConfig.romSafeMargin);
     }
   };
