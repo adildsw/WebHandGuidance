@@ -1,5 +1,7 @@
 export type Pos = { x: number; y: number };
 
+export type TaskType = 'MOVE' | 'HOLD' | 'ROM_MOVE' | 'ROM_HOLD' | 'MEDIA';
+
 export type Handedness = 'Left' | 'Right';
 
 export type PolarPos = {
@@ -49,7 +51,7 @@ export type MediaTaskPayload = {
 
 export type Task = {
   tag: string;
-  type: 'MOVE' | 'HOLD' | 'ROM_MOVE' | 'ROM_HOLD' | 'MEDIA';
+  type: TaskType;
   movePayload: MoveTaskPayload;
   holdPayload: HoldTaskPayload;
   romMovePayload: ROMMoveTaskPayload;

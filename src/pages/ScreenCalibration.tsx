@@ -7,7 +7,7 @@ import { CREDIT_CARD_HEIGHT_INCH, CREDIT_CARD_WIDTH_INCH, DOLLAR_BILL_HEIGHT_INC
 import p5 from 'p5';
 import type { CalibrationTools } from '../types/config';
 import { go } from '../utils/navigation';
-import MediaPlayer from './subpages/MediaPlayer'; 
+import MediaPlayer from '../components/MediaPlayer'; 
 
 const sketch: Sketch = (p5) => {
   let width = 200;

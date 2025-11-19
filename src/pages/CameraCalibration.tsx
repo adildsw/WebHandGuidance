@@ -10,7 +10,7 @@ import useDetection from '../hooks/useMediaPipeHandDetection';
 import type { Pos } from '../types/task';
 import { go } from '../utils/navigation';
 import type { SilhouetteParams } from '../types/config';
-import MediaPlayer from './subpages/MediaPlayer';
+import MediaPlayer from '../components/MediaPlayer';
 
 const sketch: Sketch = (p5) => {
   let width = 200;
@@ -109,6 +109,10 @@ const CameraCalibration = () => {
   const [isTutorialVisible, setIsTutorialVisible] = useState(true);
 
   const { videoRef, pinchDetection, headShoulderDetection, loading, error, startWebcam, stopWebcam } = useDetection(true);
+
+  useEffect(() => {
+    console.log(pinchDetection);
+  }, [pinchDetection]);
 
   const overlayRef = useRef<HTMLDivElement | null>(null);
 

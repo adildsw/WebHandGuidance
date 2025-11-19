@@ -1,27 +1,52 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
-import type { Task } from '../types/task';
-import { useConfig } from '../utils/context';
-import { MM_TO_INCH } from '../utils/constants';
+import type { Task, TaskType } from '../../types/task';
+import { useConfig } from '../../utils/context';
+import { MM_TO_INCH } from '../../utils/constants';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import useDetection from '../hooks/useMediaPipeHandDetection';
-import { go } from '../utils/navigation';
+import useDetection from '../../hooks/useMediaPipeHandDetection';
+import { go } from '../../utils/navigation';
 import toast from 'react-hot-toast';
-import { encodeBase64 } from '../utils/encoder';
-import MoveTaskDesigner from './subpages/MoveTaskDesigner';
+import { encodeBase64 } from '../../utils/encoder';
+import MoveTaskDesigner from './MoveTaskDesigner';
+import MediaTaskDesigner from './MediaTaskDesigner';
 
-const TaskCreator = () => {
+const TaskDesigner = () => {
   const { config, generateDefaultTask } = useConfig();
   const { devicePPI, devicePixelRatio, testbedWidthMM } = config;
   const factor = (MM_TO_INCH * devicePPI) / devicePixelRatio;
   const testbedWidth = testbedWidthMM * factor;
 
   const detection = useDetection(false);
-  const { startWebcam } = detection;
 
   const [studyName, setStudyName] = useState<string>('unnamed_study');
   const [tasks, setTasks] = useState<Task[]>([generateDefaultTask()]);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
+  const taskType: TaskType = tasks[currentIndex]?.type || 'MOVE';
+
+  // Handling Drag/Drop for Task Rearrangement
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const handleDrop = () => {
+    if (dragIndex === null || hoverIndex === null) return;
+    const arr = [...tasks];
+    const [moved] = arr.splice(dragIndex, 1);
+    let insertAt = hoverIndex;
+    if (hoverIndex > dragIndex) insertAt -= 1;
+    arr.splice(insertAt, 0, moved);
+    setTasks(arr);
+    setDragIndex(null);
+    setHoverIndex(null);
+  };
+
+  const modifyCurrentTask = (newTask: Task) => {
+    console.log('MODIFYING TASK AT IDX', currentIndex, tasks);
+    setTasks((prev) => {
+      const newTasks = [...prev];
+      newTasks[currentIndex] = newTask;
+      return newTasks;
+    });
+  };
 
   const newStudyTask = () => {
     setCurrentIndex(0);
@@ -110,10 +135,6 @@ const TaskCreator = () => {
   const disablePrev = currentIndex <= 0;
   const atLast = currentIndex === tasks.length - 1 || tasks.length === 0;
 
-  useEffect(() => {
-    startWebcam();
-  }, [startWebcam]);
-
   const shiftTaskUp = (index: number) => {
     if (index <= 0) return;
     setTasks((prev) => {
@@ -147,25 +168,54 @@ const TaskCreator = () => {
             <span className="p-1 py-2 items-center text-center text-xl font-bold bg-gray-800 text-white rounded-lg">Task List</span>
 
             {/* Task List */}
-            <div className="flex flex-col grow border border-gray-200 rounded-lg gap-2 p-2">
-              {tasks.map((task, index) => (
-                <div
-                  key={index}
-                  className={
-                    `flex flex-col py-2 rounded text-center font-semibold ` +
-                    (index === currentIndex ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-400 cursor-pointer')
-                  }
-                  onClick={() => setCurrentIndex(index)}
-                >
-                  <span>{task.type}</span>
-                  <span className="text-xs font-light">{task.tag}</span>
+            <div className="flex flex-col grow border border-gray-200 rounded-lg gap-0 p-2" onDragOver={(e) => e.preventDefault()} onDrop={handleDrop}>
+              {tasks.map((task, i) => (
+                <div key={i}>
+                  {hoverIndex === i && (
+                    <div className="h-2 -my-1">
+                      <div className="w-full h-[3px] bg-blue-600 rounded" />
+                    </div>
+                  )}
+
+                  <div
+                    draggable
+                    onDragStart={() => {
+                      setDragIndex(i);
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+                      const offset = e.clientY - rect.top;
+                      const after = offset > rect.height / 2;
+                      setHoverIndex(after ? i + 1 : i);
+                    }}
+                    onDragLeave={(e) => {
+                      const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+                      const inY = e.clientY >= rect.top && e.clientY <= rect.bottom;
+                      const inX = e.clientX >= rect.left && e.clientX <= rect.right;
+                      if (!inX || !inY) setHoverIndex(null);
+                    }}
+                    className={
+                      'flex flex-col py-2 mb-2 rounded text-center font-semibold ' +
+                      (i === currentIndex ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-400 cursor-pointer')
+                    }
+                    onClick={() => setCurrentIndex(i)}
+                  >
+                    <span>{task.type}</span>
+                    <span className="text-xs font-light overflow-hidden">{task.tag}</span>
+                  </div>
                 </div>
               ))}
+
+              {hoverIndex === tasks.length && (
+                <div className="h-2 mt-1">
+                  <div className="w-full h-[3px] bg-blue-600 rounded" />
+                </div>
+              )}
             </div>
 
             {/* Task List Rearrangement */}
             <div className="flex flex-row gap-2 justify-center">
-              {/* two buttons or up and down */}
               <button
                 onClick={() => shiftTaskUp(currentIndex)}
                 className={`grow py-1 bg-gray-300 rounded hover:bg-gray-400 ` + (currentIndex === 0 ? 'opacity-50 cursor-not-allowed' : '')}
@@ -278,13 +328,16 @@ const TaskCreator = () => {
                     onChange={(e) => {
                       setTasks((prev) => {
                         const newTasks = [...prev];
-                        newTasks[currentIndex].type = e.target.value as 'MOVE' | 'HOLD' | 'ROM_MOVE' | 'ROM_HOLD' | 'MEDIA';
+                        newTasks[currentIndex].type = e.target.value as TaskType;
                         return newTasks;
                       });
                     }}
                   >
                     <option value="MOVE">Move</option>
                     <option value="HOLD">Hold</option>
+                    <option value="ROM_MOVE">ROM Move</option>
+                    <option value="ROM_HOLD">ROM Hold</option>
+                    <option value="MEDIA">Media</option>
                   </select>
                 </div>
 
@@ -323,11 +376,13 @@ const TaskCreator = () => {
             </div>
           </div>
 
-          <MoveTaskDesigner currentIndex={currentIndex} tasks={tasks} setTasks={setTasks} detectionProp={detection} />
+          {/* Task Designer */}
+          {['MOVE', 'HOLD'].includes(taskType) && <MoveTaskDesigner task={tasks[currentIndex]} modifyTask={modifyCurrentTask} detectionProp={detection} />}
+          {taskType === 'MEDIA' && <MediaTaskDesigner task={tasks[currentIndex]} modifyTask={modifyCurrentTask} />}
         </div>
       </div>
     </div>
   );
 };
 
-export default TaskCreator;
+export default TaskDesigner;

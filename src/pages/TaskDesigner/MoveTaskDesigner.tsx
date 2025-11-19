@@ -7,9 +7,11 @@ import useDetection from '../../hooks/useMediaPipeHandDetection';
 import type { Font } from 'p5';
 
 type MoveTaskDesignerProps = {
-  tasks: Task[];
-  setTasks: (tasks: Task[] | ((prev: Task[]) => Task[])) => void;
-  currentIndex: number;
+  // tasks: Task[];
+  // setTasks: (tasks: Task[] | ((prev: Task[]) => Task[])) => void;
+  // currentIndex: number;
+  task: Task;
+  modifyTask: (task: Task) => void;
   detectionProp: ReturnType<typeof useDetection>;
 };
 
@@ -19,7 +21,6 @@ const sketch: Sketch = (p5) => {
   let worldPPI = 26;
   let markerDiameter = 10;
   let distanceThreshold = 50;
-  let axis = false;
 
   let pts: Pos[] = [];
 
@@ -42,7 +43,6 @@ const sketch: Sketch = (p5) => {
     markerDiameter?: number;
     worldPPI?: number;
     markers?: Pos[];
-    isAxisVisible?: boolean;
   }) => {
     if (typeof props.frameWidth === 'number') w = props.frameWidth;
     if (typeof props.frameHeight === 'number') h = props.frameHeight;
@@ -51,13 +51,10 @@ const sketch: Sketch = (p5) => {
     if (typeof props.worldPPI === 'number') worldPPI = props.worldPPI;
     if (Array.isArray(props.markers)) pts = props.markers;
     if (p5.width !== w || p5.height !== h) p5.resizeCanvas(w, h);
-    axis = props.isAxisVisible ?? false;
   };
 
   p5.draw = () => {
     p5.clear();
-
-    if (axis) drawAxis();
     drawMarkers();
   };
 
@@ -103,61 +100,9 @@ const sketch: Sketch = (p5) => {
       p5.text(`(${(pts[i].x / 10).toFixed(1)}, ${(pts[i].y / 10).toFixed(1)})`, cx, cy + markerDiameter);
     }
   };
-
-  const drawAxis = () => {
-    p5.stroke(255, 255, 255, 128);
-    p5.strokeWeight(1);
-    p5.line(0, -h, 0, h);
-    p5.line(-w, 0, w, 0);
-    const maxWidthMM = w * (INCH_TO_MM / worldPPI);
-    const maxHeightMM = h * (INCH_TO_MM / worldPPI);
-    const tickSize = 50;
-    p5.textSize(10);
-    p5.fill(255);
-
-    for (let i = 0; i > -maxWidthMM; i -= tickSize) {
-      if ((Math.abs(i) / tickSize) % 2 == 1) {
-        p5.line(i * (MM_TO_INCH * worldPPI), -2, i * (MM_TO_INCH * worldPPI), 2);
-        continue;
-      }
-      p5.line(i * (MM_TO_INCH * worldPPI), -5, i * (MM_TO_INCH * worldPPI), 5);
-      p5.textAlign(p5.CENTER, p5.BOTTOM);
-      p5.text(`${Math.round(i) / 10} cm`, i * (MM_TO_INCH * worldPPI), 20);
-    }
-    for (let i = 0; i <= maxWidthMM; i += tickSize) {
-      if ((Math.abs(i) / tickSize) % 2 == 1) {
-        p5.line(i * (MM_TO_INCH * worldPPI), -2, i * (MM_TO_INCH * worldPPI), 2);
-        continue;
-      }
-      p5.line(i * (MM_TO_INCH * worldPPI), -5, i * (MM_TO_INCH * worldPPI), 5);
-      p5.textAlign(p5.CENTER, p5.BOTTOM);
-      p5.text(`${Math.round(i) / 10} cm`, i * (MM_TO_INCH * worldPPI), 20);
-    }
-
-    for (let i = 0; i > -maxHeightMM; i -= tickSize) {
-      if (i == 0) continue;
-      if ((Math.abs(i) / tickSize) % 2 == 1) {
-        p5.line(-5, i * (MM_TO_INCH * worldPPI), 5, i * (MM_TO_INCH * worldPPI));
-        continue;
-      }
-      p5.line(-5, i * (MM_TO_INCH * worldPPI), 5, i * (MM_TO_INCH * worldPPI));
-      p5.textAlign(p5.LEFT, p5.CENTER);
-      p5.text(`${Math.round(i) / 10} cm`, 10, i * (MM_TO_INCH * worldPPI));
-    }
-    for (let i = 0; i <= maxHeightMM; i += tickSize) {
-      if (i == 0) continue;
-      if ((Math.abs(i) / tickSize) % 2 == 1) {
-        p5.line(-5, i * (MM_TO_INCH * worldPPI), 5, i * (MM_TO_INCH * worldPPI));
-        continue;
-      }
-      p5.line(-5, i * (MM_TO_INCH * worldPPI), 5, i * (MM_TO_INCH * worldPPI));
-      p5.textAlign(p5.LEFT, p5.CENTER);
-      p5.text(`${Math.round(i) / 10} cm`, 10, i * (MM_TO_INCH * worldPPI));
-    }
-  };
 };
 
-const MoveTaskDesigner = ({ tasks, setTasks, currentIndex, detectionProp }: MoveTaskDesignerProps) => {
+const MoveTaskDesigner = ({ task, modifyTask, detectionProp }: MoveTaskDesignerProps) => {
   const { config } = useConfig();
   const { worldPPI, devicePPI, devicePixelRatio, testbedWidthMM, testbedHeightMM, markerDiameterMM } = config;
   const factor = (MM_TO_INCH * devicePPI) / devicePixelRatio;
@@ -165,24 +110,17 @@ const MoveTaskDesigner = ({ tasks, setTasks, currentIndex, detectionProp }: Move
   const testbedHeight = testbedHeightMM * factor;
   const markerDiameter = markerDiameterMM * factor;
 
-  const { distanceThreshold, hand, markers, repetitions, trials } = tasks[currentIndex].type === 'MOVE' ? tasks[currentIndex].movePayload : tasks[currentIndex].holdPayload;
-  const { holdDuration } = tasks[currentIndex].type === 'HOLD' ? tasks[currentIndex].holdPayload : { holdDuration: 0 };
+  const taskType = task.type as 'MOVE' | 'HOLD';
+  const { distanceThreshold, hand, markers, repetitions, trials } = taskType === 'MOVE' ? task.movePayload : task.holdPayload;
+  const { holdDuration } = taskType === 'HOLD' ? task.holdPayload : { holdDuration: 0 };
 
-  const { videoRef, loading, error } = detectionProp;
-
-  const [isAxisVisible, setIsAxisVisible] = useState<boolean>(true);
-
+  const { startWebcam, stopWebcam, videoRef, loading, error } = detectionProp;
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'v') {
-        setIsAxisVisible((prev) => !prev);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
+    startWebcam();
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+      stopWebcam();
     };
-  }, []);
+  }, [startWebcam, stopWebcam]);
 
   const overlayRef = useRef<HTMLDivElement | null>(null);
 
@@ -190,7 +128,7 @@ const MoveTaskDesigner = ({ tasks, setTasks, currentIndex, detectionProp }: Move
   const [dragIndex, setDragIndex] = useState<number | null>(null);
 
   const moveTaskDistance = useMemo(() => {
-    const payload = tasks[currentIndex].movePayload;
+    const payload = task.movePayload;
 
     let distance: number = 0;
     for (let i = 1; i < payload.markers.length; i++) {
@@ -199,7 +137,7 @@ const MoveTaskDesigner = ({ tasks, setTasks, currentIndex, detectionProp }: Move
       distance += Math.sqrt(dx * dx + dy * dy);
     }
     return distance;
-  }, [tasks, currentIndex]);
+  }, [task]);
 
   /**
    * Get mouse position in pixels relative to the center of the testbed overlay (Bottom-Right Positive Axes)
@@ -214,10 +152,8 @@ const MoveTaskDesigner = ({ tasks, setTasks, currentIndex, detectionProp }: Move
   };
 
   const findHoverIndex = (pixelX: number, pixelY: number) => {
-    if (['HOLD', 'MOVE'].includes(tasks[currentIndex].type) === false) return null;
-
     let idx: number | null = null;
-    const markers = tasks[currentIndex].type === 'HOLD' ? tasks[currentIndex].holdPayload.markers : tasks[currentIndex].movePayload.markers;
+    const markers = taskType === 'HOLD' ? task.holdPayload.markers : task.movePayload.markers;
     for (let i = 0; i < markers.length; i++) {
       const dx = markers[i].x * MM_TO_INCH * worldPPI - pixelX;
       const dy = markers[i].y * MM_TO_INCH * worldPPI - pixelY;
@@ -231,26 +167,20 @@ const MoveTaskDesigner = ({ tasks, setTasks, currentIndex, detectionProp }: Move
   };
 
   const onMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (['HOLD', 'MOVE'].includes(tasks[currentIndex].type) === false) return;
-
     const { x, y } = getMousePos(e);
     const mx = (x / worldPPI) * INCH_TO_MM;
     const my = (y / worldPPI) * INCH_TO_MM;
     if (dragIndex !== null) {
-      setTasks((prev) => {
-        const newTasks = [...prev];
-        if (tasks[currentIndex].type === 'HOLD') newTasks[currentIndex].holdPayload.markers[dragIndex] = { x: mx, y: my };
-        else newTasks[currentIndex].movePayload.markers[dragIndex] = { x: mx, y: my };
-        return newTasks;
-      });
+      const newTask = { ...task };
+      if (taskType === 'HOLD') newTask.holdPayload.markers[dragIndex] = { x: mx, y: my };
+      else newTask.movePayload.markers[dragIndex] = { x: mx, y: my };
+      modifyTask(newTask);
       return;
     }
     setHoverIndex(findHoverIndex(x, y));
   };
 
   const onMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (['HOLD', 'MOVE'].includes(tasks[currentIndex].type) === false) return;
-
     const { x, y } = getMousePos(e);
     const mx = (x / worldPPI) * INCH_TO_MM;
     const my = (y / worldPPI) * INCH_TO_MM;
@@ -259,18 +189,16 @@ const MoveTaskDesigner = ({ tasks, setTasks, currentIndex, detectionProp }: Move
       if (idx !== null) {
         setDragIndex(idx);
       } else {
-        if (tasks[currentIndex].type === 'MOVE')
-          setTasks((prev) => {
-            const newTasks = [...prev];
-            newTasks[currentIndex].movePayload.markers.push({ x: mx, y: my });
-            return newTasks;
-          });
-        else
-          setTasks((prev) => {
-            const newTasks = [...prev];
-            newTasks[currentIndex].holdPayload.markers = [{ x: mx, y: my }];
-            return newTasks;
-          });
+        if (taskType === 'MOVE') {
+          const newTask = { ...task };
+          newTask.movePayload.markers.push({ x: mx, y: my });
+          modifyTask(newTask);
+        }
+        else {
+          const newTask = { ...task };
+          newTask.holdPayload.markers[0] = { x: mx, y: my };
+          modifyTask(newTask);
+        }
       }
     }
   };
@@ -285,42 +213,40 @@ const MoveTaskDesigner = ({ tasks, setTasks, currentIndex, detectionProp }: Move
   };
 
   const onContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (['HOLD', 'MOVE'].includes(tasks[currentIndex].type) === false) return;
-    const markers = tasks[currentIndex].type === 'HOLD' ? tasks[currentIndex].holdPayload.markers : tasks[currentIndex].movePayload.markers;
+    const markers = taskType === 'HOLD' ? task.holdPayload.markers : task.movePayload.markers;
 
     e.preventDefault();
     const { x, y } = getMousePos(e);
     const idx = findHoverIndex(x, y);
     if (idx !== null && markers.length > 1) {
-      setTasks((prev) => {
-        const newTasks = [...prev];
-        if (tasks[currentIndex].type === 'MOVE') {
-          newTasks[currentIndex].movePayload.markers = newTasks[currentIndex].movePayload.markers.filter((_, i) => i !== idx);
-        } else {
-          newTasks[currentIndex].holdPayload.markers = newTasks[currentIndex].holdPayload.markers.filter((_, i) => i !== idx);
-        }
-        return newTasks;
-      });
+      const newTask = { ...task };
+      if (taskType === 'HOLD') {
+        newTask.holdPayload.markers = newTask.holdPayload.markers.filter((_, i) => i !== idx);
+      } else {
+        newTask.movePayload.markers = newTask.movePayload.markers.filter((_, i) => i !== idx);
+      }
+      modifyTask(newTask);
       setHoverIndex(null);
       setDragIndex(null);
     }
   };
 
-  if (['MOVE', 'HOLD'].includes(tasks[currentIndex].type) === false) return <></>;
+  if (['MOVE', 'HOLD'].includes(taskType) === false) return <></>;
 
   return (
-    <div>
+    <div className="flex flex-col gap-2 items-center">
       {/* Task Form */}
-      <div className="px-4 flex flex-row gap-2 overflow-auto bg-white p-2">
+      <div className="px-4 flex flex-row gap-2 overflow-auto p-2 bg-gray-100 rounded-lg w-full">
         <div className="flex flex-col items-center justify-between">
           <label className="text-sm font-bold text-gray-600">Hand</label>
           <select
             className="w-24 px-2 py-1 h-full text-center rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-300"
             value={hand}
             onChange={(e) => {
-              const newTasks = [...tasks];
-              newTasks[currentIndex].movePayload.hand = e.target.value as 'Left' | 'Right';
-              setTasks(newTasks);
+              const newTask = { ...task };
+              if (taskType === 'HOLD') newTask.holdPayload.hand = e.target.value as 'Left' | 'Right';
+              else newTask.movePayload.hand = e.target.value as 'Left' | 'Right';
+              modifyTask(newTask);
             }}
           >
             <option value="Left">Left</option>
@@ -330,40 +256,36 @@ const MoveTaskDesigner = ({ tasks, setTasks, currentIndex, detectionProp }: Move
         <div className="flex flex-col items-center justify-between">
           <label className="text-sm font-bold text-gray-600">Reps</label>
           <input
-            className={`w-16 px-2 py-1 rounded border border-gray-300 text-center ${tasks[currentIndex].type === 'HOLD' ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className={`w-16 px-2 py-1 rounded border border-gray-300 text-center ${taskType === 'HOLD' ? 'opacity-50 cursor-not-allowed' : ''}`}
             inputMode="numeric"
             pattern="[0-9]*"
             value={String(repetitions)}
-            disabled={tasks[currentIndex].type === 'HOLD'}
+            disabled={taskType === 'HOLD'}
             onChange={(e) => {
               const v = e.target.value.replace(/[^0-9]/g, '');
               const n = v === '' ? 0 : Number(v);
-              setTasks((prev) => {
-                const newTasks = [...prev];
-                if (tasks[currentIndex].type === 'MOVE') newTasks[currentIndex].movePayload.repetitions = n;
-                else newTasks[currentIndex].holdPayload.repetitions = n;
-                return newTasks;
-              });
+              const newTask = { ...task };
+              if (taskType === 'MOVE') newTask.movePayload.repetitions = n;
+              else newTask.holdPayload.repetitions = n;
+              modifyTask(newTask);
             }}
           />
         </div>
         <div className="flex flex-col items-center justify-between">
           <label className="text-sm font-bold text-gray-600">Trials</label>
           <input
-            className={`w-16 px-2 py-1 rounded border border-gray-300 text-center ${tasks[currentIndex].type === 'HOLD' ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className={`w-16 px-2 py-1 rounded border border-gray-300 text-center ${taskType === 'HOLD' ? 'opacity-50 cursor-not-allowed' : ''}`}
             inputMode="numeric"
             pattern="[0-9]*"
             value={String(trials)}
-            disabled={tasks[currentIndex].type === 'HOLD'}
+            disabled={taskType === 'HOLD'}
             onChange={(e) => {
               const v = e.target.value.replace(/[^0-9]/g, '');
               const n = v === '' ? 0 : Number(v);
-              setTasks((prev) => {
-                const newTasks = [...prev];
-                if (tasks[currentIndex].type === 'MOVE') newTasks[currentIndex].movePayload.trials = n;
-                else newTasks[currentIndex].holdPayload.trials = n;
-                return newTasks;
-              });
+              const newTask = { ...task };
+              if (taskType === 'MOVE') newTask.movePayload.trials = n;
+              else newTask.holdPayload.trials = n;
+              modifyTask(newTask);
             }}
           />
         </div>
@@ -382,15 +304,15 @@ const MoveTaskDesigner = ({ tasks, setTasks, currentIndex, detectionProp }: Move
               step={1}
               value={distanceThreshold}
               onChange={(e) => {
-                const newTasks = [...tasks];
-                if (tasks[currentIndex].type === 'HOLD') newTasks[currentIndex].holdPayload.distanceThreshold = Number(e.target.value);
-                else newTasks[currentIndex].movePayload.distanceThreshold = Number(e.target.value);
-                setTasks(newTasks);
+                const newTask = { ...task };
+                if (taskType === 'HOLD') newTask.holdPayload.distanceThreshold = Number(e.target.value);
+                else newTask.movePayload.distanceThreshold = Number(e.target.value);
+                modifyTask(newTask);
               }}
             />
           </div>
 
-          {tasks[currentIndex].type === 'HOLD' ? (
+          {taskType === 'HOLD' ? (
             <div className="flex flex-col grow items-center justify-between">
               <label className="text-sm text-gray-600 font-bold">Hold Duration</label>
               <span className="text-xs text-gray-400">{holdDuration / 1000} s</span>
@@ -402,9 +324,9 @@ const MoveTaskDesigner = ({ tasks, setTasks, currentIndex, detectionProp }: Move
                 step={1}
                 value={holdDuration / 1000}
                 onChange={(e) => {
-                  const newTasks = [...tasks];
-                  newTasks[currentIndex].holdPayload.holdDuration = Number(e.target.value) * 1000;
-                  setTasks(newTasks);
+                  const newTask = { ...task };
+                  newTask.holdPayload.holdDuration = Number(e.target.value) * 1000;
+                  modifyTask(newTask);
                 }}
               />
             </div>
@@ -434,25 +356,21 @@ const MoveTaskDesigner = ({ tasks, setTasks, currentIndex, detectionProp }: Move
         >
           {!loading && !error && <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />}
           <div className="absolute inset-0">
-            {['HOLD', 'MOVE'].includes(tasks[currentIndex].type) && (
-              <ReactP5Wrapper
-                sketch={sketch}
-                frameWidth={testbedWidth}
-                frameHeight={testbedHeight}
-                distanceThreshold={tasks[currentIndex].type === 'HOLD' ? tasks[currentIndex].holdPayload.distanceThreshold : tasks[currentIndex].movePayload.distanceThreshold}
-                worldPPI={worldPPI}
-                markers={tasks[currentIndex].type === 'HOLD' ? tasks[currentIndex].holdPayload.markers : tasks[currentIndex].movePayload.markers}
-                markerDiameter={markerDiameter}
-                isAxisVisible={isAxisVisible}
-              />
-            )}
-            Í
+            <ReactP5Wrapper
+              sketch={sketch}
+              frameWidth={testbedWidth}
+              frameHeight={testbedHeight}
+              distanceThreshold={taskType === 'HOLD' ? task.holdPayload.distanceThreshold : task.movePayload.distanceThreshold}
+              worldPPI={worldPPI}
+              markers={taskType === 'HOLD' ? task.holdPayload.markers : task.movePayload.markers}
+              markerDiameter={markerDiameter}
+            />
           </div>
         </div>
       </div>
 
       {/* Task Instructions */}
-      {tasks[currentIndex].type === 'MOVE' ? (
+      {taskType === 'MOVE' ? (
         <span className="text-center text-sm text-gray-400 pt-2">
           <span className="bg-gray-200 font-bold rounded p-1">Left Click</span> to Place Marker • <span className="bg-gray-200 font-bold rounded p-1">Left Click + Drag</span> to
           Reposition Marker • <span className="bg-gray-200 font-bold rounded p-1">Right Click</span> to Delete Marker
@@ -462,9 +380,6 @@ const MoveTaskDesigner = ({ tasks, setTasks, currentIndex, detectionProp }: Move
           <span className="bg-gray-200 font-bold rounded p-1">Left Click + Drag</span> to Reposition Hold Target
         </span>
       )}
-      <span className="text-center text-sm text-gray-400 pt-2">
-        Press <span className="bg-gray-200 font-bold rounded p-1">v</span> to Toggle Axis Visualization
-      </span>
     </div>
   );
 };

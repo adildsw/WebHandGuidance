@@ -1,7 +1,7 @@
 import { useRef } from 'react';
-import { MM_TO_INCH } from '../../utils/constants';
-import { useConfig } from '../../utils/context';
-import { go } from '../../utils/navigation';
+import { MM_TO_INCH } from '../utils/constants'; 
+import { useConfig } from '../utils/context';
+import { go } from '../utils/navigation';
 
 type MediaPlayerProps = {
   mediaUrl: string;

@@ -23,7 +23,9 @@ export type HeadShoulderDetectionResult = {
   noseShoulderDistance: number | null;
   interShoulderDistance: number | null;
   posErrorX: number | null;
+  posErrorY: number | null;
   posErrorZ: number | null;
+  guideOpacity: number;
   posMessage: string;
 };
 

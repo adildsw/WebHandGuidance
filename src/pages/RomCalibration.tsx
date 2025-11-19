@@ -9,7 +9,7 @@ import { useConfig } from '../utils/context';
 import useDetection from '../hooks/useMediaPipeHandDetection';
 import { go } from '../utils/navigation';
 import { calculatePolar, polarToCartesian } from '../utils/math';
-import MediaPlayer from './subpages/MediaPlayer';
+import MediaPlayer from '../components/MediaPlayer';
 
 type RomCalibrationStages = 'preinit' | 'init' | 'leftStretch' | 'rightStretch' | 'leftRaised' | 'rightRaised' | 'done';
 
@@ -43,16 +43,28 @@ const sketch: Sketch = (p5) => {
     interShoulderDistance: null,
     noseShoulderDistance: null,
     posErrorX: null,
+    posErrorY: null,
     posErrorZ: null,
+    guideOpacity: 1,
     posMessage: 'Uncalibrated',
   };
 
+  // Calibration Params
   let calibrationStage: RomCalibrationStages = 'done';
-
   let leftStretchedRom: PolarPos | null = null;
   let rightStretchedRom: PolarPos | null = null;
   let leftRaisedRom: PolarPos | null = null;
   let rightRaisedRom: PolarPos | null = null;
+  let romCalibrationParams: { leftRadius: number; rightRadius: number } | null = null;
+
+  // Silhouette Params
+  let silH = SIL_IMG_HEIGHT * silParams.silScaleY;
+  let silW = SIL_IMG_WIDTH * silParams.silScaleX;
+  let noseY = silParams.silY + NOSE_Y_OFFSET * silH;
+  let shoulderY = silParams.silY + SHOULDER_Y_OFFSET * silH;
+  let leftShoulderX = SHOULDER_X_OFFSET * silW;
+  let rightShoulderX = -SHOULDER_X_OFFSET * silW;
+  let silOpacity = 255;
 
   p5.preload = () => {
     f = p5.loadFont('./fonts/sf-ui-display-bold.otf');
@@ -83,6 +95,7 @@ const sketch: Sketch = (p5) => {
     rightStretchedRom?: PolarPos | null;
     leftRaisedRom?: PolarPos | null;
     rightRaisedRom?: PolarPos | null;
+    romCalibrationParams?: { leftRadius: number; rightRadius: number } | null;
   }) => {
     if (typeof props.frameWidth === 'number') width = props.frameWidth;
     if (typeof props.frameHeight === 'number') height = props.frameHeight;
@@ -96,178 +109,157 @@ const sketch: Sketch = (p5) => {
       interShoulderDistance: null,
       noseShoulderDistance: null,
       posErrorX: null,
+      posErrorY: null,
       posErrorZ: null,
+      guideOpacity: 1,
       posMessage: 'Uncalibrated',
     };
-    silParams = props.silParams ?? defaultConfig.silParams;
-    calibrationStage = props.calibrationStage ?? 'init';
 
+    calibrationStage = props.calibrationStage ?? 'init';
     leftStretchedRom = props.leftStretchedRom ?? null;
     rightStretchedRom = props.rightStretchedRom ?? null;
     leftRaisedRom = props.leftRaisedRom ?? null;
     rightRaisedRom = props.rightRaisedRom ?? null;
+    romCalibrationParams = props.romCalibrationParams ?? null;
+
+    silParams = props.silParams ?? defaultConfig.silParams;
+    silH = SIL_IMG_HEIGHT * silParams.silScaleY;
+    silW = SIL_IMG_WIDTH * silParams.silScaleX;
+    noseY = silParams.silY + NOSE_Y_OFFSET * silH;
+    shoulderY = silParams.silY + SHOULDER_Y_OFFSET * silH;
+    leftShoulderX = -SHOULDER_X_OFFSET * silW;
+    rightShoulderX = SHOULDER_X_OFFSET * silW;
+    silOpacity = p5.map(headShoulderDetection.guideOpacity, 0, 1, 0, 255, true);
   };
 
-  const drawInitSilhouette = () => {
-    if (
-      !headShoulderDetection.nose ||
-      !headShoulderDetection.leftShoulder ||
-      !headShoulderDetection.rightShoulder ||
-      !headShoulderDetection.noseShoulderDistance ||
-      !headShoulderDetection.interShoulderDistance ||
-      !headShoulderDetection.posErrorX ||
-      !headShoulderDetection.posErrorZ
-    )
-      return;
-
-    const h = SIL_IMG_HEIGHT * silParams.silScaleY;
-    const w = SIL_IMG_WIDTH * silParams.silScaleX;
-
-    const noseY = silParams.silY + NOSE_Y_OFFSET * h;
-    const shoulderY = silParams.silY + SHOULDER_Y_OFFSET * h;
-    const leftShoulderX = SHOULDER_X_OFFSET * w;
-    const rightShoulderX = -SHOULDER_X_OFFSET * w;
-
-    let imgOpacity = 64;
-    if (Math.abs(headShoulderDetection.posErrorZ) > 0.15) {
-      imgOpacity = p5.map(Math.abs(headShoulderDetection.posErrorZ), 0.15, 0.5, 64, 255, true);
-    } else if (Math.abs(headShoulderDetection.posErrorX) > 0.15) {
-      imgOpacity = p5.map(Math.abs(headShoulderDetection.posErrorX), 0.15, 0.5, 64, 255, true);
-    }
-
-    p5.fill(255, 255, 255);
-    p5.textSize(32);
-    p5.textAlign(p5.CENTER, p5.CENTER);
-    p5.text(headShoulderDetection.posMessage, 0, -height / 2 + 40);
-
-    // Draw Silhouette
+  const drawSilhouette = () => {
     p5.imageMode(p5.CENTER);
-    p5.tint(255, imgOpacity);
-    p5.image(silImg, 0, silParams.silY, w, h);
+    p5.tint(255, silOpacity);
+    p5.image(silImg, 0, silParams.silY, silW, silH);
+  };
 
-    // Silhouette POIs
+  const drawSilhouettePOIs = () => {
     p5.noFill();
-    p5.stroke(255, 255, 255, imgOpacity);
-    p5.strokeWeight(2);
+    p5.stroke(255, 255, 255, silOpacity);
+    p5.strokeWeight(1);
     p5.circle(0, noseY, 16);
     p5.circle(leftShoulderX, shoulderY, 16);
     p5.circle(rightShoulderX, shoulderY, 16);
 
-    // User POIs
+    p5.fill(255, 255, 255);
+    p5.textSize(12);
+    p5.textAlign(p5.CENTER, p5.CENTER);
+    p5.text('L', leftShoulderX, shoulderY);
+    p5.text('R', rightShoulderX, shoulderY);
+  };
+
+  const drawUserPOIs = () => {
+    if (!headShoulderDetection.nose || !headShoulderDetection.leftShoulder || !headShoulderDetection.rightShoulder) return;
+
     p5.noStroke();
-    p5.fill(255, 255, 255, imgOpacity);
+    p5.fill(255, 255, 255, silOpacity);
     p5.circle(headShoulderDetection.nose.x, headShoulderDetection.nose.y, 8);
     p5.circle(headShoulderDetection.leftShoulder.x, headShoulderDetection.leftShoulder.y, 8);
     p5.circle(headShoulderDetection.rightShoulder.x, headShoulderDetection.rightShoulder.y, 8);
+
+    // Draw Positional Error Text
+    p5.fill(255, 255, 255);
+    p5.textSize(32);
+    p5.textAlign(p5.CENTER, p5.CENTER);
+    p5.text(headShoulderDetection.posMessage, 0, -height / 2 + 40);
+  };
+
+  const drawUserPinch = () => {
+    p5.noStroke();
+    p5.fill(0, 0, 0, 255);
+    if (pinchPos.left) p5.circle(pinchPos.left.x, pinchPos.left.y, 12);
+    if (pinchPos.right) p5.circle(pinchPos.right.x, pinchPos.right.y, 12);
+
+    p5.fill(255, 255, 255);
+    p5.textSize(12);
+    p5.textAlign(p5.CENTER, p5.CENTER);
+    if (pinchPos.left) p5.text('L', pinchPos.left.x, pinchPos.left.y);
+    if (pinchPos.right) p5.text('R', pinchPos.right.x, pinchPos.right.y);
   };
 
   const drawCalibrationSilhouette = (img: p5.Image) => {
-    const h = SIL_IMG_HEIGHT * silParams.silScaleY;
-    const w = SIL_IMG_WIDTH * silParams.silScaleX;
-
     p5.imageMode(p5.CENTER);
     p5.tint(255, 255);
-    p5.image(img, 0, silParams.silY, w, h);
+    p5.image(img, 0, silParams.silY, silW, silH);
   };
 
-  const drawRomIndicators = () => {
+  const drawPolarPos = (polarPos: PolarPos, anchor: Pos) => {
+    const pos = polarToCartesian(polarPos.radius, polarPos.angle, anchor);
+    p5.circle(pos.x, pos.y, 24);
+  };
+
+  const drawRomIndicators = (leftAnchor: Pos | null, rightAnchor: Pos | null) => {
     p5.stroke(255);
     p5.strokeWeight(1);
     p5.fill(0, 0, 0, 128);
 
-    if (leftStretchedRom && headShoulderDetection.leftShoulder) {
-      const leftStretchedPos = polarToCartesian(leftStretchedRom.radius, leftStretchedRom.angle, headShoulderDetection.leftShoulder);
-      p5.line(headShoulderDetection.leftShoulder.x, headShoulderDetection.leftShoulder.y, leftStretchedPos.x, leftStretchedPos.y);
-      p5.circle(leftStretchedPos.x, leftStretchedPos.y, 24);
-      p5.circle(headShoulderDetection.leftShoulder.x, headShoulderDetection.leftShoulder.y, 8);
-    }
-    if (rightStretchedRom && headShoulderDetection.rightShoulder) {
-      const rightStretchedPos = polarToCartesian(rightStretchedRom.radius, rightStretchedRom.angle, headShoulderDetection.rightShoulder);
-      p5.line(headShoulderDetection.rightShoulder.x, headShoulderDetection.rightShoulder.y, rightStretchedPos.x, rightStretchedPos.y);
-      p5.circle(rightStretchedPos.x, rightStretchedPos.y, 24);
-      p5.circle(headShoulderDetection.rightShoulder.x, headShoulderDetection.rightShoulder.y, 8);
-    }
-    if (leftRaisedRom && headShoulderDetection.leftShoulder) {
-      const leftRaisedPos = polarToCartesian(leftRaisedRom.radius, leftRaisedRom.angle, headShoulderDetection.leftShoulder);
-      p5.line(headShoulderDetection.leftShoulder.x, headShoulderDetection.leftShoulder.y, leftRaisedPos.x, leftRaisedPos.y);
-      p5.circle(leftRaisedPos.x, leftRaisedPos.y, 24);
-    }
-    if (rightRaisedRom && headShoulderDetection.rightShoulder) {
-      const rightRaisedPos = polarToCartesian(rightRaisedRom.radius, rightRaisedRom.angle, headShoulderDetection.rightShoulder);
-      p5.line(headShoulderDetection.rightShoulder.x, headShoulderDetection.rightShoulder.y, rightRaisedPos.x, rightRaisedPos.y);
-      p5.circle(rightRaisedPos.x, rightRaisedPos.y, 24);
-    }
+    if (leftStretchedRom && leftAnchor) drawPolarPos(leftStretchedRom, leftAnchor);
+    if (rightStretchedRom && rightAnchor) drawPolarPos(rightStretchedRom, rightAnchor);
+    if (leftRaisedRom && leftAnchor) drawPolarPos(leftRaisedRom, leftAnchor);
+    if (rightRaisedRom && rightAnchor) drawPolarPos(rightRaisedRom, rightAnchor);
   };
 
-  const drawFinalSilhouette = () => {
-    const h = SIL_IMG_HEIGHT * silParams.silScaleY;
-    const w = SIL_IMG_WIDTH * silParams.silScaleX;
+  const drawRomIndicatorsOnUser = () => {
+    if (!headShoulderDetection.leftShoulder || !headShoulderDetection.rightShoulder) return;
+    drawRomIndicators(headShoulderDetection.leftShoulder, headShoulderDetection.rightShoulder);
+  };
 
-    const shoulderY = silParams.silY + SHOULDER_Y_OFFSET * h;
-    const leftShoulderX = -SHOULDER_X_OFFSET * w;
-    const rightShoulderX = SHOULDER_X_OFFSET * w;
+  const drawRomIndicatorsOnSilhouette = () => {
+    const leftShoulderPos: Pos = { x: leftShoulderX, y: shoulderY };
+    const rightShoulderPos: Pos = { x: rightShoulderX, y: shoulderY };
+    drawRomIndicators(leftShoulderPos, rightShoulderPos);
+  };
 
-    // Draw Silhouette
-    p5.imageMode(p5.CENTER);
-    p5.tint(255, 255);
-    p5.image(silImg, 0, silParams.silY, w, h);
+  const drawRomCircles = () => {
+    if (!romCalibrationParams) return;
+    p5.noFill();
+    p5.stroke(255);
+    p5.strokeWeight(1);
+    p5.circle(leftShoulderX, shoulderY, romCalibrationParams.leftRadius * 2);
+    p5.circle(rightShoulderX, shoulderY, romCalibrationParams.rightRadius * 2);
 
-    if (leftStretchedRom && rightStretchedRom && leftRaisedRom && rightRaisedRom) {
-      p5.stroke(255);
-      p5.strokeWeight(1);
-      p5.fill(0, 0, 0, 128);
-
-      const leftStretchedPos = polarToCartesian(leftStretchedRom.radius, leftStretchedRom.angle, { x: leftShoulderX, y: shoulderY });
-      const leftRaisedPos = polarToCartesian(leftRaisedRom.radius, leftRaisedRom.angle, { x: leftShoulderX, y: shoulderY });
-      p5.line(leftShoulderX, shoulderY, leftStretchedPos.x, leftStretchedPos.y);
-      p5.line(leftShoulderX, shoulderY, leftRaisedPos.x, leftRaisedPos.y);
-      p5.circle(leftStretchedPos.x, leftStretchedPos.y, 24);
-      p5.circle(leftRaisedPos.x, leftRaisedPos.y, 24);
-
-      const rightStretchedPos = polarToCartesian(rightStretchedRom.radius, rightStretchedRom.angle, { x: rightShoulderX, y: shoulderY });
-      const rightRaisedPos = polarToCartesian(rightRaisedRom.radius, rightRaisedRom.angle, { x: rightShoulderX, y: shoulderY });
-      p5.line(rightShoulderX, shoulderY, rightStretchedPos.x, rightStretchedPos.y);
-      p5.line(rightShoulderX, shoulderY, rightRaisedPos.x, rightRaisedPos.y);
-      p5.circle(rightStretchedPos.x, rightStretchedPos.y, 24);
-      p5.circle(rightRaisedPos.x, rightRaisedPos.y, 24);
-
-      const averageLeftRomRadius = (leftStretchedRom.radius + leftRaisedRom.radius) / 2;
-      const averageRightRomRadius = (rightStretchedRom.radius + rightRaisedRom.radius) / 2;
-
-      p5.fill(0, 0, 0, 48);
-      p5.circle(leftShoulderX, shoulderY, averageLeftRomRadius * 2);
-      p5.circle(rightShoulderX, shoulderY, averageRightRomRadius * 2);
-
-      p5.fill(0, 255, 0, 64);
-      p5.circle(leftShoulderX, shoulderY, averageLeftRomRadius * 2 * 0.8);
-      p5.circle(rightShoulderX, shoulderY, averageRightRomRadius * 2 * 0.8);
-    }
+    p5.fill(0, 255, 0, 32);
+    p5.stroke(0);
+    p5.circle(leftShoulderX, shoulderY, romCalibrationParams.leftRadius * 2 * 0.8);
+    p5.circle(rightShoulderX, shoulderY, romCalibrationParams.rightRadius * 2 * 0.8);
   };
 
   p5.draw = () => {
     p5.clear();
 
-    if (calibrationStage === 'init') drawInitSilhouette();
-    else if (calibrationStage === 'leftStretch') drawCalibrationSilhouette(silLeftStretchImg);
+    if (calibrationStage === 'init') {
+      drawSilhouette();
+      drawSilhouettePOIs();
+      drawUserPOIs();
+    } else if (calibrationStage === 'leftStretch') drawCalibrationSilhouette(silLeftStretchImg);
     else if (calibrationStage === 'rightStretch') drawCalibrationSilhouette(silRightStretchImg);
     else if (calibrationStage === 'leftRaised') drawCalibrationSilhouette(silLeftRaisedImg);
     else if (calibrationStage === 'rightRaised') drawCalibrationSilhouette(silRightRaisedImg);
 
-    // if (calibrationStage !== 'done' ) drawRomIndicators();
-    // else drawFinalSilhouette();
-    if (calibrationStage === 'done') drawFinalSilhouette();
-    else drawRomIndicators();
+    if (['leftStretch', 'rightStretch', 'leftRaised', 'rightRaised'].includes(calibrationStage)) drawRomIndicatorsOnUser();
+    else if (calibrationStage === 'done') {
+      drawSilhouette();
+      drawRomIndicatorsOnSilhouette();
+      drawRomCircles();
+    }
 
-    p5.noStroke();
-    p5.fill(0, 0, 0, 255);
-    if (pinchPos.left) p5.circle(pinchPos.left.x, pinchPos.left.y, 12);
-    if (pinchPos.right) p5.circle(pinchPos.right.x, pinchPos.right.y, 12);
+    if (calibrationStage === 'preinit') {
+      drawSilhouette();
+      drawRomCircles();
+    }
+
+    drawUserPinch();
   };
 };
 
 const RomCalibration = () => {
   const { config, setRomCalibrationParams } = useConfig();
-  const { devicePPI, devicePixelRatio, testbedHeightMM, testbedWidthMM, silParams } = config;
+  const { devicePPI, devicePixelRatio, testbedHeightMM, testbedWidthMM, silParams, romCalibrationParams } = config;
   const factor = devicePPI / devicePixelRatio;
   const testbedWidth = testbedWidthMM * MM_TO_INCH * factor;
   const testbedHeight = testbedHeightMM * MM_TO_INCH * factor;
@@ -292,11 +284,8 @@ const RomCalibration = () => {
   const leftRomRef = useRef<PolarPos | null>(null);
   const rightRomRef = useRef<PolarPos | null>(null);
   useEffect(() => {
-    if (!pinchPos.left || !headShoulderDetection.leftShoulder) leftRomRef.current = null;
-    else leftRomRef.current = calculatePolar(headShoulderDetection.leftShoulder, pinchPos.left);
-
-    if (!pinchPos.right || !headShoulderDetection.rightShoulder) rightRomRef.current = null;
-    else rightRomRef.current = calculatePolar(headShoulderDetection.rightShoulder, pinchPos.right);
+    if (pinchPos.left && headShoulderDetection.leftShoulder) leftRomRef.current = calculatePolar(headShoulderDetection.leftShoulder, pinchPos.left);
+    if (pinchPos.right && headShoulderDetection.rightShoulder) rightRomRef.current = calculatePolar(headShoulderDetection.rightShoulder, pinchPos.right);
   }, [pinchPos, headShoulderDetection]);
 
   const [calibrationStage, setCalibrationStage] = useState<RomCalibrationStages>('preinit');
@@ -373,12 +362,10 @@ const RomCalibration = () => {
 
   useEffect(() => {
     if (calibrationStage === 'done') {
-      setRomCalibrationParams({
-        leftStretchedRom,
-        leftRaisedRom,
-        rightStretchedRom,
-        rightRaisedRom,
-      });
+      const averageLeftRomRadius = leftStretchedRom && leftRaisedRom ? (leftStretchedRom.radius + leftRaisedRom.radius) / 2 : null;
+      const averageRightRomRadius = rightStretchedRom && rightRaisedRom ? (rightStretchedRom.radius + rightRaisedRom.radius) / 2 : null;
+      if (averageLeftRomRadius !== null && averageRightRomRadius !== null) setRomCalibrationParams({ leftRadius: averageLeftRomRadius, rightRadius: averageRightRomRadius });
+      else setRomCalibrationParams(null);
     }
   }, [calibrationStage, leftStretchedRom, leftRaisedRom, rightStretchedRom, rightRaisedRom, setRomCalibrationParams]);
 
@@ -439,6 +426,7 @@ const RomCalibration = () => {
               leftRaisedRom={leftRaisedRom}
               rightStretchedRom={rightStretchedRom}
               rightRaisedRom={rightRaisedRom}
+              romCalibrationParams={romCalibrationParams}
             />
           </div>
         </div>

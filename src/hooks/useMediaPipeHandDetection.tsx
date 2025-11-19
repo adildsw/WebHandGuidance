@@ -1,8 +1,12 @@
 import { FilesetResolver, HandLandmarker, PoseLandmarker } from '@mediapipe/tasks-vision';
+import type { PoseLandmarkerResult } from '@mediapipe/tasks-vision';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import type { FingerTips, HeadShoulderDetectionResult, PinchDetectionResult, WristDetectionResult } from '../types/detections';
 import {
   defaultFingerTips,
+  defaultHeadShoulderResult,
+  defaultPinchResult,
+  defaultWristResult,
   HAND_LANDMARKER_MODEL_PATH,
   MM_TO_INCH,
   NOSE_Y_OFFSET,
@@ -59,15 +63,8 @@ const initDetectors = async () => {
 const detectPinchAndWrist = (detector: HandLandmarker, video: HTMLVideoElement, testbedWidth: number, testbedHeight: number, factor: number) => {
   const leftFingerTips: FingerTips = { ...defaultFingerTips };
   const rightFingerTips: FingerTips = { ...defaultFingerTips };
-  const pinch: PinchDetectionResult = {
-    pinchPos: { left: null, right: null },
-    indexPinch: { left: false, right: false },
-    middlePinch: { left: false, right: false },
-  };
-  const wrist: WristDetectionResult = {
-    leftWrist: null,
-    rightWrist: null,
-  };
+  const pinch: PinchDetectionResult = { ...defaultPinchResult };
+  const wrist: WristDetectionResult = { ...defaultWristResult };
 
   try {
     const detections = detector.detectForVideo(video, performance.now());
@@ -142,82 +139,93 @@ const detectPinchAndWrist = (detector: HandLandmarker, video: HTMLVideoElement, 
   return { pinch, wrist };
 };
 
-const detectHeadAndShoulders = (detector: PoseLandmarker, video: HTMLVideoElement, testbedWidth: number, testbedHeight: number, silParams: SilhouetteParams) => {
-  const headShoulderResult: HeadShoulderDetectionResult = {
-    nose: null,
-    leftShoulder: null,
-    rightShoulder: null,
-    noseShoulderDistance: null,
-    interShoulderDistance: null,
-    posErrorX: null,
-    posErrorZ: null,
-    posMessage: 'Uncalibrated',
-  };
+const processHeadShoulderLandmarks = (detections: PoseLandmarkerResult, video: HTMLVideoElement, testbedWidth: number, testbedHeight: number, silParams: SilhouetteParams) => {
+  const headShoulderResult: HeadShoulderDetectionResult = { ...defaultHeadShoulderResult };
 
+  const vh = video.videoHeight;
+  const vw = video.videoWidth;
+
+  const nose = detections.landmarks?.[0]?.[HEAD_SHOULDER_INDICES.nose];
+  const leftShoulder = detections.landmarks?.[0]?.[HEAD_SHOULDER_INDICES.leftShoulder];
+  const rightShoulder = detections.landmarks?.[0]?.[HEAD_SHOULDER_INDICES.rightShoulder];
+
+  if (!nose || !leftShoulder || !rightShoulder) return headShoulderResult;
+
+  const nosePt = mapVideoToTestbed((1 - nose.x) * vw, nose.y * vh, vw, vh, testbedWidth, testbedHeight);
+  const leftShoulderPt = mapVideoToTestbed((1 - leftShoulder.x) * vw, leftShoulder.y * vh, vw, vh, testbedWidth, testbedHeight);
+  const rightShoulderPt = mapVideoToTestbed((1 - rightShoulder.x) * vw, rightShoulder.y * vh, vw, vh, testbedWidth, testbedHeight);
+  const noseShoulderDistance = distance(nosePt.x, nosePt.y, nosePt.x, (leftShoulderPt.y + rightShoulderPt.y) / 2);
+  const interShoulderDistance = distance(leftShoulderPt.x, leftShoulderPt.y, rightShoulderPt.x, rightShoulderPt.y);
+
+  // |---------------------------------
+  // | Position Error Calculation
+  // |---------------------------------
+  let posErrorX: number | null = null;
+  let posErrorY: number | null = null;
+  let posErrorZ: number | null = null;
+  let guideOpacity: number = 1;
+  let posMessage = 'Uncalibrated';
+  if (silParams.silCalibrated) {
+    const h = SIL_IMG_HEIGHT * silParams.silScaleY;
+    const w = SIL_IMG_WIDTH * silParams.silScaleX;
+
+    const noseY = silParams.silY + NOSE_Y_OFFSET * h;
+    const shoulderY = silParams.silY + SHOULDER_Y_OFFSET * h;
+    const leftShoulderX = -SHOULDER_X_OFFSET * w;
+    const rightShoulderX = SHOULDER_X_OFFSET * w;
+
+    // Calculate Average Error
+    const noseShoulderDistanceError = Math.abs(noseShoulderDistance! - distance(0, noseY, 0, shoulderY));
+    const interShoulderDistanceError = Math.abs(interShoulderDistance! - distance(leftShoulderX, shoulderY, rightShoulderX, shoulderY));
+    const averageError = (noseShoulderDistanceError + interShoulderDistanceError) / 2;
+
+    // Calculate Error as Percent of Average Distance from Silhouette
+    const averageSilDistance = (distance(0, noseY, 0, shoulderY) + distance(leftShoulderX, shoulderY, rightShoulderX, shoulderY)) / 2;
+    const signZ = noseShoulderDistance > distance(0, noseY, 0, shoulderY) ? 1 : -1;
+    posErrorZ = (averageError / averageSilDistance) * signZ;
+
+    // Calculate Horizontal Positional Error
+    const noseXDistanceError = Math.abs(nosePt.x - 0);
+    const signX = nosePt.x < 0 ? 1 : -1;
+    posErrorX = (noseXDistanceError / (testbedWidth / 2)) * signX;
+
+    // Calculate Vertical Positional Error
+    const noseYDistanceError = Math.abs(nosePt.y - noseY);
+    const signY = nosePt.y < noseY ? 1 : -1;
+    posErrorY = (noseYDistanceError / (testbedHeight / 2)) * signY;
+
+    posMessage = "You're in Position!";
+    if (Math.abs(posErrorZ) > 0.15) posMessage = posErrorZ > 0 ? 'Move Further From Screen' : 'Move Closer To Screen';
+    else if (Math.abs(posErrorX) > 0.1) posMessage = posErrorX > 0 ? 'Move Right' : 'Move Left';
+    else if (Math.abs(posErrorY) > 0.1) posMessage = posErrorY > 0 ? 'Move Down' : 'Move Up';
+
+    // Guide Opacity Calculation
+    const maxError = 0.3;
+    const totalError = Math.abs(posErrorX) + Math.abs(posErrorY) + Math.abs(posErrorZ);
+    guideOpacity = Math.min(totalError / maxError, 1);
+  }
+
+  return {
+    nose: nosePt,
+    leftShoulder: leftShoulderPt,
+    rightShoulder: rightShoulderPt,
+    noseShoulderDistance: noseShoulderDistance,
+    interShoulderDistance: interShoulderDistance,
+    posErrorX,
+    posErrorY,
+    posErrorZ,
+    guideOpacity,
+    posMessage,
+  };
+};
+
+const detectHeadAndShoulders = (detector: PoseLandmarker, video: HTMLVideoElement, testbedWidth: number, testbedHeight: number, silParams: SilhouetteParams) => {
   try {
     const detections = detector.detectForVideo(video, performance.now());
-    const vw = video.videoWidth;
-    const vh = video.videoHeight;
-    const nose = detections.landmarks?.[0]?.[HEAD_SHOULDER_INDICES.nose];
-    const leftShoulder = detections.landmarks?.[0]?.[HEAD_SHOULDER_INDICES.leftShoulder];
-    const rightShoulder = detections.landmarks?.[0]?.[HEAD_SHOULDER_INDICES.rightShoulder];
-
-    if (!nose || !leftShoulder || !rightShoulder) return headShoulderResult;
-
-    const nosePt = mapVideoToTestbed((1 - nose.x) * vw, nose.y * vh, vw, vh, testbedWidth, testbedHeight);
-    const leftShoulderPt = mapVideoToTestbed((1 - leftShoulder.x) * vw, leftShoulder.y * vh, vw, vh, testbedWidth, testbedHeight);
-    const rightShoulderPt = mapVideoToTestbed((1 - rightShoulder.x) * vw, rightShoulder.y * vh, vw, vh, testbedWidth, testbedHeight);
-    const noseShoulderDistance = distance(nosePt.x, nosePt.y, nosePt.x, (leftShoulderPt.y + rightShoulderPt.y) / 2);
-    const interShoulderDistance = distance(leftShoulderPt.x, leftShoulderPt.y, rightShoulderPt.x, rightShoulderPt.y);
-
-    // |---------------------------------
-    // | Position Error Calculation
-    // |---------------------------------
-    let posErrorX: number | null = null;
-    let posErrorZ: number | null = null;
-    let posMessage = 'Uncalibrated';
-    if (silParams.silCalibrated) {
-      const h = SIL_IMG_HEIGHT * silParams.silScaleY;
-      const w = SIL_IMG_WIDTH * silParams.silScaleX;
-
-      const noseY = silParams.silY + NOSE_Y_OFFSET * h;
-      const shoulderY = silParams.silY + SHOULDER_Y_OFFSET * h;
-      const leftShoulderX = SHOULDER_X_OFFSET * w;
-      const rightShoulderX = -SHOULDER_X_OFFSET * w;
-
-      // Calculate Average Error
-      const noseShoulderDistanceError = Math.abs(noseShoulderDistance! - distance(0, noseY, 0, shoulderY));
-      const interShoulderDistanceError = Math.abs(interShoulderDistance! - distance(leftShoulderX, shoulderY, rightShoulderX, shoulderY));
-      const averageError = (noseShoulderDistanceError + interShoulderDistanceError) / 2;
-
-      // Calculate Error as Percent of Average Distance from Silhouette
-      const averageSilDistance = (distance(0, noseY, 0, shoulderY) + distance(leftShoulderX, shoulderY, rightShoulderX, shoulderY)) / 2;
-      const signZ = noseShoulderDistance > distance(0, noseY, 0, shoulderY) ? 1 : -1;
-      posErrorZ = (averageError / averageSilDistance) * signZ;
-
-      // Calculate Horizontal Positional Error
-      const noseXDistanceError = Math.abs(nosePt.x - 0);
-      const signX = nosePt.x < 0 ? 1 : -1;
-      posErrorX = (noseXDistanceError / (testbedWidth / 2)) * signX;
-
-      posMessage = "You're in Position!";
-      if (Math.abs(posErrorZ) > 0.15) posMessage = posErrorZ > 0 ? 'Move Further From Screen' : 'Move Closer To Screen';
-      else if (Math.abs(posErrorX) > 0.15) posMessage = posErrorX > 0 ? 'Move Right' : 'Move Left';
-    }
-
-    return {
-      nose: nosePt,
-      leftShoulder: leftShoulderPt,
-      rightShoulder: rightShoulderPt,
-      noseShoulderDistance: noseShoulderDistance,
-      interShoulderDistance: interShoulderDistance,
-      posErrorX,
-      posErrorZ,
-      posMessage,
-    };
+    return processHeadShoulderLandmarks(detections, video, testbedWidth, testbedHeight, silParams);
   } catch (err) {
     console.error('Error during head and shoulders detection:', err);
-    return headShoulderResult;
+    return { ...defaultHeadShoulderResult };
   }
 };
 
@@ -251,7 +259,9 @@ const useDetection = (runOnStart: boolean = false) => {
     noseShoulderDistance: null,
     interShoulderDistance: null,
     posErrorX: null,
+    posErrorY: null,
     posErrorZ: null,
+    guideOpacity: 0,
     posMessage: 'Uncalibrated',
   });
 
@@ -296,6 +306,7 @@ const useDetection = (runOnStart: boolean = false) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       if (!videoRef.current) return;
+      if (runOnStart) isDetecting.current = true;
       videoRef.current.srcObject = stream;
       videoRef.current.onloadedmetadata = () => {
         videoRef.current?.play();
@@ -306,7 +317,7 @@ const useDetection = (runOnStart: boolean = false) => {
       console.error('Error accessing webcam:', err);
       setError(err as string);
     }
-  }, [loading, error, performDetectionLoop]);
+  }, [loading, error, performDetectionLoop, runOnStart]);
 
   const stopWebcam = useCallback(() => {
     stopDetecting();

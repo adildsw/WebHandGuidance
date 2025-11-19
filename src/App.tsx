@@ -1,11 +1,12 @@
 import { HashRouter, Route, Routes } from 'react-router-dom';
 import ScreenCalibration from './pages/ScreenCalibration';
 import { ConfigProvider } from './utils/context';
-import TaskCreator from './pages/TaskCreator';
 import Config from './pages/Config';
 import Home from './pages/Home';
 import { library } from '@fortawesome/fontawesome-svg-core';
 import {
+  faArrowRight,
+  faCheck,
   faChevronDown,
   faChevronLeft,
   faChevronRight,
@@ -30,9 +31,11 @@ import NoMobileSupport from './pages/NoMobileSupport';
 import { useEffect, useState } from 'react';
 import RomCalibration from './pages/RomCalibration';
 import useBle from './hooks/useBle';
-import MediaPlayer from './pages/subpages/MediaPlayer';
+import MediaPlayer from './components/MediaPlayer';
+import TaskDesigner from './pages/TaskDesigner/TaskDesigner';
+import SilhouetteVisualizer from './pages/SilhouetteVisualizer';
 
-library.add(faChevronUp, faChevronDown, faLink, faHome, faSave, faFile, faChevronLeft, faChevronRight, faPlus, faTrash, faRedo, faFolderOpen, faDownload, faUpRightAndDownLeftFromCenter);
+library.add(faCheck, faArrowRight, faChevronUp, faChevronDown, faLink, faHome, faSave, faFile, faChevronLeft, faChevronRight, faPlus, faTrash, faRedo, faFolderOpen, faDownload, faUpRightAndDownLeftFromCenter);
 
 const App = () => {
   const webSerial = useWebSerial({ baudRate: 115200 });
@@ -64,7 +67,8 @@ const App = () => {
             <Route path="/camera-calibration" element={<CameraCalibration />} />
             <Route path="/rom-calibration" element={<RomCalibration />} />
             <Route path="/config" element={<Config />} />
-            <Route path="/create-study-tasks" element={<TaskCreator />} />
+            <Route path="/create-study-tasks" element={<TaskDesigner />} />
+            <Route path="/visualizer" element={<SilhouetteVisualizer />} />
             
             <Route path="/videotest" element={<MediaPlayer mediaUrl='https://webhandguidance.b-cdn.net/rom_calibration_demo_test.mp4' mediaTitle='Test Video' mediaSubtitle='This is a test video' doneBtnTitle='Begin Calibration' />} />
             <Route path="imgtest" element={<MediaPlayer mediaUrl='https://webhandguidance.b-cdn.net/first_message_image_test.png' mediaTitle='Test Image' mediaSubtitle='This is a test image' />} />

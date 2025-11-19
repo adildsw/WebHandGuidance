@@ -205,10 +205,17 @@ const Config = () => {
                 onChange={(e) => setDefaultHoldDuration(toNumber(e.target.value) * 1000)}
               />
             </div>
+          <button
+            onClick={() => go('#/visualizer')}
+            className="w-full px-4 py-3 mt-4 rounded-lg border border-gray-300 bg-gray-100 text-gray-900 hover:bg-gray-800 hover:text-white font-bold cursor-pointer"
+          >
+            Silhouette Visualizer
+          </button>
           </div>
         </div>
 
         <div className="flex flex-col gap-2 w-full">
+
           <button onClick={resetParams} className="w-full px-4 py-3 rounded-lg bg-white-300 border border-gray-200 text-gray-900 hover:bg-red-400 cursor-pointer">
             Reset to Default
           </button>

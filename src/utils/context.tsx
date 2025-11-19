@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import type { CalibrationTools, Config, ConfigContextType } from '../types/config';
-import type { HoldTaskPayload, MoveTaskPayload, PolarPos, ROMHoldTaskPayload, ROMMoveTaskPayload, Task } from '../types/task';
+import type { CalibrationTools, Config, ConfigContextType, RomCalibrationParams } from '../types/config';
+import type { HoldTaskPayload, MediaTaskPayload, MoveTaskPayload, ROMHoldTaskPayload, ROMMoveTaskPayload, Task } from '../types/task';
 import { uid } from 'uid/single';
 import { defaultConfig } from './constants';
 
@@ -83,59 +83,81 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     setConfigState((prev) => ({ ...prev, silParams: params }));
   };
 
-  const setRomCalibrationParams = (params: { leftStretchedRom: PolarPos | null; leftRaisedRom: PolarPos | null; rightStretchedRom: PolarPos | null; rightRaisedRom: PolarPos | null }) => {
+  const setRomCalibrationParams = (params: RomCalibrationParams | null) => {
     setConfigState((prev) => ({ ...prev, romCalibrationParams: params }));
   };
 
-  const defaultMoveTaskPayload: MoveTaskPayload = {
+  // const setRomCalibrationParams = (params: { leftStretchedRom: PolarPos | null; leftRaisedRom: PolarPos | null; rightStretchedRom: PolarPos | null; rightRaisedRom: PolarPos | null }) => {
+  //   setConfigState((prev) => ({ ...prev, romCalibrationParams: params }));
+  // };
+
+  // const defaultMoveTaskPayload: MoveTaskPayload = {
+  //   hand: config.defaultHand,
+  //   repetitions: config.defaultRepetitions,
+  //   trials: config.defaultTrials,
+  //   markers: [{ x: 0, y: 0 }],
+  //   distanceThreshold: config.defaultDistanceThreshold,
+  // };
+
+  const generateDefaultMoveTaskPayload = (): MoveTaskPayload => ({
     hand: config.defaultHand,
-    repitions: config.defaultRepetitions,
+    repetitions: config.defaultRepetitions,
     trials: config.defaultTrials,
     markers: [{ x: 0, y: 0 }],
     distanceThreshold: config.defaultDistanceThreshold,
-  };
+  });
 
-  const defaultHoldTaskPayload: HoldTaskPayload = {
+  // const defaultHoldTaskPayload: HoldTaskPayload = {
+  //   hand: config.defaultHand,
+  //   repetitions: config.defaultRepetitions,
+  //   trials: 1,
+  //   markers: [{ x: 0, y: 0 }],
+  //   distanceThreshold: config.defaultDistanceThreshold,
+  //   holdDuration: config.defaultHoldDuration,
+  // };
+
+  const generateDefaultHoldTaskPayload = (): HoldTaskPayload => ({
     hand: config.defaultHand,
-    repitions: config.defaultRepetitions,
+    repetitions: config.defaultRepetitions,
     trials: 1,
     markers: [{ x: 0, y: 0 }],
     distanceThreshold: config.defaultDistanceThreshold,
     holdDuration: config.defaultHoldDuration,
-  };
+  });
 
-  const defaultROMMoveTaskPayload: ROMMoveTaskPayload = {
+  const generateDefaultROMMoveTaskPayload = (): ROMMoveTaskPayload => ({
     hand: config.defaultHand,
-    repitions: config.defaultRepetitions,
+    repetitions: config.defaultRepetitions,
     trials: config.defaultTrials,
     markers: [{ radius: 0, angle: 0 }],
     distanceThreshold: config.defaultDistanceThreshold,
-  };
+  });
 
-  const defaultROMHoldTaskPayload: ROMHoldTaskPayload = {
+  const generateDefaultROMHoldTaskPayload = (): ROMHoldTaskPayload => ({
     hand: config.defaultHand,
-    repitions: config.defaultRepetitions,
+    repetitions: config.defaultRepetitions,
     trials: 1,
     markers: [{ radius: 0, angle: 0 }],
     distanceThreshold: config.defaultDistanceThreshold,
     holdDuration: config.defaultHoldDuration,
-  };
+  });
 
-  const mediaPayload = {
-    mediaUrl: 'https://webhandguidance.b-cdn.net/task_video_1_demo_test.mp4',
-    mediaTitle: 'Sample Video Title',
-    mediaSubtitle: 'Same Video Subtitle',
-  };
+  const generateDefaultMediaPayload = (): MediaTaskPayload => ({
+    mediaUrl: '',
+    mediaTitle: '',
+    mediaSubtitle: '',
+  });
+  // https://webhandguidance.b-cdn.net/task_video_1_demo_test.mp4
 
   const generateDefaultTask = (type: 'MOVE' | 'HOLD' | 'ROM_MOVE' | 'ROM_HOLD' | 'MEDIA' = config.defaultTaskType): Task => {
     return {
-      tag: 'task-' + uid(5),
+      tag: type === 'MEDIA' ? 'media-' + uid(5) : 'task-' + uid(5),
       type: type,
-      movePayload: defaultMoveTaskPayload,
-      holdPayload: defaultHoldTaskPayload,
-      romMovePayload: defaultROMMoveTaskPayload,
-      romHoldPayload: defaultROMHoldTaskPayload,
-      mediaPayload: mediaPayload,
+      movePayload: generateDefaultMoveTaskPayload(),
+      holdPayload: generateDefaultHoldTaskPayload(),
+      romMovePayload: generateDefaultROMMoveTaskPayload(),
+      romHoldPayload: generateDefaultROMHoldTaskPayload(),
+      mediaPayload: generateDefaultMediaPayload(),
     };
   };
 

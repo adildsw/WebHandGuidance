@@ -1,5 +1,5 @@
 import type { Config } from '../types/config';
-import type { FingerTips } from '../types/detections';
+import type { FingerTips, HeadShoulderDetectionResult, PinchDetectionResult, WristDetectionResult } from '../types/detections';
 
 export const CREDIT_CARD_WIDTH_INCH = 3.37;
 export const CREDIT_CARD_HEIGHT_INCH = 2.13;
@@ -40,12 +40,31 @@ export const defaultConfig: Config = {
   maxVibrationThresholdMM: 200,
   defaultTaskType: 'MOVE',
   silParams: { silY: 0, silScaleX: 1, silScaleY: 1, silCalibrated: false },
-  romCalibrationParams: {
-    leftStretchedRom: null,
-    leftRaisedRom: null,
-    rightStretchedRom: null,
-    rightRaisedRom: null,
-  },
+  romCalibrationParams: null,
+};
+
+export const defaultHeadShoulderResult: HeadShoulderDetectionResult = {
+  nose: null,
+  leftShoulder: null,
+  rightShoulder: null,
+  noseShoulderDistance: null,
+  interShoulderDistance: null,
+  posErrorX: null,
+  posErrorY: null,
+  posErrorZ: null,
+  guideOpacity: 1,
+  posMessage: 'Uncalibrated',
+};
+
+export const defaultPinchResult: PinchDetectionResult = {
+  pinchPos: { left: null, right: null },
+  indexPinch: { left: false, right: false },
+  middlePinch: { left: false, right: false },
+};
+
+export const defaultWristResult: WristDetectionResult = {
+  leftWrist: null,
+  rightWrist: null,
 };
 
 export const HAND_LANDMARKER_MODEL_PATH = './models/hand_landmarker.task';
