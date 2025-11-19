@@ -220,8 +220,21 @@ const ScreenCalibration = () => {
     };
   }, [config, devicePPI, setDevicePPI]);
 
-  if (isTutorialVisible)
-    return (
+  // if (isTutorialVisible)
+  //   return (
+  //     <MediaPlayer
+  //       mediaUrl="https://webhandguidance.b-cdn.net/screen_calibration_demo_test.mp4"
+  //       mediaTitle="Screen Calibration Tutorial"
+  //       mediaSubtitle="This video will demonstrate how to calibrate your screen."
+  //       doneCallback={() => setIsTutorialVisible(false)}
+  //       doneBtnTitle="Begin Calibration"
+  //       showHomeBtn
+  //     />
+  //   );
+
+  return (
+    <>
+    {isTutorialVisible && (
       <MediaPlayer
         mediaUrl="https://webhandguidance.b-cdn.net/screen_calibration_demo_test.mp4"
         mediaTitle="Screen Calibration Tutorial"
@@ -230,9 +243,7 @@ const ScreenCalibration = () => {
         doneBtnTitle="Begin Calibration"
         showHomeBtn
       />
-    );
-
-  return (
+    )}
     <div className="w-screen h-screen flex gap-4 flex-col items-center justify-center p-16 py-8">
       <div className="w-full flex flex-col text-center gap-2">
         <h1 className="text-3xl font-bold">Calibrate Display</h1>
@@ -280,7 +291,7 @@ const ScreenCalibration = () => {
         </div>
       </div>
 
-      <div ref={calibrationDivRef} className="flex flex-col w-full grow">
+      <div ref={calibrationDivRef} className="flex flex-col w-full grow border border-gray rounded-lg z-64">
         <ReactP5Wrapper sketch={sketch} size={canvasSize} devicePPI={devicePPI} devicePixelRatio={devicePixelRatio} calibrationTool={calibrationTool} />
       </div>
 
@@ -312,6 +323,7 @@ const ScreenCalibration = () => {
         </button>
       </div>
     </div>
+    </>
   );
 };
 

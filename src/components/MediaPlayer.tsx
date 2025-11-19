@@ -30,7 +30,7 @@ const MediaPlayer = ({ mediaUrl, mediaTitle, mediaSubtitle, doneCallback, doneBt
   };
 
   return (
-    <div className="w-screen h-screen flex gap-4 flex-col items-center justify-center p-16 py-8">
+    <div className="fixed top-0 left-0 bg-white z-99 w-screen h-screen flex gap-4 flex-col items-center justify-center p-16 py-8">
       <div className="w-full flex flex-col text-center gap-2">
         <h1 className="text-3xl font-bold">{mediaTitle}</h1>
         <p className="text-gray-500 text-md italic">{mediaSubtitle}</p>
