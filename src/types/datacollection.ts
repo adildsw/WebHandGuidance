@@ -1,10 +1,12 @@
+import type { Handedness } from "./task";
+
 export type CollectedData = {
   unix_timestamp: number;
   time_sec: number;
   participant_id: string;
   task_tag: string;
-  task_type: 'HOLD' | 'MOVE';
-  user_hand: 'Left' | 'Right';
+  task_type: 'HOLD' | 'MOVE' | 'ROM_HOLD' | 'ROM_MOVE';
+  user_hand: Handedness;
   task_idx: number;
   trial_idx: number;
   repetition_idx: number;
@@ -24,8 +26,8 @@ export type CollectedRawData = {
   time_sec: number;
   participant_id: string;
   task_tag: string;
-  task_type: 'HOLD' | 'MOVE';
-  user_hand: 'Left' | 'Right';
+  task_type: 'HOLD' | 'MOVE' | 'ROM_HOLD' | 'ROM_MOVE';
+  user_hand: Handedness;
   task_idx: number;
   trial_idx: number;
   repetition_idx: number;
@@ -47,7 +49,7 @@ export type CollectedIMUData = {
   time_sec: number;
   participant_id: string;
   task_tag: string;
-  task_type: 'HOLD' | 'MOVE';
+  task_type: 'HOLD' | 'MOVE' | 'ROM_HOLD' | 'ROM_MOVE';
   task_idx: number;
   trial_idx: number;
   repetition_idx: number;

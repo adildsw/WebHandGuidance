@@ -22,7 +22,7 @@ import {
   faTrash,
   faUpRightAndDownLeftFromCenter,
 } from '@fortawesome/free-solid-svg-icons';
-import Study from './pages/Study';
+import Study from './pages/TaskExecutor/Study';
 import CameraCalibration from './pages/CameraCalibration';
 import { Toaster } from 'react-hot-toast';
 import SerialConnector from './components/SerialConnector';

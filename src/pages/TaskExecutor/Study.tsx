@@ -1,252 +1,39 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ReactP5Wrapper } from '@p5-wrapper/react';
-import type { Sketch } from '@p5-wrapper/react';
-import type { Pos, Task } from '../types/task';
-import { useConfig } from '../utils/context';
-import { defaultConfig, INCH_TO_MM, MM_TO_INCH } from '../utils/constants';
+import type { PolarPos, Pos, Task } from '../../types/task';
+import { useConfig } from '../../utils/context';
+import { INCH_TO_MM, MM_TO_INCH, SHOULDER_X_OFFSET, SHOULDER_Y_OFFSET, SIL_IMG_HEIGHT, SIL_IMG_WIDTH } from '../../utils/constants';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import type { Font } from 'p5';
 import { uid } from 'uid/single';
-import useDetection from '../hooks/useMediaPipeHandDetection';
-import { decodeBase64 } from '../utils/encoder';
-import { closestPointOnLine, directionalMap, distance } from '../utils/math';
-import type { CollectedData, CollectedIMUData, CollectedRawData } from '../types/datacollection';
-import { go } from '../utils/navigation';
-import { downloadZip, toCSV } from '../utils/datacollection';
-import type useBle from '../hooks/useBle';
-import type useWebSerial from '../hooks/useWebSerial';
-import type { Config } from '../types/config';
+import useDetection from '../../hooks/useMediaPipeHandDetection';
+import { decodeBase64 } from '../../utils/encoder';
+import { closestPointOnLine, directionalMap, distance, polarToCartesian } from '../../utils/math';
+import type { CollectedData, CollectedIMUData, CollectedRawData } from '../../types/datacollection';
+import { go } from '../../utils/navigation';
+import { downloadZip, toCSV } from '../../utils/datacollection';
+import type useBle from '../../hooks/useBle';
+import type useWebSerial from '../../hooks/useWebSerial';
+import taskVisualizationSketch from './taskVisualizationSketch';
+import MediaPlayer from '../../components/MediaPlayer';
 
 const CLICK_SOUND = new Audio('./audio/click.mp3');
 const BEEP_SOUND = new Audio('./audio/beep.mp3');
 
-const sketch: Sketch = (p5) => {
-  let w = 400;
-  let h = 300;
-  let markerDiameter = 10;
-  let worldPPI = 24;
-
-  // let wristPos: { left: Pos | null; right: Pos | null } = { left: null, right: null };
-  let activeWristPos: Pos | null = null;
-  let directionPoint: Pos | null = null;
-  let directionPointDistanceMM: number | null = null;
-
-  let f: Font;
-
-  let task: Task | null = null;
-  let markers: Pos[] = [];
-  let distanceThreshold = 15;
-
-  let currentTarget: number = -1;
-  let isRepeating: boolean = false;
-  let isTaskRunning: boolean = false;
-  let holdProgress: number = 0;
-
-  let config: Config = defaultConfig;
-
-  p5.preload = () => {
-    f = p5.loadFont('./fonts/sf-ui-display-bold.otf');
-  };
-
-  p5.setup = () => {
-    p5.createCanvas(w, h, p5.WEBGL);
-    p5.textFont(f);
-    p5.drawingContext.antialias = true;
-  };
-
-  p5.updateWithProps = (props: {
-    frameWidth?: number;
-    frameHeight?: number;
-    markerDiameter?: number;
-    worldPPI?: number;
-    task?: Task | null;
-    currentTarget?: number | null;
-    activeWristPos?: Pos | null;
-    currentRepetition?: number | null;
-    isTaskRunning?: boolean;
-    holdProgress?: number;
-    directionPoint?: Pos | null;
-    directionPointDistanceMM?: number | null;
-    config?: Config;
-  }) => {
-    if (typeof props.frameWidth === 'number') w = props.frameWidth;
-    if (typeof props.frameHeight === 'number') h = props.frameHeight;
-    if (typeof props.markerDiameter === 'number') markerDiameter = props.markerDiameter;
-    if (typeof props.worldPPI === 'number') worldPPI = props.worldPPI;
-    if (p5.width !== w || p5.height !== h) p5.resizeCanvas(w, h);
-
-    if (props.activeWristPos) activeWristPos = props.activeWristPos;
-
-    if (props.task === null || props.task === undefined) {
-      task = null;
-      markers = [];
-      distanceThreshold = 15;
-      return;
-    }
-
-    task = props.task;
-    markers = props.task.markers;
-    distanceThreshold = props.task.distanceThreshold;
-    currentTarget = typeof props.currentTarget === 'number' ? props.currentTarget : -1;
-    isRepeating = typeof props.currentRepetition === 'number' ? props.currentRepetition < task.repetitions - 1 : false;
-    isTaskRunning = typeof props.isTaskRunning === 'boolean' ? props.isTaskRunning : false;
-    holdProgress = typeof props.holdProgress === 'number' ? props.holdProgress : 0;
-    directionPoint = props.directionPoint || null;
-    directionPointDistanceMM = props.directionPointDistanceMM || null;
-
-    if (props.config) config = props.config;
-  };
-
-  p5.draw = () => {
-    p5.clear();
-    if (!task) return;
-
-    if (task.type === 'MOVE') drawMarkers();
-    else if (task.type === 'HOLD') drawHoldMarker();
-    drawWrist();
-  };
-
-  const drawHoldMarker = () => {
-    if (currentTarget === -1) return;
-    if (task === null) return;
-
-    const isInsideTarget =
-      activeWristPos &&
-      distance((activeWristPos.x * INCH_TO_MM) / worldPPI, (activeWristPos.y * INCH_TO_MM) / worldPPI, markers[currentTarget].x, markers[currentTarget].y) < distanceThreshold / 2;
-
-    const cPos: Pos = { x: markers[currentTarget].x * MM_TO_INCH * worldPPI, y: markers[currentTarget].y * MM_TO_INCH * worldPPI };
-    p5.noStroke();
-    if (isInsideTarget) p5.fill(0, 255, 0, 128);
-    else p5.fill(255, 0, 0, 128);
-    p5.circle(cPos.x, cPos.y, markerDiameter);
-
-    p5.strokeWeight(2);
-    if (isInsideTarget) {
-      p5.stroke(0, 255, 0);
-      p5.fill(0, 255, 0, 32);
-    } else {
-      p5.stroke(255, 0, 0);
-      p5.fill(255, 0, 0, 32);
-    }
-    p5.circle(cPos.x, cPos.y, distanceThreshold * MM_TO_INCH * worldPPI);
-
-    // Draw arc to show progress around marker
-    p5.noFill();
-    p5.strokeWeight(4);
-    p5.stroke(255);
-    p5.arc(cPos.x, cPos.y, 1.2 * distanceThreshold * MM_TO_INCH * worldPPI, 1.2 * distanceThreshold * MM_TO_INCH * worldPPI, -p5.HALF_PI, -p5.HALF_PI + p5.TWO_PI * holdProgress);
-  };
-
-  const drawMarkers = () => {
-    p5.noFill();
-    p5.stroke(255);
-    p5.strokeWeight(2);
-
-    // Current Target
-    const cPos: Pos = { x: markers[currentTarget].x * MM_TO_INCH * worldPPI, y: markers[currentTarget].y * MM_TO_INCH * worldPPI };
-
-    // Next Target
-    let nPos: Pos | null = null;
-    if (currentTarget < markers.length - 1) nPos = { x: markers[currentTarget + 1].x * MM_TO_INCH * worldPPI, y: markers[currentTarget + 1].y * MM_TO_INCH * worldPPI };
-    else if (isRepeating) nPos = { x: markers[0].x * MM_TO_INCH * worldPPI, y: markers[0].y * MM_TO_INCH * worldPPI };
-
-    // Previous Target
-    let pPos: Pos | null = null;
-    if (currentTarget > 0) pPos = { x: markers[currentTarget - 1].x * MM_TO_INCH * worldPPI, y: markers[currentTarget - 1].y * MM_TO_INCH * worldPPI };
-    else if (isRepeating) pPos = { x: markers[markers.length - 1].x * MM_TO_INCH * worldPPI, y: markers[markers.length - 1].y * MM_TO_INCH * worldPPI };
-
-    // Current Marker
-    p5.noStroke();
-    p5.fill(0, 255, 0, 200);
-    p5.circle(cPos.x, cPos.y, markerDiameter);
-
-    // Current Marker Threshold
-    p5.noFill();
-    p5.stroke(255, 0, 0);
-    p5.strokeWeight(2);
-    p5.circle(cPos.x, cPos.y, distanceThreshold * MM_TO_INCH * worldPPI);
-
-    // Current Marker Label
-    p5.fill(255);
-    p5.textAlign(p5.CENTER, p5.CENTER);
-    p5.textSize(12);
-    p5.text(String(currentTarget + 1), cPos.x, cPos.y);
-
-    [nPos, pPos].forEach((pos, idx) => {
-      if (!pos) return;
-
-      // Marker
-      p5.noStroke();
-      p5.fill(255, 255, 255, 64);
-      p5.circle(pos.x, pos.y, markerDiameter);
-
-      // Label
-      p5.fill(255);
-      p5.textAlign(p5.CENTER, p5.CENTER);
-      p5.textSize(12);
-      if (idx == 0) p5.text(String(currentTarget + 1 + idx), pos.x, pos.y);
-      else p5.text(String(currentTarget + 1 - 1), pos.x, pos.y);
-
-      // Line
-      p5.stroke(255, 255, 255, 64);
-      p5.strokeWeight(2);
-      p5.line(cPos.x, cPos.y, pos.x, pos.y);
-    });
-  };
-
-  const drawWrist = () => {
-    p5.noStroke();
-
-    // Wrist Marker
-    p5.fill(0, 0, 255, 128);
-    if (activeWristPos) p5.circle(activeWristPos.x, activeWristPos.y, 12);
-
-    // Wrist Label
-    p5.fill(255);
-    p5.textAlign(p5.CENTER, p5.CENTER);
-    p5.textSize(6);
-    if (activeWristPos) p5.text(task?.hand === 'Left' ? 'L' : 'R', activeWristPos.x, activeWristPos.y);
-
-    // Wrist to Target Line
-    if (!isTaskRunning) return;
-    if (directionPointDistanceMM !== null && directionPoint && activeWristPos !== null) {
-      const { x, y } = directionPoint;
-      p5.fill(255, 255, 255);
-      p5.noStroke();
-      p5.circle(x * MM_TO_INCH * worldPPI, y * MM_TO_INCH * worldPPI, markerDiameter * 0.3);
-
-      p5.textSize(10);
-      p5.textAlign(p5.CENTER, p5.BOTTOM);
-      p5.fill(255);
-      p5.text(`${directionPointDistanceMM?.toFixed(1)} mm`, x * MM_TO_INCH * worldPPI, y * MM_TO_INCH * worldPPI);
-
-      // p5.strokeWeight(2);
-      // p5.stroke(255, 0, 0, 128);
-      console.log('directionPointDistanceMM', directionPointDistanceMM, config.minVibrationThresholdMM, config.maxVibrationThresholdMM);
-      if (directionPointDistanceMM < config.minVibrationThresholdMM) {
-        const opacity = p5.map(directionPointDistanceMM, 0, config.minVibrationThresholdMM, 0, 128, true);
-        const lineWidth = p5.map(directionPointDistanceMM, 0, config.minVibrationThresholdMM, 0, 1, true);
-        p5.strokeWeight(lineWidth);
-        p5.stroke(255, 255, 255, opacity);
-      } else {
-        const opacity = p5.map(directionPointDistanceMM, config.minVibrationThresholdMM, config.maxVibrationThresholdMM, 128, 255, true);
-        const lineWidth = p5.map(directionPointDistanceMM, config.minVibrationThresholdMM, config.maxVibrationThresholdMM, 1, 2, true);
-        p5.strokeWeight(lineWidth);
-        p5.stroke(255, 0, 0, opacity);
-      }
-      p5.line(activeWristPos.x, activeWristPos.y, directionPoint.x * MM_TO_INCH * worldPPI, directionPoint.y * MM_TO_INCH * worldPPI);
-    }
-  };
-};
-
 const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>; ble: ReturnType<typeof useBle> }) => {
   const { config } = useConfig();
-  const { devicePPI, worldPPI, devicePixelRatio, testbedWidthMM, testbedHeightMM, markerDiameterMM } = config;
+  const { devicePPI, worldPPI, devicePixelRatio, testbedWidthMM, testbedHeightMM, markerDiameterMM, silParams, romCalibrationParams } = config;
   const factor = devicePPI / devicePixelRatio;
   const testbedWidth = testbedWidthMM * factor * MM_TO_INCH;
   const testbedHeight = testbedHeightMM * factor * MM_TO_INCH;
   const markerDiameter = markerDiameterMM * factor * MM_TO_INCH;
 
+  const silH = useMemo(() => SIL_IMG_HEIGHT * silParams.silScaleY, [silParams]);
+  const silW = useMemo(() => SIL_IMG_WIDTH * silParams.silScaleX, [silParams]);
+  const shoulderY = useMemo(() => silParams.silY + SHOULDER_Y_OFFSET * silH, [silParams, silH]);
+  const leftShoulderX = useMemo(() => -SHOULDER_X_OFFSET * silW, [silW]);
+  const rightShoulderX = useMemo(() => SHOULDER_X_OFFSET * silW, [silW]);
+
+  // #region Handling Device Communication
   const { latestImuVal: webSerialLatestImuVal, writeDirection: webSerialWriteDirection, isConnected: webSerialIsConnected } = webSerial;
   const { latestImuVal: bleLatestImuVal, writeDirection: bleWriteDirection, isConnected: bleIsConnected } = ble;
 
@@ -265,6 +52,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
   const isConnected = useMemo(() => {
     return webSerialIsConnected || bleIsConnected;
   }, [webSerialIsConnected, bleIsConnected]);
+  // #endregion Handling Device Communication
 
   const { videoRef, error, loading, wristDetection, startWebcam } = useDetection(true);
   const { leftWrist, rightWrist } = wristDetection;
@@ -276,29 +64,113 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
   const [currentTaskIndex, setCurrentTaskIndex] = useState<number | null>(null);
   const [currentTrial, setCurrentTrial] = useState<number | null>(null);
   const [currentRepetition, setCurrentRepetition] = useState<number | null>(null);
+
+  //#region Derived Task Params
   const currentTask: Task | null = useMemo(() => (currentTaskIndex !== null && tasks.length > currentTaskIndex ? tasks[currentTaskIndex] : null), [tasks, currentTaskIndex]);
+
+  const hand = useMemo<'Left' | 'Right'>(() => {
+    if (currentTask === null || currentTask.type === 'MEDIA') return 'Right';
+    if (currentTask.type === 'MOVE') return currentTask.movePayload.hand;
+    if (currentTask.type === 'HOLD') return currentTask.holdPayload.hand;
+    if (currentTask.type === 'ROM_MOVE') return currentTask.romMovePayload.hand;
+    if (currentTask.type === 'ROM_HOLD') return currentTask.romHoldPayload.hand;
+    return 'Right';
+  }, [currentTask]);
+
+  const distanceThreshold = useMemo<number>(() => {
+    if (currentTask === null || currentTask.type === 'MEDIA') return 15;
+    if (currentTask.type === 'MOVE') return currentTask.movePayload.distanceThreshold;
+    if (currentTask.type === 'HOLD') return currentTask.holdPayload.distanceThreshold;
+    if (currentTask.type === 'ROM_MOVE') return currentTask.romMovePayload.distanceThreshold;
+    if (currentTask.type === 'ROM_HOLD') return currentTask.romHoldPayload.distanceThreshold;
+    return 15;
+  }, [currentTask]);
+
+  const holdDuration = useMemo<number | null>(() => {
+    if (currentTask === null) return null;
+    if (currentTask.type === 'HOLD') return currentTask?.holdPayload.holdDuration || null;
+    if (currentTask.type === 'ROM_HOLD') return currentTask?.romHoldPayload.holdDuration || null;
+    return null;
+  }, [currentTask]);
+
+  const anchor = useMemo(() => {
+    const anchor = hand === 'Left' ? { x: leftShoulderX, y: shoulderY } : { x: rightShoulderX, y: shoulderY };
+    anchor.x = (anchor.x / worldPPI) * INCH_TO_MM;
+    anchor.y = (anchor.y / worldPPI) * INCH_TO_MM;
+    return anchor;
+  }, [hand, leftShoulderX, rightShoulderX, shoulderY, worldPPI]);
+
+  const repetitions = useMemo<number>(() => {
+    if (currentTask === null || currentTask.type === 'MEDIA') return 1;
+    if (currentTask.type === 'MOVE') return currentTask.movePayload.repetitions;
+    if (currentTask.type === 'HOLD') return currentTask.holdPayload.repetitions;
+    if (currentTask.type === 'ROM_MOVE') return currentTask.romMovePayload.repetitions;
+    if (currentTask.type === 'ROM_HOLD') return currentTask.romHoldPayload.repetitions;
+    return 1;
+  }, [currentTask]);
+
+  const trials = useMemo<number>(() => {
+    if (currentTask === null || currentTask.type === 'MEDIA') return 1;
+    if (currentTask.type === 'MOVE') return currentTask.movePayload.trials;
+    if (currentTask.type === 'HOLD') return currentTask.holdPayload.trials;
+    if (currentTask.type === 'ROM_MOVE') return currentTask.romMovePayload.trials;
+    if (currentTask.type === 'ROM_HOLD') return currentTask.romHoldPayload.trials;
+    return 1;
+  }, [currentTask]);
+
+  const markers = useMemo<Pos[]>(() => {
+    if (currentTask === null) return [];
+    if (currentTask.type === 'MEDIA') return [];
+    if (currentTask.type === 'MOVE') return currentTask.movePayload.markers;
+    if (currentTask.type === 'HOLD') return currentTask.holdPayload.markers;
+
+    if (!romCalibrationParams) return [];
+    const polarMarkers: PolarPos[] = currentTask.type === 'ROM_MOVE' ? currentTask.romMovePayload.markers : currentTask.romHoldPayload.markers;
+    const maxRadius = hand === 'Left' ? romCalibrationParams.leftRadius : romCalibrationParams.rightRadius;
+    console.log(polarMarkers);
+    const m = polarMarkers.map((polar) => {
+      const cartesian = polarToCartesian((polar.radius * maxRadius * INCH_TO_MM) / worldPPI, polar.angle, anchor);
+      return { x: cartesian.x, y: cartesian.y };
+    });
+    console.log("Markers:", m);
+    return m;
+  }, [currentTask, anchor, hand, worldPPI, romCalibrationParams]);
+
+  const isRepeating = useMemo<boolean>(() => {
+    if (currentTask === null) return false;
+    if (currentTask.type === 'MEDIA') return false;
+    if (currentRepetition === null) return false;
+    if (currentTask.type === 'MOVE' && currentRepetition < currentTask.movePayload.repetitions - 1) return true;
+    if (currentTask.type === 'HOLD' && currentRepetition < currentTask.holdPayload.repetitions - 1) return true;
+    if (currentTask.type === 'ROM_MOVE' && currentRepetition < currentTask.romMovePayload.repetitions - 1) return true;
+    if (currentTask.type === 'ROM_HOLD' && currentRepetition < currentTask.romHoldPayload.repetitions - 1) return true;
+    return false;
+  }, [currentTask, currentRepetition]);
+  //#endregion Derived Task Params
+
   const [currentTarget, setCurrentTarget] = useState<number | null>(null);
   const [previousTarget, setPreviousTarget] = useState<number | null>(null);
 
   const activeWrist = useMemo<Pos | null>(() => {
-    if (currentTask === null) return null;
-    if (currentTask.hand === 'Left') return leftWrist;
+    if (currentTask === null || currentTask.type === 'MEDIA') return null;
+    if (hand === 'Left') return leftWrist;
     return rightWrist;
-  }, [currentTask, leftWrist, rightWrist]);
+  }, [currentTask, hand, leftWrist, rightWrist]);
 
   const directionPoint = useMemo<Pos | null>(() => {
-    if (currentTask === null) return null;
+    if (currentTask === null || currentTask.type === 'MEDIA') return null;
     if (currentTarget === null) return null;
-    if (currentTask.type === 'HOLD') return currentTask.markers[0];
+    if (currentTask.type === 'HOLD' || currentTask.type === 'ROM_HOLD') return markers[0];
     if (currentTarget === null || previousTarget === null) return null;
     if (activeWrist === null) return null;
     if (activeWrist.x === undefined || activeWrist.y === undefined) return null;
+
     const ax = (activeWrist.x * INCH_TO_MM) / worldPPI;
     const ay = (activeWrist.y * INCH_TO_MM) / worldPPI;
-    const p1 = currentTask.markers[previousTarget];
-    const p2 = currentTask.markers[currentTarget];
+    const p1 = markers[previousTarget];
+    const p2 = markers[currentTarget];
     return closestPointOnLine(ax, ay, p1.x, p1.y, p2.x, p2.y);
-  }, [currentTask, currentTarget, previousTarget, activeWrist, worldPPI]);
+  }, [markers, currentTask, currentTarget, previousTarget, activeWrist, worldPPI]);
 
   const directionPointDistanceMM = useMemo<number>(() => {
     if (directionPoint === null || activeWrist === null) return 0;
@@ -309,7 +181,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
   const holdProgress = (() => {
     if (!taskStartTime) return 0;
     const elapsed = Date.now() - taskStartTime;
-    const percent = Math.min(elapsed / (currentTask?.holdDuration || 1), 1);
+    const percent = Math.min(elapsed / (holdDuration || 1), 1);
     return percent;
   })();
 
@@ -319,30 +191,28 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
   }, [taskStartTime]);
   const isStudyComplete = useMemo<boolean>(() => currentTaskIndex !== null && tasks !== null && currentTaskIndex === tasks.length, [currentTaskIndex, tasks]);
 
+  const goHome = () => {
+    if (window.confirm('Are you sure you want to return to the home page?')) go('#/');
+  };
+
+  //#region Data Collection
   const [collectedData, setCollectedData] = useState<CollectedData[]>([]);
   const [collectedRawData, setCollectedRawData] = useState<CollectedRawData[]>([]);
   const [collectedIMUData, setCollectedIMUData] = useState<CollectedIMUData[]>([]);
-  const [isDataSaved, setIsDataSaved] = useState<boolean>(false);
-
-  const goHome = () => {
-    if (isDataSaved || window.confirm('Are you sure you want to return to the home page?')) go('#/');
-  };
 
   const saveDataAsCSV = () => {
+    if (collectedData.length === 0 || collectedRawData.length === 0) return;
     const dataCsv = toCSV<CollectedData>(collectedData, Object.keys(collectedData[0]) as (keyof CollectedData)[]);
     const rawDataCsv = toCSV<CollectedRawData>(collectedRawData, Object.keys(collectedRawData[0]) as (keyof CollectedRawData)[]);
     const imuDataCsv = collectedIMUData.length > 0 ? toCSV<CollectedIMUData>(collectedIMUData, Object.keys(collectedIMUData[0]) as (keyof CollectedIMUData)[]) : null;
     downloadZip('handguidance_' + (collectedIMUData.length > 0 ? 'imutrial_' : '') + participantId, dataCsv, rawDataCsv, imuDataCsv, JSON.stringify(tasks, null, 2));
-    setIsDataSaved(true);
   };
+  //#endregion Data Collection
 
   useEffect(() => {
     const hash = window.location.hash;
     const params = new URLSearchParams(hash.split('?')[1]);
     const encoded = params.get('data');
-    let pId = params.get('participantId');
-
-    if (!pId) pId = window.prompt('Enter Participant ID:');
 
     if (encoded) {
       try {
@@ -350,6 +220,9 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
         const parsed = JSON.parse(decoded);
         if (Array.isArray(parsed)) {
           setTasks(parsed);
+
+          let pId = params.get('participantId');
+          if (!pId) pId = window.prompt('Enter Participant ID:');
           setParticipantId(pId || 'P-' + uid(5));
 
           // Initializing Task
@@ -381,13 +254,13 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
   }, [tasks, currentTaskIndex, currentTrial, isStudyComplete]);
 
   const progressTask = useCallback(() => {
+    console.log('Progressing Task...');
     if (currentTask === null) return;
     if (currentTarget === null) return;
     if (currentRepetition === null) return;
     if (currentTrial === null) return;
     if (currentTaskIndex === null) return;
 
-    const { markers, repetitions, trials } = currentTask;
     if (currentTarget < markers.length - 1) {
       setPreviousTarget(currentTarget);
       setCurrentTarget(currentTarget + 1);
@@ -411,17 +284,16 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
       setCurrentTarget(0);
       BEEP_SOUND.play();
     }
-  }, [currentTarget, currentRepetition, currentTrial, currentTaskIndex, currentTask]);
+  }, [currentTarget, currentRepetition, currentTrial, currentTaskIndex, currentTask, repetitions, trials, markers]);
 
   useEffect(() => {
     if (currentTaskIndex === null) return;
     if (currentTask === null) return;
+    if (currentTask.type === 'MEDIA') return;
     if (currentTarget === null) return;
     if (currentRepetition === null) return;
     if (currentTrial === null) return;
     if (isStudyComplete) return;
-
-    const { type, hand, markers, distanceThreshold } = currentTask;
 
     if (activeWrist === null) return;
 
@@ -437,8 +309,6 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
       const dy = py - ay;
       const vx = directionalMap(dx, config.minVibrationThresholdMM, config.maxVibrationThresholdMM);
       const vy = directionalMap(dy, config.minVibrationThresholdMM, config.maxVibrationThresholdMM);
-      // const vx = (Math.sign(dx) * Math.min(Math.max(Math.abs(dx) - distanceThreshold / 2, 0), 1.5 * distanceThreshold)) / (1.5 * distanceThreshold);
-      // const vy = (Math.sign(dy) * Math.min(Math.max(Math.abs(dy) - distanceThreshold / 2, 0), 1.5 * distanceThreshold)) / (1.5 * distanceThreshold);
       writeDirection(vx, vy);
     }
 
@@ -514,9 +384,9 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
 
     if (taskStartTime === null) {
       setTaskStartTime(Date.now());
-      if (type === 'HOLD') setTimeout(() => progressTask(), currentTask.holdDuration);
+      if (['HOLD', 'ROM_HOLD'].includes(currentTask.type) && holdDuration !== null) setTimeout(() => progressTask(), holdDuration);
     }
-    if (type === 'MOVE') progressTask();
+    if (['MOVE', 'ROM_MOVE'].includes(currentTask.type)) progressTask();
   }, [
     writeDirection,
     currentTask,
@@ -535,6 +405,10 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
     config.minVibrationThresholdMM,
     config.maxVibrationThresholdMM,
     directionPoint,
+    distanceThreshold,
+    hand,
+    markers,
+    holdDuration,
   ]);
 
   if (participantId === '') {
@@ -552,10 +426,12 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
           <h1 className="text-2xl font-bold">Study Complete</h1>
           <p className="text-gray-600">Thank you for participating!</p>
           <div className="flex flex-row gap-2">
-            <button className="px-4 py-3 rounded-lg bg-white border border-gray-300 text-gray-900 hover:bg-gray-100 cursor-pointer" onClick={saveDataAsCSV}>
-              <FontAwesomeIcon icon="download" className="mr-2" />
-              Download Data
-            </button>
+            {collectedData.length !== 0 && collectedRawData.length !== 0 && (
+              <button className="px-4 py-3 rounded-lg bg-white border border-gray-300 text-gray-900 hover:bg-gray-100 cursor-pointer" onClick={saveDataAsCSV}>
+                <FontAwesomeIcon icon="download" className="mr-2" />
+                Download Data
+              </button>
+            )}
 
             <button className="px-4 py-3 rounded-lg bg-gray-200 text-gray-900 font-bold hover:bg-gray-800 hover:text-white cursor-pointer" onClick={goHome}>
               <FontAwesomeIcon icon="home" className="mr-2" />
@@ -566,6 +442,25 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
       </div>
     );
 
+  if (isTaskCorrupt)
+    return (
+      <div className="w-screen h-screen flex gap-6 flex-col items-center justify-center select-none">
+        <p className="text-red-600 font-bold text-lg">[ERROR] Corrupt Task Data.</p>
+      </div>
+    );
+
+  if (currentTask && currentTask.type === 'MEDIA')
+    return (
+      <MediaPlayer
+        mediaUrl={currentTask.mediaPayload.mediaUrl}
+        mediaTitle={currentTask.mediaPayload.mediaTitle}
+        mediaSubtitle={currentTask.mediaPayload.mediaSubtitle}
+        showHomeBtn={false}
+        doneBtnTitle="Continue"
+        doneCallback={() => progressTask()}
+      />
+    );
+    
   return (
     <div className="w-screen h-screen flex gap-6 flex-col items-center justify-center select-none">
       <div className="flex flex-col gap-2" style={{ width: `${testbedWidth}px` }}>
@@ -601,11 +496,11 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
               <span className="px-2 py-1 text-center rounded font-semibold text-lg">
                 {currentTask?.type === 'MOVE' ? (
                   <>
-                    <span className="font-bold text-blue-800">Move</span> <span className="font-bold text-red-800 border p-1 rounded">{currentTask?.hand} Hand</span> to Target
+                    <span className="font-bold text-blue-800">Move</span> <span className="font-bold text-red-800 border p-1 rounded">{hand} Hand</span> to Target
                   </>
                 ) : (
                   <>
-                    <span className="font-bold text-blue-800">Hold</span> <span className="font-bold text-red-800 border p-1 rounded">{currentTask?.hand} Hand</span> Inside Target
+                    <span className="font-bold text-blue-800">Hold</span> <span className="font-bold text-red-800 border p-1 rounded">{hand} Hand</span> Inside Target
                   </>
                 )}
               </span>
@@ -619,15 +514,13 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
             </div>
             <div className="flex flex-col items-center justify-between">
               <label className="text-sm font-bold text-gray-600">Trials</label>
-              <span className="px-2 py-1 text-center rounded font-semibold text-xl">
-                {currentTask && currentTrial !== null ? currentTrial + 1 + ' / ' + String(currentTask.trials) : '-'}
-              </span>
+              <span className="px-2 py-1 text-center rounded font-semibold text-xl">{currentTask && currentTrial !== null ? currentTrial + 1 + ' / ' + String(trials) : '-'}</span>
             </div>
 
             <div className="flex flex-col items-center justify-between">
               <label className="text-sm font-bold text-gray-600">Repetitions</label>
               <span className="px-2 py-1 text-center rounded font-semibold text-xl">
-                {currentTask && currentRepetition !== null ? currentRepetition + 1 + ' / ' + String(currentTask.repetitions) : '-'}
+                {currentTask && currentRepetition !== null ? currentRepetition + 1 + ' / ' + String(repetitions) : '-'}
               </span>
             </div>
           </div>
@@ -638,51 +531,49 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
             {!error && !loading && (
               <video ref={videoRef} muted playsInline className={`absolute inset-0 w-full h-full object-cover ${isTaskCorrupt && 'blur'}`} style={{ transform: 'scaleX(-1)' }} />
             )}
-            {isTaskCorrupt ? (
-              <span className="text-red-600 bg-white border p-2 font-bold text-gray-500 z-9">[ERROR] Corrupt Task Data</span>
-            ) : (
-              <div className="absolute inset-0">
-                <ReactP5Wrapper
-                  sketch={sketch}
-                  frameWidth={testbedWidth}
-                  frameHeight={testbedHeight}
-                  devicePPI={devicePPI}
-                  devicePixelRatio={devicePixelRatio}
-                  markerDiameter={markerDiameter}
-                  worldPPI={worldPPI}
-                  activeWristPos={activeWrist}
-                  task={currentTask}
-                  currentTarget={currentTarget}
-                  currentRepetition={currentRepetition}
-                  isTaskRunning={isTaskRunning}
-                  holdProgress={holdProgress}
-                  directionPoint={directionPoint}
-                  directionPointDistanceMM={directionPointDistanceMM}
-                  config={config}
-                />
-              </div>
-            )}
+            <div className="absolute inset-0">
+              <ReactP5Wrapper
+                sketch={taskVisualizationSketch}
+                frameWidth={testbedWidth}
+                frameHeight={testbedHeight}
+                markerDiameter={markerDiameter}
+                worldPPI={worldPPI}
+                type={currentTask?.type || 'MOVE'}
+                distanceThreshold={distanceThreshold}
+                markers={markers}
+                isRepeating={isRepeating}
+                hand={hand}
+                activeWristPos={activeWrist}
+                currentTarget={currentTarget}
+                currentRepetition={currentRepetition}
+                isTaskRunning={isTaskRunning}
+                holdProgress={holdProgress}
+                directionPoint={directionPoint}
+                directionPointDistanceMM={directionPointDistanceMM}
+                config={config}
+              />
+            </div>
           </div>
         </div>
 
         <span className="text-center text-md text-gray-500">
           {!isTaskRunning && (
             <>
-              <kbd className="bg-gray-200 py-1 font-bold px-2 rounded">Move {currentTask?.hand} Hand</kbd> Inside the{' '}
-              <kbd className="bg-red-200 py-1 font-bold px-2 rounded">Red Circle</kbd> to Begin Task
+              <kbd className="bg-gray-200 py-1 font-bold px-2 rounded">Move {hand} Hand</kbd> Inside the <kbd className="bg-red-200 py-1 font-bold px-2 rounded">Red Circle</kbd> to
+              Begin Task
             </>
           )}
-          {isTaskRunning && currentTask?.type === 'MOVE' && (
+          {isTaskRunning && ['MOVE', 'ROM_MOVE'].includes(currentTask?.type || '') && (
             <>
               Follow the <kbd className="bg-red-200 py-1 font-bold px-2 rounded">Red Circle</kbd> with Your{' '}
-              <kbd className="bg-gray-200 py-1 font-bold px-2 rounded">{currentTask?.hand} Hand</kbd>
+              <kbd className="bg-gray-200 py-1 font-bold px-2 rounded">{hand} Hand</kbd>
             </>
           )}
-          {isTaskRunning && currentTask?.type === 'HOLD' && (
+          {isTaskRunning && ['HOLD', 'ROM_HOLD'].includes(currentTask?.type || '') && (
             <>
-              Keep Your <kbd className="bg-gray-200 py-1 font-bold px-2 rounded">{currentTask?.hand} Hand</kbd> Steady Inside the{' '}
+              Keep Your <kbd className="bg-gray-200 py-1 font-bold px-2 rounded">{hand} Hand</kbd> Steady Inside the{' '}
               <kbd className="bg-red-200 py-1 font-bold px-2 rounded">Red Circle</kbd> for{' '}
-              <span className="font-bold text-red-600">{Math.ceil(((1 - holdProgress) * (currentTask?.holdDuration || 1)) / 1000)} more seconds</span>
+              <span className="font-bold text-red-600">{Math.ceil(((1 - holdProgress) * (holdDuration || 1)) / 1000)} more seconds</span>
             </>
           )}
         </span>

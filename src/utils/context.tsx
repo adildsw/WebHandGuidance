@@ -101,7 +101,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
   const generateDefaultHoldTaskPayload = (): HoldTaskPayload => ({
     hand: config.defaultHand,
-    repetitions: config.defaultRepetitions,
+    repetitions: 1,
     trials: 1,
     markers: [{ x: 0, y: 0 }],
     distanceThreshold: config.defaultDistanceThreshold,
@@ -118,7 +118,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
   const generateDefaultROMHoldTaskPayload = (): ROMHoldTaskPayload => ({
     hand: config.defaultHand,
-    repetitions: config.defaultRepetitions,
+    repetitions: 1,
     trials: 1,
     markers: [{ radius: 0, angle: 0 }],
     distanceThreshold: config.defaultDistanceThreshold,
