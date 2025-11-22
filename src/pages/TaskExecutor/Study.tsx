@@ -54,7 +54,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
   }, [webSerialIsConnected, bleIsConnected]);
   // #endregion Handling Device Communication
 
-  const { videoRef, error, loading, wristDetection, startWebcam } = useDetection(true);
+  const { videoRef, error, loading, wristDetection, headShoulderDetection, startWebcam } = useDetection(true);
   const { leftWrist, rightWrist } = wristDetection;
 
   const [participantId, setParticipantId] = useState<string>('');
@@ -132,7 +132,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
       const cartesian = polarToCartesian((polar.radius * maxRadius * INCH_TO_MM) / worldPPI, polar.angle, anchor);
       return { x: cartesian.x, y: cartesian.y };
     });
-    console.log("Markers:", m);
+    console.log('Markers:', m);
     return m;
   }, [currentTask, anchor, hand, worldPPI, romCalibrationParams]);
 
@@ -196,6 +196,9 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
   };
 
   //#region Data Collection
+  const [isDataSent, setIsDataSent] = useState<boolean>(false);
+  const [isDataSentSuccessfully, setIsDataSentSuccessfully] = useState<boolean>(false);
+
   const [collectedData, setCollectedData] = useState<CollectedData[]>([]);
   const [collectedRawData, setCollectedRawData] = useState<CollectedRawData[]>([]);
   const [collectedIMUData, setCollectedIMUData] = useState<CollectedIMUData[]>([]);
@@ -205,8 +208,47 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
     const dataCsv = toCSV<CollectedData>(collectedData, Object.keys(collectedData[0]) as (keyof CollectedData)[]);
     const rawDataCsv = toCSV<CollectedRawData>(collectedRawData, Object.keys(collectedRawData[0]) as (keyof CollectedRawData)[]);
     const imuDataCsv = collectedIMUData.length > 0 ? toCSV<CollectedIMUData>(collectedIMUData, Object.keys(collectedIMUData[0]) as (keyof CollectedIMUData)[]) : null;
+    // const { dataCsv, rawDataCsv, imuDataCsv, task } = generateDataPackage()!;
     downloadZip('handguidance_' + (collectedIMUData.length > 0 ? 'imutrial_' : '') + participantId, dataCsv, rawDataCsv, imuDataCsv, JSON.stringify(tasks, null, 2));
   };
+
+  useEffect(() => {
+    if (!isStudyComplete || isDataSent || config.serverURL === '') return;
+    const generateDataPackage = () => {
+      if (collectedData.length === 0 || collectedRawData.length === 0) return null;
+      return {
+        dataCsv: toCSV<CollectedData>(collectedData, Object.keys(collectedData[0]) as (keyof CollectedData)[]),
+        rawDataCsv: toCSV<CollectedRawData>(collectedRawData, Object.keys(collectedRawData[0]) as (keyof CollectedRawData)[]),
+        imuDataCsv: collectedIMUData.length > 0 ? toCSV<CollectedIMUData>(collectedIMUData, Object.keys(collectedIMUData[0]) as (keyof CollectedIMUData)[]) : '',
+        participantId,
+        timestamp: new Date().toISOString(),
+        task: JSON.stringify(tasks, null, 2),
+      };
+    };
+
+    const dataPackage = generateDataPackage();
+    if (dataPackage === null) return;
+
+    fetch(config.serverURL + '/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(dataPackage),
+    })
+      .then((response) => {
+        setIsDataSent(true);
+        if (!response.ok) {
+          setIsDataSentSuccessfully(false);
+          console.error('Failed to send data');
+        } else {
+          setIsDataSentSuccessfully(true);
+        }
+      })
+      .catch((error) => {
+        setIsDataSent(true);
+        console.error('Error sending data:', error);
+      });
+  }, [isStudyComplete, isDataSent, config.serverURL, collectedData, collectedRawData, collectedIMUData, participantId, tasks]);
+
   //#endregion Data Collection
 
   useEffect(() => {
@@ -425,6 +467,8 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
         <div className="flex flex-col gap-2 items-center justify-center">
           <h1 className="text-2xl font-bold">Study Complete</h1>
           <p className="text-gray-600">Thank you for participating!</p>
+          {isDataSent && !isDataSentSuccessfully && <p className="text-red-600 font-semibold">There was an error sending your data to the server.</p>}
+          {isDataSent && isDataSentSuccessfully && <p className="text-green-600 font-semibold">Your data has been collected!</p>}
           <div className="flex flex-row gap-2">
             {collectedData.length !== 0 && collectedRawData.length !== 0 && (
               <button className="px-4 py-3 rounded-lg bg-white border border-gray-300 text-gray-900 hover:bg-gray-100 cursor-pointer" onClick={saveDataAsCSV}>
@@ -460,7 +504,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
         doneCallback={() => progressTask()}
       />
     );
-    
+
   return (
     <div className="w-screen h-screen flex gap-6 flex-col items-center justify-center select-none">
       <div className="flex flex-col gap-2" style={{ width: `${testbedWidth}px` }}>
@@ -551,6 +595,8 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
                 directionPoint={directionPoint}
                 directionPointDistanceMM={directionPointDistanceMM}
                 config={config}
+                headShoulderDetection={headShoulderDetection}
+                silParams={silParams}
               />
             </div>
           </div>

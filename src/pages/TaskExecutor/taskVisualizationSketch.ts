@@ -1,9 +1,11 @@
 import type { Sketch } from '@p5-wrapper/react';
-import type { Pos, TaskType } from "../../types/task";
-import type { Font } from "p5";
-import type { Config } from "../../types/config";
-import { defaultConfig, INCH_TO_MM, MM_TO_INCH } from "../../utils/constants";
-import { distance } from "../../utils/math";
+import type { Pos, TaskType } from '../../types/task';
+import type { Font } from 'p5';
+import type { Config, SilhouetteParams } from '../../types/config';
+import { defaultConfig, INCH_TO_MM, MM_TO_INCH, SIL_IMG_HEIGHT, SIL_IMG_WIDTH } from '../../utils/constants';
+import { distance } from '../../utils/math';
+import type { HeadShoulderDetectionResult } from '../../types/detections';
+import type p5 from 'p5';
 
 const taskVisualizationSketch: Sketch = (p5) => {
   let w = 400;
@@ -14,8 +16,22 @@ const taskVisualizationSketch: Sketch = (p5) => {
   let activeWristPos: Pos | null = null;
   let directionPoint: Pos | null = null;
   let directionPointDistanceMM: number | null = null;
+  let headShoulderDetection: HeadShoulderDetectionResult = {
+    nose: null,
+    leftShoulder: null,
+    rightShoulder: null,
+    interShoulderDistance: null,
+    noseShoulderDistance: null,
+    posErrorX: null,
+    posErrorY: null,
+    posErrorZ: null,
+    guideOpacity: 1,
+    posMessage: 'Uncalibrated',
+  };
 
   let f: Font;
+  let silImg: p5.Image;
+  let silParams: SilhouetteParams = defaultConfig.silParams;
 
   let type: 'MOVE' | 'HOLD' = 'MOVE';
   let hand: 'Left' | 'Right' = 'Right';
@@ -27,10 +43,16 @@ const taskVisualizationSketch: Sketch = (p5) => {
   let isTaskRunning: boolean = false;
   let holdProgress: number = 0;
 
+  // Silhouette Params
+  let silH = SIL_IMG_HEIGHT * silParams.silScaleY;
+  let silW = SIL_IMG_WIDTH * silParams.silScaleX;
+  let silOpacity = 255;
+
   let config: Config = defaultConfig;
 
   p5.preload = () => {
     f = p5.loadFont('./fonts/sf-ui-display-bold.otf');
+    silImg = p5.loadImage('./assets/standing.png');
   };
 
   p5.setup = () => {
@@ -50,7 +72,10 @@ const taskVisualizationSketch: Sketch = (p5) => {
     markers?: Pos[];
     isRepeating?: boolean;
     hand?: 'Left' | 'Right';
-    
+
+    headShoulderDetection?: HeadShoulderDetectionResult;
+    silParams?: SilhouetteParams;
+
     activeWristPos?: Pos | null;
     currentTarget?: number | null;
     currentRepetition?: number | null;
@@ -67,8 +92,8 @@ const taskVisualizationSketch: Sketch = (p5) => {
     if (p5.width !== w || p5.height !== h) p5.resizeCanvas(w, h);
 
     if (!props.type) type = 'MOVE';
-    else if (["ROM_MOVE", "MOVE"].includes(props.type)) type = 'MOVE';
-    else if (["ROM_HOLD", "HOLD"].includes(props.type)) type = 'HOLD';
+    else if (['ROM_MOVE', 'MOVE'].includes(props.type)) type = 'MOVE';
+    else if (['ROM_HOLD', 'HOLD'].includes(props.type)) type = 'HOLD';
 
     hand = props.hand || 'Right';
     markers = props.markers || [];
@@ -83,14 +108,24 @@ const taskVisualizationSketch: Sketch = (p5) => {
     directionPointDistanceMM = props.directionPointDistanceMM || null;
 
     if (props.config) config = props.config;
-  };
 
-  p5.draw = () => {
-    p5.clear();
+    headShoulderDetection = props.headShoulderDetection ?? {
+      nose: null,
+      leftShoulder: null,
+      rightShoulder: null,
+      interShoulderDistance: null,
+      noseShoulderDistance: null,
+      posErrorX: null,
+      posErrorY: null,
+      posErrorZ: null,
+      guideOpacity: 1,
+      posMessage: 'Uncalibrated',
+    };
+    silParams = props.silParams ?? defaultConfig.silParams;
 
-    if (type === 'MOVE') drawMarkers();
-    else if (type === 'HOLD') drawHoldMarker();
-    drawWrist();
+    silH = SIL_IMG_HEIGHT * silParams.silScaleY;
+    silW = SIL_IMG_WIDTH * silParams.silScaleX;
+    silOpacity = p5.map(headShoulderDetection.guideOpacity, 0, 1, 0, 255, true);
   };
 
   const drawHoldMarker = () => {
@@ -160,6 +195,11 @@ const taskVisualizationSketch: Sketch = (p5) => {
 
     [nPos, pPos].forEach((pos, idx) => {
       if (!pos) return;
+      
+      // Line
+      p5.stroke(255, 0, 0, 128);
+      p5.strokeWeight(4);
+      p5.line(cPos.x, cPos.y, pos.x, pos.y);
 
       // Marker
       p5.noStroke();
@@ -173,10 +213,6 @@ const taskVisualizationSketch: Sketch = (p5) => {
       if (idx == 0) p5.text(String(currentTarget + 1 + idx), pos.x, pos.y);
       else p5.text(String(currentTarget + 1 - 1), pos.x, pos.y);
 
-      // Line
-      p5.stroke(255, 255, 255, 64);
-      p5.strokeWeight(2);
-      p5.line(cPos.x, cPos.y, pos.x, pos.y);
     });
   };
 
@@ -206,7 +242,6 @@ const taskVisualizationSketch: Sketch = (p5) => {
       p5.fill(255);
       p5.text(`${directionPointDistanceMM?.toFixed(1)} mm`, x * MM_TO_INCH * worldPPI, y * MM_TO_INCH * worldPPI);
 
-      console.log('directionPointDistanceMM', directionPointDistanceMM, config.minVibrationThresholdMM, config.maxVibrationThresholdMM);
       if (directionPointDistanceMM < config.minVibrationThresholdMM) {
         const opacity = p5.map(directionPointDistanceMM, 0, config.minVibrationThresholdMM, 0, 128, true);
         const lineWidth = p5.map(directionPointDistanceMM, 0, config.minVibrationThresholdMM, 0, 1, true);
@@ -214,12 +249,40 @@ const taskVisualizationSketch: Sketch = (p5) => {
         p5.stroke(255, 255, 255, opacity);
       } else {
         const opacity = p5.map(directionPointDistanceMM, config.minVibrationThresholdMM, config.maxVibrationThresholdMM, 128, 255, true);
-        const lineWidth = p5.map(directionPointDistanceMM, config.minVibrationThresholdMM, config.maxVibrationThresholdMM, 1, 2, true);
+        const lineWidth = p5.map(directionPointDistanceMM, config.minVibrationThresholdMM, config.maxVibrationThresholdMM, 1, 3, true);
         p5.strokeWeight(lineWidth);
         p5.stroke(255, 0, 0, opacity);
       }
       p5.line(activeWristPos.x, activeWristPos.y, directionPoint.x * MM_TO_INCH * worldPPI, directionPoint.y * MM_TO_INCH * worldPPI);
     }
+  };
+
+  const drawSilhouette = () => {
+    p5.imageMode(p5.CENTER);
+    p5.tint(255, silOpacity);
+    p5.image(silImg, 0, silParams.silY, silW, silH);
+  };
+
+  const drawUserPOIs = () => {
+    if (!headShoulderDetection.nose || !headShoulderDetection.leftShoulder || !headShoulderDetection.rightShoulder) return;
+
+    // Draw Positional Error Text
+    p5.noStroke();
+    p5.fill(255, 255, 255, silOpacity);
+    p5.textSize(32);
+    p5.textAlign(p5.CENTER, p5.CENTER);
+    p5.text(headShoulderDetection.posMessage, 0, -h / 2 + 40);
+  };
+
+  p5.draw = () => {
+    p5.clear();
+
+    drawSilhouette();
+    drawUserPOIs();
+
+    if (type === 'MOVE') drawMarkers();
+    else if (type === 'HOLD') drawHoldMarker();
+    drawWrist();
   };
 };
 

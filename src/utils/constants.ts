@@ -43,6 +43,7 @@ export const defaultConfig: Config = {
   silParams: { silY: 0, silScaleX: 1, silScaleY: 1, silCalibrated: false },
   romCalibrationParams: null,
   romSafeMargin: 0.85,
+  serverURL: "https://xia9elgwbl.execute-api.us-east-2.amazonaws.com/",
 };
 
 export const defaultHeadShoulderResult: HeadShoulderDetectionResult = {

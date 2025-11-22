@@ -94,6 +94,9 @@ const sketch: Sketch = (p5) => {
         const progressX = p5.lerp(pinchPos.left.x, pinchPos.right.x, calibrationProgress);
         const progressY = p5.lerp(pinchPos.left.y, pinchPos.right.y, calibrationProgress);
         p5.line(pinchPos.left.x, pinchPos.left.y, progressX, progressY);
+
+        p5.strokeWeight(16);
+        p5.line(-width / 2 + 10, -height / 2 + 10, p5.lerp(-width / 2 + 10, width / 2 - 10, calibrationProgress), -height / 2 + 10);
       }
     }
   };
@@ -109,10 +112,6 @@ const CameraCalibration = () => {
   const [isTutorialVisible, setIsTutorialVisible] = useState(true);
 
   const { videoRef, pinchDetection, headShoulderDetection, loading, error, startWebcam, stopWebcam } = useDetection(true);
-
-  useEffect(() => {
-    console.log(pinchDetection);
-  }, [pinchDetection]);
 
   const overlayRef = useRef<HTMLDivElement | null>(null);
 
@@ -243,11 +242,11 @@ const CameraCalibration = () => {
         {!isCalibrated && (
           <div className="pb-2">
             {!pinchReady.left || !pinchReady.right ? (
-              <p className="text-gray-500 text-md">Pinch paper horizontally using your thumb and index finger.</p>
+              <p className="text-gray-500 text-xl">Pinch paper horizontally using your thumb and index finger.</p>
             ) : !calibrationReady.left || !calibrationReady.right ? (
-              <p className="text-gray-500 text-md">Pinch using your middle finger to begin calibration.</p>
+              <p className="text-gray-500 text-xl">Pinch using your middle finger to begin calibration.</p>
             ) : (
-              <p className="text-red-500 text-md font-bold">Please hold steady for {Math.floor((CALIBRATION_TIMER - calibrationProgress * CALIBRATION_TIMER) / 1000)} seconds</p>
+              <p className="text-red-500 text-xl font-bold">Please hold steady for {Math.floor((CALIBRATION_TIMER - calibrationProgress * CALIBRATION_TIMER) / 1000)} seconds</p>
             )}
           </div>
         )}
@@ -261,7 +260,7 @@ const CameraCalibration = () => {
             onChange={(e) => setWorldPPI(Number(e.target.value))}
             readOnly
           />{' '}
-          pixels/inch <span className="text-gray-400">(at 5 feet away)</span>
+          pixels/inch <span className="text-gray-400">(at 10 feet away)</span>
         </span>
       </div>
 

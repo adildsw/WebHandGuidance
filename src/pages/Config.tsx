@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useConfig } from '../utils/context';
 import { defaultConfig } from '../utils/constants';
 import { go } from '../utils/navigation';
@@ -22,7 +22,8 @@ const Config = () => {
     setMaxVibrationThreshold,
     setSilParams,
     setRomCalibrationParams,
-    setRomSafeMargin
+    setRomSafeMargin,
+    setServerURL,
   } = useConfig();
 
   const toNumber = useCallback((s: string) => {
@@ -49,7 +50,26 @@ const Config = () => {
       setSilParams(defaultConfig.silParams);
       setRomCalibrationParams(defaultConfig.romCalibrationParams);
       setRomSafeMargin(defaultConfig.romSafeMargin);
+      setServerURL(defaultConfig.serverURL);
     }
+  };
+
+  const [tempServerUrl, setTempServerURL] = useState<string>(config.serverURL);
+
+  const testServerConnection = () => {
+    fetch(tempServerUrl)
+      .then((res) => {
+        if (res.ok) {
+          setServerURL(tempServerUrl);
+          alert('Connection successful!');
+        } else {
+          setServerURL("");
+          alert('Connection failed. Please check the server URL and try again.');
+        }
+      })
+      .catch(() => {
+        alert('Connection failed. Please check the server URL and try again.');
+      });
   };
 
   return (
@@ -154,10 +174,11 @@ const Config = () => {
               />
             </div>
             
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
               <label className="text-sm text-gray-600">ROM Safe Margin</label>
               {/* slider between 0 and 1 */}
               <input
+              className='grow'
                 type="range"
                 min="0.5"
                 max="1"
@@ -165,12 +186,47 @@ const Config = () => {
                 value={String(config.romSafeMargin)}
                 onChange={(e) => setRomSafeMargin(toNumber(e.target.value))}
               />
-              <label className='text-right w-32 text-sm text-gray-400'>{(config.romSafeMargin * 100).toFixed(0)} % ROM</label>
+              <label className='text-right shrink text-sm text-gray-400'>{(config.romSafeMargin * 100).toFixed(0)} % ROM</label>
             </div>
           </div>
 
           <div className="flex flex-col gap-2">
-            <div className="text-sm font-bold text-gray-600 mb-1">Default Parameters</div>
+            <div className="text-sm font-bold text-gray-600 mb-1">Data Collection Parameters</div>
+
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-sm text-gray-600">Server URL</label>
+              <input
+                className="px-2 py-1 text-center rounded border border-gray-300 bg-white"
+                inputMode="text"
+                value={String(tempServerUrl)}
+                onChange={(e) => setTempServerURL(e.target.value)}
+              />
+              <button
+                onClick={testServerConnection}
+                className="px-3 py-1 rounded-lg border border-gray-300 bg-gray-100 text-gray-900 hover:bg-gray-800 hover:text-white font-bold cursor-pointer"
+              >
+                Connect
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <div className="text-sm font-bold text-gray-600 mb-1">Default Task Designer Parameters</div>
+
+            <div className="flex items-center justify-between">
+              <label className="text-sm text-gray-600">Task Type</label>
+              <select
+                className="w-28 px-2 py-1 rounded border border-gray-300 bg-white"
+                value={config.defaultTaskType}
+                onChange={(e) => setDefaultTaskType(e.target.value as 'MOVE' | 'HOLD' | 'ROM_HOLD' | 'ROM_MOVE' | 'MEDIA')}
+              >
+                <option value="MOVE">Move</option>
+                <option value="HOLD">Hold</option>
+                <option value="ROM_HOLD">ROM Hold</option>
+                <option value="ROM_MOVE">ROM Move</option>
+                <option value="MEDIA">Media</option>
+              </select>
+            </div>
 
             <div className="flex items-center justify-between">
               <label className="text-sm text-gray-600">Hand</label>

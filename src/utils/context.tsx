@@ -144,6 +144,10 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     };
   };
 
+  const setServerURL = (url: string) => {
+    setConfigState((prev) => ({ ...prev, serverURL: url }));
+  };
+
   useEffect(() => {
     localStorage.setItem('appConfig', JSON.stringify(config));
   }, [config]);
@@ -194,6 +198,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         setSilParams,
         setRomCalibrationParams,
         setRomSafeMargin,
+        setServerURL,
       }}
     >
       {children}

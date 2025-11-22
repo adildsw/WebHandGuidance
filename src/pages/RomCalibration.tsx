@@ -57,6 +57,7 @@ const sketch: Sketch = (p5) => {
   let rightRaisedRom: PolarPos | null = null;
   let romCalibrationParams: { leftRadius: number; rightRadius: number } | null = null;
   let romSafeMargin = 0.85;
+  let calibrationProgress = 0;
 
   // Silhouette Params
   let silH = SIL_IMG_HEIGHT * silParams.silScaleY;
@@ -98,6 +99,7 @@ const sketch: Sketch = (p5) => {
     rightRaisedRom?: PolarPos | null;
     romCalibrationParams?: { leftRadius: number; rightRadius: number } | null;
     romSafeMargin?: number;
+    calibrationProgress?: number;
   }) => {
     if (typeof props.frameWidth === 'number') width = props.frameWidth;
     if (typeof props.frameHeight === 'number') height = props.frameHeight;
@@ -124,6 +126,7 @@ const sketch: Sketch = (p5) => {
     rightRaisedRom = props.rightRaisedRom ?? null;
     romCalibrationParams = props.romCalibrationParams ?? null;
     romSafeMargin = props.romSafeMargin ?? 0.85;
+    calibrationProgress = props.calibrationProgress ?? 0;
 
     silParams = props.silParams ?? defaultConfig.silParams;
     silH = SIL_IMG_HEIGHT * silParams.silScaleY;
@@ -232,6 +235,13 @@ const sketch: Sketch = (p5) => {
     p5.circle(rightShoulderX, shoulderY, romCalibrationParams.rightRadius * 2 * romSafeMargin);
   };
 
+  const drawCalibrationProgress = () => {
+    if (calibrationProgress <= 0 || calibrationStage === 'done') return;
+    p5.stroke(0, 255, 0, 192);
+    p5.strokeWeight(16);
+    p5.line(-width / 2 + 10, -height / 2 + 10, p5.lerp(-width / 2 + 10, width / 2 - 10, calibrationProgress), -height / 2 + 10);
+  }
+
   p5.draw = () => {
     p5.clear();
 
@@ -252,6 +262,7 @@ const sketch: Sketch = (p5) => {
     }
 
     drawUserPinch();
+    drawCalibrationProgress();
   };
 };
 
@@ -429,6 +440,7 @@ const RomCalibration = () => {
                 rightRaisedRom={rightRaisedRom}
                 romCalibrationParams={romCalibrationParams}
                 romSafeMargin={romSafeMargin}
+                calibrationProgress={calibrationProgress}
               />
             </div>
           )}

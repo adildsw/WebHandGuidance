@@ -24,3 +24,10 @@ dist-ssr
 *.sw?
 
 .VSCodeCounter
+
+# Python
+__pycache__/
+*.pyc
+.env
+venv/
+env/

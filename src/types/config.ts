@@ -34,6 +34,7 @@ export type Config = {
   silParams: SilhouetteParams;
   romCalibrationParams: RomCalibrationParams | null;
   romSafeMargin: number;
+  serverURL: string;
 };
 
 export type ConfigContextType = {
@@ -57,4 +58,5 @@ export type ConfigContextType = {
   setSilParams: (params: SilhouetteParams) => void;
   setRomCalibrationParams: (params: RomCalibrationParams | null) => void;
   setRomSafeMargin: (margin: number) => void;
+  setServerURL: (url: string) => void;
 };
