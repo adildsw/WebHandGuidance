@@ -493,138 +493,152 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
       </div>
     );
 
-  if (currentTask && currentTask.type === 'MEDIA')
-    return (
-      <MediaPlayer
-        mediaUrl={currentTask.mediaPayload.mediaUrl}
-        mediaTitle={currentTask.mediaPayload.mediaTitle}
-        mediaSubtitle={currentTask.mediaPayload.mediaSubtitle}
-        showHomeBtn={false}
-        doneBtnTitle="Continue"
-        doneCallback={() => progressTask()}
-      />
-    );
+  // if (currentTask && currentTask.type === 'MEDIA')
+  //   return (
+  //     <MediaPlayer
+  //       mediaUrl={currentTask.mediaPayload.mediaUrl}
+  //       mediaTitle={currentTask.mediaPayload.mediaTitle}
+  //       mediaSubtitle={currentTask.mediaPayload.mediaSubtitle}
+  //       showHomeBtn={false}
+  //       doneBtnTitle="Continue"
+  //       doneCallback={() => progressTask()}
+  //     />
+  //   );
 
   return (
-    <div className="w-screen h-screen flex gap-6 flex-col items-center justify-center select-none">
-      <div className="flex flex-col gap-2" style={{ width: `${testbedWidth}px` }}>
-        <div className="w-full bg-gray-200 rounded-lg shadow flex items-center justify-between px-2 py-2">
-          <div className="flex items-center px-1 gap-2">
-            <span className="text-xl font-semibold">Hand Guidance Study</span>
+    <>
+      {currentTask && currentTask.type === 'MEDIA' && (
+        <MediaPlayer
+          mediaUrl={currentTask.mediaPayload.mediaUrl}
+          mediaTitle={currentTask.mediaPayload.mediaTitle}
+          mediaSubtitle={currentTask.mediaPayload.mediaSubtitle}
+          showHomeBtn={false}
+          doneBtnTitle="Continue"
+          doneCallback={() => progressTask()}
+        />
+      )}
+      <div className="w-screen h-screen flex gap-6 flex-col items-center justify-center select-none">
+        <div className="flex flex-col gap-2" style={{ width: `${testbedWidth}px` }}>
+          <div className="w-full bg-gray-200 rounded-lg shadow flex items-center justify-between px-2 py-2">
+            <div className="flex items-center px-1 gap-2">
+              <span className="text-xl font-semibold">Hand Guidance Study</span>
+            </div>
+            <div className="flex flex-row gap-2">
+              <button className="px-3 py-2 rounded text-lg bg-gray-300 cursor-pointer hover:bg-gray-600 hover:text-white items-center flex gap-1 font-bold" onClick={goHome}>
+                <FontAwesomeIcon icon="home" />
+              </button>
+            </div>
           </div>
+
           <div className="flex flex-row gap-2">
-            <button className="px-3 py-2 rounded text-lg bg-gray-300 cursor-pointer hover:bg-gray-600 hover:text-white items-center flex gap-1 font-bold" onClick={goHome}>
-              <FontAwesomeIcon icon="home" />
-            </button>
-          </div>
-        </div>
+            <div className="flex flex-row p-2 bg-white rounded-lg shadow gap-3 border border-gray-100 justify-center">
+              <div className="flex flex-col items-center justify-between">
+                <label className="text-sm font-bold text-gray-600">Status</label>
+                <span className="w-42 px-2 py-1 text-center rounded font-semibold text-xl">{isTaskRunning ? 'Task Running' : 'Ready to Start'}</span>
+              </div>
+            </div>
 
-        <div className="flex flex-row gap-2">
-          <div className="flex flex-row p-2 bg-white rounded-lg shadow gap-3 border border-gray-100 justify-center">
-            <div className="flex flex-col items-center justify-between">
-              <label className="text-sm font-bold text-gray-600">Status</label>
-              <span className="w-42 px-2 py-1 text-center rounded font-semibold text-xl">{isTaskRunning ? 'Task Running' : 'Ready to Start'}</span>
+            <div className="flex flex-row p-2 bg-white rounded-lg shadow gap-3 border border-gray-100 ">
+              <div className="flex flex-col items-center justify-between">
+                <label className="text-sm font-bold text-gray-600">User ID</label>
+                <span className="px-2 py-1 text-center rounded font-semibold text-xl">{participantId}</span>
+              </div>
+            </div>
+
+            <div className="flex flex-row p-2 bg-white rounded-lg shadow gap-3 border border-gray-100 grow justify-between">
+              <div className="flex flex-col h-full items-center justify-center grow">
+                <label className="text-sm font-bold text-gray-600">Instruction</label>
+                <span className="px-2 py-1 text-center rounded font-semibold text-lg">
+                  {currentTask?.type === 'MOVE' ? (
+                    <>
+                      <span className="font-bold text-blue-800">Move</span> <span className="font-bold text-red-800 border p-1 rounded">{hand} Hand</span> to Target
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-bold text-blue-800">Hold</span> <span className="font-bold text-red-800 border p-1 rounded">{hand} Hand</span> Inside Target
+                    </>
+                  )}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-row p-2 bg-white rounded-lg shadow gap-3 border border-gray-100 ">
+              <div className="flex flex-col items-center justify-between">
+                <label className="text-sm font-bold text-gray-600">Task</label>
+                <span className="px-2 py-1 text-center rounded font-semibold text-xl">{currentTaskIndex !== null && currentTaskIndex + 1 + ' / ' + String(tasks.length)}</span>
+              </div>
+              <div className="flex flex-col items-center justify-between">
+                <label className="text-sm font-bold text-gray-600">Trials</label>
+                <span className="px-2 py-1 text-center rounded font-semibold text-xl">
+                  {currentTask && currentTrial !== null ? currentTrial + 1 + ' / ' + String(trials) : '-'}
+                </span>
+              </div>
+
+              <div className="flex flex-col items-center justify-between">
+                <label className="text-sm font-bold text-gray-600">Repetitions</label>
+                <span className="px-2 py-1 text-center rounded font-semibold text-xl">
+                  {currentTask && currentRepetition !== null ? currentRepetition + 1 + ' / ' + String(repetitions) : '-'}
+                </span>
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-row p-2 bg-white rounded-lg shadow gap-3 border border-gray-100 ">
-            <div className="flex flex-col items-center justify-between">
-              <label className="text-sm font-bold text-gray-600">User ID</label>
-              <span className="px-2 py-1 text-center rounded font-semibold text-xl">{participantId}</span>
+          <div className="md:col-span-3 bg-gray-100 flex items-center justify-center relative" style={{ width: `${testbedWidth}px`, height: `${testbedHeight}px` }}>
+            <div className="absolute inset-0 overflow-hidden rounded-lg shadow-lg">
+              {!error && !loading && (
+                <video ref={videoRef} muted playsInline className={`absolute inset-0 w-full h-full object-cover ${isTaskCorrupt && 'blur'}`} style={{ transform: 'scaleX(-1)' }} />
+              )}
+              <div className="absolute inset-0">
+                <ReactP5Wrapper
+                  sketch={taskVisualizationSketch}
+                  frameWidth={testbedWidth}
+                  frameHeight={testbedHeight}
+                  markerDiameter={markerDiameter}
+                  worldPPI={worldPPI}
+                  type={currentTask?.type || 'MOVE'}
+                  distanceThreshold={distanceThreshold}
+                  markers={markers}
+                  isRepeating={isRepeating}
+                  hand={hand}
+                  activeWristPos={activeWrist}
+                  currentTarget={currentTarget}
+                  currentRepetition={currentRepetition}
+                  isTaskRunning={isTaskRunning}
+                  holdProgress={holdProgress}
+                  directionPoint={directionPoint}
+                  directionPointDistanceMM={directionPointDistanceMM}
+                  config={config}
+                  headShoulderDetection={headShoulderDetection}
+                  silParams={silParams}
+                />
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-row p-2 bg-white rounded-lg shadow gap-3 border border-gray-100 grow justify-between">
-            <div className="flex flex-col h-full items-center justify-center grow">
-              <label className="text-sm font-bold text-gray-600">Instruction</label>
-              <span className="px-2 py-1 text-center rounded font-semibold text-lg">
-                {currentTask?.type === 'MOVE' ? (
-                  <>
-                    <span className="font-bold text-blue-800">Move</span> <span className="font-bold text-red-800 border p-1 rounded">{hand} Hand</span> to Target
-                  </>
-                ) : (
-                  <>
-                    <span className="font-bold text-blue-800">Hold</span> <span className="font-bold text-red-800 border p-1 rounded">{hand} Hand</span> Inside Target
-                  </>
-                )}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex flex-row p-2 bg-white rounded-lg shadow gap-3 border border-gray-100 ">
-            <div className="flex flex-col items-center justify-between">
-              <label className="text-sm font-bold text-gray-600">Task</label>
-              <span className="px-2 py-1 text-center rounded font-semibold text-xl">{currentTaskIndex !== null && currentTaskIndex + 1 + ' / ' + String(tasks.length)}</span>
-            </div>
-            <div className="flex flex-col items-center justify-between">
-              <label className="text-sm font-bold text-gray-600">Trials</label>
-              <span className="px-2 py-1 text-center rounded font-semibold text-xl">{currentTask && currentTrial !== null ? currentTrial + 1 + ' / ' + String(trials) : '-'}</span>
-            </div>
-
-            <div className="flex flex-col items-center justify-between">
-              <label className="text-sm font-bold text-gray-600">Repetitions</label>
-              <span className="px-2 py-1 text-center rounded font-semibold text-xl">
-                {currentTask && currentRepetition !== null ? currentRepetition + 1 + ' / ' + String(repetitions) : '-'}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="md:col-span-3 bg-gray-100 flex items-center justify-center relative" style={{ width: `${testbedWidth}px`, height: `${testbedHeight}px` }}>
-          <div className="absolute inset-0 overflow-hidden rounded-lg shadow-lg">
-            {!error && !loading && (
-              <video ref={videoRef} muted playsInline className={`absolute inset-0 w-full h-full object-cover ${isTaskCorrupt && 'blur'}`} style={{ transform: 'scaleX(-1)' }} />
+          <span className="text-center text-md text-gray-500">
+            {!isTaskRunning && (
+              <>
+                <kbd className="bg-gray-200 py-1 font-bold px-2 rounded">Move {hand} Hand</kbd> Inside the <kbd className="bg-red-200 py-1 font-bold px-2 rounded">Red Circle</kbd>{' '}
+                to Begin Task
+              </>
             )}
-            <div className="absolute inset-0">
-              <ReactP5Wrapper
-                sketch={taskVisualizationSketch}
-                frameWidth={testbedWidth}
-                frameHeight={testbedHeight}
-                markerDiameter={markerDiameter}
-                worldPPI={worldPPI}
-                type={currentTask?.type || 'MOVE'}
-                distanceThreshold={distanceThreshold}
-                markers={markers}
-                isRepeating={isRepeating}
-                hand={hand}
-                activeWristPos={activeWrist}
-                currentTarget={currentTarget}
-                currentRepetition={currentRepetition}
-                isTaskRunning={isTaskRunning}
-                holdProgress={holdProgress}
-                directionPoint={directionPoint}
-                directionPointDistanceMM={directionPointDistanceMM}
-                config={config}
-                headShoulderDetection={headShoulderDetection}
-                silParams={silParams}
-              />
-            </div>
-          </div>
+            {isTaskRunning && ['MOVE', 'ROM_MOVE'].includes(currentTask?.type || '') && (
+              <>
+                Follow the <kbd className="bg-red-200 py-1 font-bold px-2 rounded">Red Circle</kbd> with Your{' '}
+                <kbd className="bg-gray-200 py-1 font-bold px-2 rounded">{hand} Hand</kbd>
+              </>
+            )}
+            {isTaskRunning && ['HOLD', 'ROM_HOLD'].includes(currentTask?.type || '') && (
+              <>
+                Keep Your <kbd className="bg-gray-200 py-1 font-bold px-2 rounded">{hand} Hand</kbd> Steady Inside the{' '}
+                <kbd className="bg-red-200 py-1 font-bold px-2 rounded">Red Circle</kbd> for{' '}
+                <span className="font-bold text-red-600">{Math.ceil(((1 - holdProgress) * (holdDuration || 1)) / 1000)} more seconds</span>
+              </>
+            )}
+          </span>
         </div>
-
-        <span className="text-center text-md text-gray-500">
-          {!isTaskRunning && (
-            <>
-              <kbd className="bg-gray-200 py-1 font-bold px-2 rounded">Move {hand} Hand</kbd> Inside the <kbd className="bg-red-200 py-1 font-bold px-2 rounded">Red Circle</kbd> to
-              Begin Task
-            </>
-          )}
-          {isTaskRunning && ['MOVE', 'ROM_MOVE'].includes(currentTask?.type || '') && (
-            <>
-              Follow the <kbd className="bg-red-200 py-1 font-bold px-2 rounded">Red Circle</kbd> with Your{' '}
-              <kbd className="bg-gray-200 py-1 font-bold px-2 rounded">{hand} Hand</kbd>
-            </>
-          )}
-          {isTaskRunning && ['HOLD', 'ROM_HOLD'].includes(currentTask?.type || '') && (
-            <>
-              Keep Your <kbd className="bg-gray-200 py-1 font-bold px-2 rounded">{hand} Hand</kbd> Steady Inside the{' '}
-              <kbd className="bg-red-200 py-1 font-bold px-2 rounded">Red Circle</kbd> for{' '}
-              <span className="font-bold text-red-600">{Math.ceil(((1 - holdProgress) * (holdDuration || 1)) / 1000)} more seconds</span>
-            </>
-          )}
-        </span>
       </div>
-    </div>
+    </>
   );
 };
 
