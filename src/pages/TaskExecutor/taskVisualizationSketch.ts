@@ -159,6 +159,8 @@ const taskVisualizationSketch: Sketch = (p5) => {
   };
 
   const drawMarkers = () => {
+    if (markers.length === 0 || currentTarget === -1) return;
+    
     p5.noFill();
     p5.stroke(255);
     p5.strokeWeight(2);

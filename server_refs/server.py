@@ -84,6 +84,8 @@ def upload():
     timestamp = payload.get("timestamp", "")
     task_str = payload.get("task", "")
 
+    
+
     if not all([data_csv, raw_data_csv, participant_id, timestamp, task_str]):
         return Response("Missing required fields", status=400, mimetype="text/plain")
 
