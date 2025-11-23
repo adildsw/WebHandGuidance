@@ -35,6 +35,7 @@ import MediaPlayer from './components/MediaPlayer';
 import TaskDesigner from './pages/TaskDesigner/TaskDesigner';
 import SilhouetteVisualizer from './pages/SilhouetteVisualizer';
 import { ArucoWebcam } from './pages/ArucoTest';
+import PreStudy from './pages/PreStudy';
 
 library.add(faCheck, faArrowRight, faChevronUp, faChevronDown, faLink, faHome, faSave, faFile, faChevronLeft, faChevronRight, faPlus, faTrash, faRedo, faFolderOpen, faDownload, faUpRightAndDownLeftFromCenter);
 
@@ -64,6 +65,7 @@ const App = () => {
             <Route path="/" element={<Home />} />
             <Route path="/home" element={<Home />} />
             <Route path="/study" element={<Study webSerial={webSerial} ble={ble} />} />
+            <Route path="/prestudy" element={<PreStudy webSerial={webSerial} ble={ble} />} />
             <Route path="/screen-calibration" element={<ScreenCalibration />} />
             <Route path="/camera-calibration" element={<CameraCalibration />} />
             <Route path="/rom-calibration" element={<RomCalibration />} />

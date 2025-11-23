@@ -16,9 +16,7 @@ const Home = () => {
     const text = await file.text();
     const encoded = encodeBase64(text);
     console.log(encoded);
-
-    const participantId = prompt('Enter Participant ID:');
-    go(`#/study?participantId=${participantId}&data=${encoded}`);
+    go(`#/prestudy?data=${encoded}`);
   };
 
   const isCameraCalibrated = config.silParams.silCalibrated;
