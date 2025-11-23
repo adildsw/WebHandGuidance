@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import { decodeBase64 } from '../utils/encoder';
-import type { Task } from '../types/task';
 import { uid } from 'uid/single';
-import SerialConnector from '../components/SerialConnector';
 import type useWebSerial from '../hooks/useWebSerial';
 import type useBle from '../hooks/useBle';
 
