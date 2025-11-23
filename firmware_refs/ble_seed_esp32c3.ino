@@ -1,10 +1,14 @@
+#include <Wire.h>
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEServer.h>
+#include <SparkFunLSM9DS1.h>
 
 #define SERVICE_UUID "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
 #define MOTOR_CHAR_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
 #define IMU_CHAR_UUID "8f022099-36b0-44cd-909e-d24cc105895a"
+
+LSM9DS1 imu;
 
 int motor_up = 0;
 int motor_down = 0;
@@ -16,6 +20,10 @@ int motor_backward = 0;
 float ax = 0.0f;
 float ay = 0.0f;
 float az = 0.0f;
+
+unsigned long lastAccelSendTime = 0;
+const unsigned long accelSendInterval = 20;
+
 
 BLECharacteristic *pMotorCharacteristic = nullptr;
 BLECharacteristic *pIMUCharacteristic = nullptr;
@@ -71,6 +79,14 @@ class MotorConfigCallbacks : public BLECharacteristicCallbacks {
 void setup() {
   Serial.begin(115200);
 
+  Wire.begin();
+  if (!imu.begin()) {
+    Serial.println("Failed to initialize IMU!");
+    while (1)
+      ;  // Halt if IMU initialization fails
+  }
+
+
   BLEDevice::init("HandGuidanceDevice");
   BLEServer *pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
@@ -99,17 +115,27 @@ void setup() {
   Serial.println("[INFO] Device Initialized");
 }
 
+void updateIMUData() {
+  if (imu.accelAvailable())
+    imu.readAccel();
+}
+
 void loop() {
-  ax = random(-1000, 1001) / 100.0f;
-  ay = random(-1000, 1001) / 100.0f;
-  az = random(-1000, 1001) / 100.0f;
+  unsigned long currentTime = millis();
+  
+  if (currentTime - lastAccelSendTime >= accelSendInterval) {
+    updateIMUData();
+    float ax = imu.calcAccel(imu.ax);
+    float ay = imu.calcAccel(imu.ay);
+    float az = imu.calcAccel(imu.az);
 
-  char imuBuf[64];
-  snprintf(imuBuf, sizeof(imuBuf), "%.2f,%.2f,%.2f", ax, ay, az);
-  if (pIMUCharacteristic) {
-    pIMUCharacteristic->setValue((uint8_t *)imuBuf, strlen(imuBuf));
-    pIMUCharacteristic->notify();
+    char imuBuf[64];
+    snprintf(imuBuf, sizeof(imuBuf), "%.2f,%.2f,%.2f", ax, ay, az);
+    if (pIMUCharacteristic) {
+      pIMUCharacteristic->setValue((uint8_t *)imuBuf, strlen(imuBuf));
+      pIMUCharacteristic->notify();
+    }
+
+    lastAccelSendTime = currentTime;
   }
-
-  delay(50);
 }
