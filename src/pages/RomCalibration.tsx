@@ -1,7 +1,7 @@
 import { ReactP5Wrapper, type Sketch } from '@p5-wrapper/react';
 import type p5 from 'p5';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { HeadShoulderDetectionResult } from '../types/detections';
+import type { HeadShoulderDetectionResult, WristDetectionResult } from '../types/detections';
 import { type SilhouetteParams } from '../types/config';
 import { defaultConfig, MM_TO_INCH, NOSE_Y_OFFSET, SHOULDER_X_OFFSET, SHOULDER_Y_OFFSET, SIL_IMG_HEIGHT, SIL_IMG_WIDTH } from '../utils/constants';
 import type { PolarPos, Pos } from '../types/task';
@@ -35,7 +35,7 @@ const sketch: Sketch = (p5) => {
   let silRightRaisedImg: p5.Image;
   let silParams: SilhouetteParams = defaultConfig.silParams;
 
-  let pinchPos: { left: Pos | null; right: Pos | null } = { left: null, right: null };
+  let wristPos: WristDetectionResult = { leftWrist: null, rightWrist: null };
   let headShoulderDetection: HeadShoulderDetectionResult = {
     nose: null,
     leftShoulder: null,
@@ -89,7 +89,7 @@ const sketch: Sketch = (p5) => {
   p5.updateWithProps = (props: {
     frameWidth?: number;
     frameHeight?: number;
-    pinchPos?: { left: Pos | null; right: Pos | null };
+    wristPos?: WristDetectionResult;
     headShoulderDetection?: HeadShoulderDetectionResult;
     silParams?: SilhouetteParams;
     calibrationStage?: RomCalibrationStages;
@@ -105,7 +105,7 @@ const sketch: Sketch = (p5) => {
     if (typeof props.frameHeight === 'number') height = props.frameHeight;
     p5.resizeCanvas(width, height);
 
-    pinchPos = props.pinchPos ?? { left: null, right: null };
+    wristPos = props.wristPos ?? { leftWrist: null, rightWrist: null };
     headShoulderDetection = props.headShoulderDetection ?? {
       nose: null,
       leftShoulder: null,
@@ -175,17 +175,17 @@ const sketch: Sketch = (p5) => {
     p5.text(headShoulderDetection.posMessage, 0, -height / 2 + 40);
   };
 
-  const drawUserPinch = () => {
+  const drawUserWrist = () => {
     p5.noStroke();
     p5.fill(0, 0, 0, 255);
-    if (pinchPos.left) p5.circle(pinchPos.left.x, pinchPos.left.y, 12);
-    if (pinchPos.right) p5.circle(pinchPos.right.x, pinchPos.right.y, 12);
+    if (wristPos.leftWrist) p5.circle(wristPos.leftWrist.x, wristPos.leftWrist.y, 12);
+    if (wristPos.rightWrist) p5.circle(wristPos.rightWrist.x, wristPos.rightWrist.y, 12);
 
     p5.fill(255, 255, 255);
     p5.textSize(12);
     p5.textAlign(p5.CENTER, p5.CENTER);
-    if (pinchPos.left) p5.text('L', pinchPos.left.x, pinchPos.left.y);
-    if (pinchPos.right) p5.text('R', pinchPos.right.x, pinchPos.right.y);
+    if (wristPos.leftWrist) p5.text('L', wristPos.leftWrist.x, wristPos.leftWrist.y);
+    if (wristPos.rightWrist) p5.text('R', wristPos.rightWrist.x, wristPos.rightWrist.y);
   };
 
   const drawCalibrationSilhouette = (img: p5.Image) => {
@@ -261,7 +261,7 @@ const sketch: Sketch = (p5) => {
       drawRomCircles();
     }
 
-    drawUserPinch();
+    drawUserWrist();
     drawCalibrationProgress();
   };
 };
@@ -279,8 +279,7 @@ const RomCalibration = () => {
 
   const overlayRef = useRef<HTMLDivElement | null>(null);
 
-  const { videoRef, pinchDetection, headShoulderDetection, loading, error, startWebcam, stopWebcam } = useDetection(true);
-  const pinchPos = pinchDetection.pinchPos;
+  const { videoRef, wristDetection, headShoulderDetection, loading, error, startWebcam, stopWebcam } = useDetection(true);
 
   const isUserInPos = useMemo(() => {
     if (headShoulderDetection.posErrorX === null || headShoulderDetection.posErrorZ === null) return false;
@@ -295,9 +294,9 @@ const RomCalibration = () => {
   const leftRomRef = useRef<PolarPos | null>(null);
   const rightRomRef = useRef<PolarPos | null>(null);
   useEffect(() => {
-    if (pinchPos.left && headShoulderDetection.leftShoulder) leftRomRef.current = cartesianToPolar(headShoulderDetection.leftShoulder, pinchPos.left);
-    if (pinchPos.right && headShoulderDetection.rightShoulder) rightRomRef.current = cartesianToPolar(headShoulderDetection.rightShoulder, pinchPos.right);
-  }, [pinchPos, headShoulderDetection]);
+    if (wristDetection.leftWrist && headShoulderDetection.leftShoulder) leftRomRef.current = cartesianToPolar(headShoulderDetection.leftShoulder, wristDetection.leftWrist);
+    if (wristDetection.rightWrist && headShoulderDetection.rightShoulder) rightRomRef.current = cartesianToPolar(headShoulderDetection.rightShoulder, wristDetection.rightWrist);
+  }, [wristDetection, headShoulderDetection]);
 
   const [calibrationStage, setCalibrationStage] = useState<RomCalibrationStages>('preinit');
   const [calibrationStartTime, setCalibrationStartTime] = useState<number | null>(null);
@@ -363,7 +362,6 @@ const RomCalibration = () => {
       setCalibrationStartTime(Date.now());
       timerRef.current = window.setTimeout(() => {
         setRightRaisedRom(rightRomRef.current);
-        setIsCalibrated(true);
         setCalibrationStage('done');
         setCalibrationStartTime(null);
         timerRef.current = null;
@@ -372,13 +370,15 @@ const RomCalibration = () => {
   }, [calibrationStage, isUserInPos]);
 
   useEffect(() => {
-    if (calibrationStage === 'done') {
+    if (calibrationStage === 'done' && !isCalibrated) {
+      console.log("Yes");
       const averageLeftRomRadius = leftStretchedRom && leftRaisedRom ? (leftStretchedRom.radius + leftRaisedRom.radius) / 2 : null;
       const averageRightRomRadius = rightStretchedRom && rightRaisedRom ? (rightStretchedRom.radius + rightRaisedRom.radius) / 2 : null;
       if (averageLeftRomRadius !== null && averageRightRomRadius !== null) setRomCalibrationParams({ leftRadius: averageLeftRomRadius, rightRadius: averageRightRomRadius });
       else setRomCalibrationParams(null);
+      setIsCalibrated(true);
     }
-  }, [calibrationStage, leftStretchedRom, leftRaisedRom, rightStretchedRom, rightRaisedRom, setRomCalibrationParams]);
+  }, [calibrationStage, leftStretchedRom, leftRaisedRom, rightStretchedRom, rightRaisedRom, setRomCalibrationParams, isCalibrated]);
 
   useEffect(() => {
     if (isTutorialVisible) stopWebcam();
@@ -427,7 +427,7 @@ const RomCalibration = () => {
             <div className="absolute inset-0">
               <ReactP5Wrapper
                 sketch={sketch}
-                pinchPos={pinchPos}
+                wristPos={wristDetection}
                 frameWidth={testbedWidth}
                 frameHeight={testbedHeight}
                 headShoulderDetection={headShoulderDetection}
@@ -481,7 +481,6 @@ const RomCalibration = () => {
           onClick={() => {
             stopWebcam();
             setAreWeDone(true);
-            // go('/');
             forceRoot();
           }}
         >

@@ -1,6 +1,8 @@
 import type { Config } from '../types/config';
-import type { FingerTips, HeadShoulderDetectionResult, PinchDetectionResult, WristDetectionResult } from '../types/detections';
+import type { FingerTips, HeadShoulderDetectionResult, WristDetectionResult } from '../types/detections';
 import type { Task } from '../types/task';
+
+export const SYSTEM_VERSION = '0.2';
 
 export const CREDIT_CARD_WIDTH_INCH = 3.37;
 export const CREDIT_CARD_HEIGHT_INCH = 2.13;
@@ -51,6 +53,7 @@ export const defaultConfig: Config = {
   romCalibrationParams: null,
   romSafeMargin: 0.85,
   serverURL: "https://xia9elgwbl.execute-api.us-east-2.amazonaws.com/",
+  version: "0.1",
 };
 
 export const defaultHeadShoulderResult: HeadShoulderDetectionResult = {
@@ -64,12 +67,6 @@ export const defaultHeadShoulderResult: HeadShoulderDetectionResult = {
   posErrorZ: null,
   guideOpacity: 1,
   posMessage: 'Uncalibrated',
-};
-
-export const defaultPinchResult: PinchDetectionResult = {
-  pinchPos: { left: null, right: null },
-  indexPinch: { left: false, right: false },
-  middlePinch: { left: false, right: false },
 };
 
 export const defaultWristResult: WristDetectionResult = {

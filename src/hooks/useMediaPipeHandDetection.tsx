@@ -1,14 +1,13 @@
 import { FilesetResolver, HandLandmarker, PoseLandmarker } from '@mediapipe/tasks-vision';
-import type { PoseLandmarkerResult } from '@mediapipe/tasks-vision';
+import type { NormalizedLandmark, PoseLandmarkerResult } from '@mediapipe/tasks-vision';
 import { AR } from 'js-aruco2';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import type { FingerTips, HeadShoulderDetectionResult, Marker, MarkerOperationResult, PinchDetectionResult, WristDetectionResult } from '../types/detections';
+import type { HeadShoulderDetectionResult, Marker, MarkerOperationResult, WristDetectionResult } from '../types/detections';
 import {
   CALIBRATION_MARKER_ID,
   CONTINUE_MARKER_ID,
-  defaultFingerTips,
+  // defaultFingerTips,
   defaultHeadShoulderResult,
-  defaultPinchResult,
   defaultWristResult,
   HAND_LANDMARKER_MODEL_PATH,
   MM_TO_INCH,
@@ -25,12 +24,14 @@ import { distance, mapVideoToTestbed } from '../utils/math';
 import { useConfig } from '../utils/context';
 import type { SilhouetteParams } from '../types/config';
 
-const INDEX_PINCH_THRESHOLD = 0.25;
-const MIDDLE_PINCH_THRESHOLD = 0.25;
-const PINCH_INDICES: Record<keyof FingerTips, number> = { thumb: 4, index: 8, middle: 12, ring: 16, pinky: 20 };
-const WRIST_INDICES = { wrist1: 0, wrist2: 5, wrist3: 17 };
+// const PINCH_INDICES: Record<keyof FingerTips, number> = { thumb: 4, index: 8, middle: 12, ring: 16, pinky: 20 };
+// const WRIST_INDICES = { wrist1: 0, wrist2: 5, wrist3: 17 };
 
 const HEAD_SHOULDER_INDICES = { nose: 0, leftShoulder: 11, rightShoulder: 12 };
+const LANDMARK_WRIST_INDICES = {
+  right: [16, 18, 20],
+  left: [15, 17, 19],
+};
 
 // |-------------------------
 // | MODEL INITIALIZATIONS
@@ -64,83 +65,79 @@ const initDetectors = async () => {
 // |-------------------------
 // | MODEL DETECTIONS
 // |-------------------------
-const detectPinchAndWrist = (detector: HandLandmarker, video: HTMLVideoElement, testbedWidth: number, testbedHeight: number, factor: number) => {
-  const leftFingerTips: FingerTips = { ...defaultFingerTips };
-  const rightFingerTips: FingerTips = { ...defaultFingerTips };
-  const pinch: PinchDetectionResult = { ...defaultPinchResult };
-  const wrist: WristDetectionResult = { ...defaultWristResult };
+// const detectWrist = (detector: HandLandmarker, video: HTMLVideoElement, testbedWidth: number, testbedHeight: number) => {
+//   const leftFingerTips: FingerTips = { ...defaultFingerTips };
+//   const rightFingerTips: FingerTips = { ...defaultFingerTips };
+//   const wrist: WristDetectionResult = { ...defaultWristResult };
 
-  try {
-    const detections = detector.detectForVideo(video, performance.now());
-    const vw = video.videoWidth;
-    const vh = video.videoHeight;
-    const hands = detections.landmarks || [];
+//   try {
+//     const detections = detector.detectForVideo(video, performance.now());
+//     const vw = video.videoWidth;
+//     const vh = video.videoHeight;
+//     const hands = detections.landmarks || [];
 
-    for (let i = 0; i < hands.length; i++) {
-      const handed = (detections.handedness?.[i]?.[0]?.categoryName || detections.handedness?.[i]?.[0]?.displayName || '').toLowerCase();
-      const side = handed === 'left' ? 'left' : handed === 'right' ? 'right' : hands.length === 1 ? ((hands[i]?.[0]?.x ?? 0.5) < 0.5 ? 'left' : 'right') : null;
-      if (!side) continue;
-      for (const k of Object.keys(PINCH_INDICES) as (keyof FingerTips)[]) {
-        const lm = hands[i]?.[PINCH_INDICES[k]];
-        if (!lm) continue;
-        const x = 1 - lm.x;
-        const y = lm.y;
-        const pt = mapVideoToTestbed(x * vw, y * vh, vw, vh, testbedWidth, testbedHeight);
-        if (!pt) continue;
-        if (side === 'left') leftFingerTips[k] = pt;
-        else rightFingerTips[k] = pt;
-      }
+//     for (let i = 0; i < hands.length; i++) {
+//       const handed = (detections.handedness?.[i]?.[0]?.categoryName || detections.handedness?.[i]?.[0]?.displayName || '').toLowerCase();
+//       const side = handed === 'left' ? 'left' : handed === 'right' ? 'right' : hands.length === 1 ? ((hands[i]?.[0]?.x ?? 0.5) < 0.5 ? 'left' : 'right') : null;
+//       if (!side) continue;
+//       for (const k of Object.keys(PINCH_INDICES) as (keyof FingerTips)[]) {
+//         const lm = hands[i]?.[PINCH_INDICES[k]];
+//         if (!lm) continue;
+//         const x = 1 - lm.x;
+//         const y = lm.y;
+//         const pt = mapVideoToTestbed(x * vw, y * vh, vw, vh, testbedWidth, testbedHeight);
+//         if (!pt) continue;
+//         if (side === 'left') leftFingerTips[k] = pt;
+//         else rightFingerTips[k] = pt;
+//       }
 
-      const w1 = hands[i]?.[WRIST_INDICES.wrist1];
-      const w2 = hands[i]?.[WRIST_INDICES.wrist2];
-      const w3 = hands[i]?.[WRIST_INDICES.wrist3];
-      if (w1 && w2 && w3) {
-        const x = 1 - (w1.x + w2.x + w3.x) / 3;
-        const y = (w1.y + w2.y + w3.y) / 3;
-        const pt = mapVideoToTestbed(x * vw, y * vh, vw, vh, testbedWidth, testbedHeight);
+//       const w1 = hands[i]?.[WRIST_INDICES.wrist1];
+//       const w2 = hands[i]?.[WRIST_INDICES.wrist2];
+//       const w3 = hands[i]?.[WRIST_INDICES.wrist3];
+//       if (w1 && w2 && w3) {
+//         const x = 1 - (w1.x + w2.x + w3.x) / 3;
+//         const y = (w1.y + w2.y + w3.y) / 3;
+//         const pt = mapVideoToTestbed(x * vw, y * vh, vw, vh, testbedWidth, testbedHeight);
 
-        if (side === 'left') wrist.leftWrist = pt;
-        else wrist.rightWrist = pt;
-      }
-    }
+//         if (side === 'left') wrist.leftWrist = pt;
+//         else wrist.rightWrist = pt;
+//       }
+//     }
 
-    pinch.pinchPos.left =
-      leftFingerTips.index && leftFingerTips.thumb
-        ? {
-            x: (leftFingerTips.index.x + leftFingerTips.thumb.x) / 2,
-            y: (leftFingerTips.index.y + leftFingerTips.thumb.y) / 2,
-          }
-        : null;
+//   } catch (err) {
+//     console.error('Error during hand detection:', err);
+//   }
 
-    pinch.pinchPos.right =
-      rightFingerTips.index && rightFingerTips.thumb
-        ? {
-            x: (rightFingerTips.index.x + rightFingerTips.thumb.x) / 2,
-            y: (rightFingerTips.index.y + rightFingerTips.thumb.y) / 2,
-          }
-        : null;
+//   return wrist;
+// };
 
-    pinch.indexPinch.left =
-      leftFingerTips.index && leftFingerTips.thumb
-        ? distance(leftFingerTips.index.x, leftFingerTips.index.y, leftFingerTips.thumb.x, leftFingerTips.thumb.y) / factor < INDEX_PINCH_THRESHOLD
-        : false;
-    pinch.indexPinch.right =
-      rightFingerTips.index && rightFingerTips.thumb
-        ? distance(rightFingerTips.index.x, rightFingerTips.index.y, rightFingerTips.thumb.x, rightFingerTips.thumb.y) / factor < INDEX_PINCH_THRESHOLD
-        : false;
-    pinch.middlePinch.left =
-      leftFingerTips.middle && leftFingerTips.thumb && pinch.indexPinch.left
-        ? distance(leftFingerTips.middle.x, leftFingerTips.middle.y, leftFingerTips.thumb.x, leftFingerTips.thumb.y) / factor < MIDDLE_PINCH_THRESHOLD
-        : false;
-    pinch.middlePinch.right =
-      rightFingerTips.middle && rightFingerTips.thumb && pinch.indexPinch.right
-        ? distance(rightFingerTips.middle.x, rightFingerTips.middle.y, rightFingerTips.thumb.x, rightFingerTips.thumb.y) / factor < MIDDLE_PINCH_THRESHOLD
-        : false;
-  } catch (err) {
-    console.error('Error during hand detection:', err);
+const processWristLandmarks = (detections: PoseLandmarkerResult, video: HTMLVideoElement, testbedWidth: number, testbedHeight: number) => {
+  const wristResult: WristDetectionResult = { ...defaultWristResult };
+  if (detections.landmarks.length < 1) return wristResult;
+
+  const vh = video.videoHeight;
+  const vw = video.videoWidth;
+
+  const L1: NormalizedLandmark = detections.landmarks[0][LANDMARK_WRIST_INDICES.left[0]];
+  const L2: NormalizedLandmark = detections.landmarks[0][LANDMARK_WRIST_INDICES.left[1]];
+  const L3: NormalizedLandmark = detections.landmarks[0][LANDMARK_WRIST_INDICES.left[2]];
+  if (L1.visibility > 0.75 && L2.visibility > 0.75 && L3.visibility > 0.75) {
+    const x = (L1.x + L2.x + L3.x) / 3;
+    const y = (L1.y + L2.y + L3.y) / 3;
+    wristResult.leftWrist = mapVideoToTestbed((1 - x) * vw, y * vh, vw, vh, testbedWidth, testbedHeight);
   }
 
-  return { pinch, wrist };
+  const R1: NormalizedLandmark = detections.landmarks[0][LANDMARK_WRIST_INDICES.right[0]];
+  const R2: NormalizedLandmark = detections.landmarks[0][LANDMARK_WRIST_INDICES.right[1]];
+  const R3: NormalizedLandmark = detections.landmarks[0][LANDMARK_WRIST_INDICES.right[2]];
+  if (R1.visibility > 0.75 && R2.visibility > 0.75 && R3.visibility > 0.75) {
+    const x = (R1.x + R2.x + R3.x) / 3;
+    const y = (R1.y + R2.y + R3.y) / 3;
+    wristResult.rightWrist = mapVideoToTestbed((1 - x) * vw, y * vh, vw, vh, testbedWidth, testbedHeight);
+  }
+  // console.log("LEFT:", L1.visibility, L2.visibility, L3.visibility, "RIGHT: ", R1.visibility, R2.visibility, R3.visibility);
+
+  return wristResult;
 };
 
 const processHeadShoulderLandmarks = (detections: PoseLandmarkerResult, video: HTMLVideoElement, testbedWidth: number, testbedHeight: number, silParams: SilhouetteParams) => {
@@ -223,13 +220,18 @@ const processHeadShoulderLandmarks = (detections: PoseLandmarkerResult, video: H
   };
 };
 
-const detectHeadAndShoulders = (detector: PoseLandmarker, video: HTMLVideoElement, testbedWidth: number, testbedHeight: number, silParams: SilhouetteParams) => {
+const detectBodyLandmarks = (detector: PoseLandmarker, video: HTMLVideoElement, testbedWidth: number, testbedHeight: number, silParams: SilhouetteParams) => {
   try {
     const detections = detector.detectForVideo(video, performance.now());
-    return processHeadShoulderLandmarks(detections, video, testbedWidth, testbedHeight, silParams);
+    const headShoulder = processHeadShoulderLandmarks(detections, video, testbedWidth, testbedHeight, silParams);
+    const wrist = processWristLandmarks(detections, video, testbedWidth, testbedHeight);
+    return {
+      headShoulder,
+      wrist,
+    }
   } catch (err) {
     console.error('Error during head and shoulders detection:', err);
-    return { ...defaultHeadShoulderResult };
+    return { headShoulder: { ...defaultHeadShoulderResult }, wrist: { ...defaultWristResult } };
   }
 };
 
@@ -322,7 +324,6 @@ const useDetection = (runOnStart: boolean = false) => {
   const testbedWidth = useMemo(() => (testbedWidthMM * MM_TO_INCH * devicePPI) / devicePixelRatio, [testbedWidthMM, devicePPI, devicePixelRatio]);
 
   const isDetecting = useRef<boolean>(runOnStart);
-  const factor = devicePPI / devicePixelRatio;
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -346,11 +347,6 @@ const useDetection = (runOnStart: boolean = false) => {
     calibrationMarkerLength: null,
   });
 
-  const [pinchDetection, setPinchDetection] = useState<PinchDetectionResult>({
-    pinchPos: { left: null, right: null },
-    indexPinch: { left: false, right: false },
-    middlePinch: { left: false, right: false },
-  });
   const [wristDetection, setWristDetection] = useState<WristDetectionResult>({
     leftWrist: null,
     rightWrist: null,
@@ -393,9 +389,10 @@ const useDetection = (runOnStart: boolean = false) => {
     }
 
     if (isDetecting.current) {
-      const { pinch, wrist } = detectPinchAndWrist(detector.handDetector, video, testbedWidth, testbedHeight, factor);
-      const headShoulder = detectHeadAndShoulders(detector.poseDetector, video, testbedWidth, testbedHeight, silParams);
-      setPinchDetection(pinch);
+      // const wrist = detectWrist(detector.handDetector, video, testbedWidth, testbedHeight);
+      // const headShoulder = detectHeadAndShoulders(detector.poseDetector, video, testbedWidth, testbedHeight, silParams);
+      // setPinchDetection(pinch);
+      const { wrist, headShoulder } = detectBodyLandmarks(detector.poseDetector, video, testbedWidth, testbedHeight, silParams);
       setWristDetection(wrist);
       setHeadShoulderDetection(headShoulder);
 
@@ -409,7 +406,7 @@ const useDetection = (runOnStart: boolean = false) => {
     }
 
     animationFrameId.current = requestAnimationFrame(performDetectionLoop);
-  }, [testbedHeight, testbedWidth, isDetecting, factor, silParams, markerOperationResults]);
+  }, [testbedHeight, testbedWidth, isDetecting, silParams, markerOperationResults]);
 
   const startWebcam = useCallback(async () => {
     if (loading || error) return;
@@ -492,7 +489,7 @@ const useDetection = (runOnStart: boolean = false) => {
     };
     return cleanup;
   }, []);
-  return { videoRef, pinchDetection, wristDetection, headShoulderDetection, detectedMarkers: markerOperationResults, loading, error, startWebcam, stopWebcam, startDetecting, stopDetecting };
+  return { videoRef, wristDetection, headShoulderDetection, detectedMarkers: markerOperationResults, loading, error, startWebcam, stopWebcam, startDetecting, stopDetecting };
 };
 
 export default useDetection;

@@ -122,6 +122,13 @@ const CameraCalibration = () => {
     };
   }, [headShoulderDetection, silParams]);
 
+  const downloadMarkers = () => {
+    const link = document.createElement('a');
+    link.href = './assets/markers.zip';
+    link.download = 'markers.zip';
+    link.click();
+  };
+
   useEffect(() => {
     latestMarkerDetection.current = detectedMarkers;
   }, [detectedMarkers]);
@@ -223,6 +230,12 @@ const CameraCalibration = () => {
           onClick={() => setIsTutorialVisible(true)}
         >
           Replay Video
+        </button>
+        <button
+          className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"
+          onClick={() => downloadMarkers()}
+        >
+          Download Markers
         </button>
         <button
           className={

@@ -29,12 +29,6 @@ export type HeadShoulderDetectionResult = {
   posMessage: string;
 };
 
-export type PinchDetectionResult = {
-  pinchPos: { left: Pos | null; right: Pos | null };
-  indexPinch: { left: boolean; right: boolean };
-  middlePinch: { left: boolean; right: boolean };
-};
-
 export type Marker = {
   id: number;
   corners: { x: number; y: number }[];

@@ -35,6 +35,7 @@ export type Config = {
   romCalibrationParams: RomCalibrationParams | null;
   romSafeMargin: number;
   serverURL: string;
+  version: string;
 };
 
 export type ConfigContextType = {

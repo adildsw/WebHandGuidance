@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { CalibrationTools, Config, ConfigContextType, RomCalibrationParams } from '../types/config';
 import type { HoldTaskPayload, MediaTaskPayload, MoveTaskPayload, ROMHoldTaskPayload, ROMMoveTaskPayload, Task } from '../types/task';
 import { uid } from 'uid/single';
-import { defaultConfig } from './constants';
+import { defaultConfig, SYSTEM_VERSION } from './constants';
 
 const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
 
@@ -12,6 +12,10 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const [config, setConfigState] = useState<Config>(() => {
     const stored = typeof window !== 'undefined' ? localStorage.getItem('appConfig') : null;
     const parsed = stored ? JSON.parse(stored) : {};
+    if ((parsed.version || "0.1") !== SYSTEM_VERSION) {
+      console.log("Version mismatch detected, resetting app settings...");
+      return { ...defaultConfig, version: SYSTEM_VERSION };
+    } else console.log("App version:", parsed.version);
     return { ...defaultConfig, ...parsed };
   });
 

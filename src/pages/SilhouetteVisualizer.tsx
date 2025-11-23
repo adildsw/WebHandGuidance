@@ -1,10 +1,9 @@
 import { ReactP5Wrapper, type Sketch } from '@p5-wrapper/react';
 import type p5 from 'p5';
 import { useEffect, useState } from 'react';
-import type { HeadShoulderDetectionResult, Marker } from '../types/detections';
+import type { HeadShoulderDetectionResult, Marker, WristDetectionResult } from '../types/detections';
 import { type RomCalibrationParams, type SilhouetteParams } from '../types/config';
 import { defaultConfig, MM_TO_INCH, NOSE_Y_OFFSET, SHOULDER_X_OFFSET, SHOULDER_Y_OFFSET, SIL_IMG_HEIGHT, SIL_IMG_WIDTH } from '../utils/constants';
-import type { Pos } from '../types/task';
 import { useConfig } from '../utils/context';
 import useDetection from '../hooks/useMediaPipeHandDetection';
 import { go } from '../utils/navigation';
@@ -17,7 +16,7 @@ const sketch: Sketch = (p5) => {
   let silImg: p5.Image;
   let silParams: SilhouetteParams = defaultConfig.silParams;
 
-  let pinchPos: { left: Pos | null; right: Pos | null } = { left: null, right: null };
+  let wristPos: WristDetectionResult = { leftWrist: null, rightWrist: null };
   let headShoulderDetection: HeadShoulderDetectionResult = {
     nose: null,
     leftShoulder: null,
@@ -65,7 +64,7 @@ const sketch: Sketch = (p5) => {
   p5.updateWithProps = (props: {
     frameWidth?: number;
     frameHeight?: number;
-    pinchPos?: { left: Pos | null; right: Pos | null };
+    wristPos?: WristDetectionResult;
     headShoulderDetection?: HeadShoulderDetectionResult;
     silParams?: SilhouetteParams;
     romCalibrationParams?: RomCalibrationParams | null;
@@ -78,7 +77,7 @@ const sketch: Sketch = (p5) => {
     if (typeof props.frameHeight === 'number') height = props.frameHeight;
     p5.resizeCanvas(width, height);
 
-    pinchPos = props.pinchPos ?? { left: null, right: null };
+    wristPos = props.wristPos ?? { leftWrist: null, rightWrist: null };
     headShoulderDetection = props.headShoulderDetection ?? {
       nose: null,
       leftShoulder: null,
@@ -160,17 +159,17 @@ const sketch: Sketch = (p5) => {
     p5.text(headShoulderDetection.posMessage, 0, -height / 2 + 40);
   };
 
-  const drawUserPinch = () => {
+  const drawUserWrist = () => {
     p5.noStroke();
     p5.fill(0, 0, 0, 255);
-    if (pinchPos.left) p5.circle(pinchPos.left.x, pinchPos.left.y, 12);
-    if (pinchPos.right) p5.circle(pinchPos.right.x, pinchPos.right.y, 12);
+    if (wristPos.leftWrist) p5.circle(wristPos.leftWrist.x, wristPos.leftWrist.y, 12);
+    if (wristPos.rightWrist) p5.circle(wristPos.rightWrist.x, wristPos.rightWrist.y, 12);
 
     p5.fill(255, 255, 255);
     p5.textSize(12);
     p5.textAlign(p5.CENTER, p5.CENTER);
-    if (pinchPos.left) p5.text('L', pinchPos.left.x, pinchPos.left.y);
-    if (pinchPos.right) p5.text('R', pinchPos.right.x, pinchPos.right.y);
+    if (wristPos.leftWrist) p5.text('L', wristPos.leftWrist.x, wristPos.leftWrist.y);
+    if (wristPos.rightWrist) p5.text('R', wristPos.rightWrist.x, wristPos.rightWrist.y);
   };
 
   const drawRomCircles = () => {
@@ -200,7 +199,7 @@ const sketch: Sketch = (p5) => {
 
     if (isROMVisible) drawRomCircles();
 
-    drawUserPinch();
+    drawUserWrist();
 
     drawArucoMarkers();
   };
@@ -213,8 +212,7 @@ const SilhouetteVisualizer = () => {
   const testbedWidth = testbedWidthMM * MM_TO_INCH * factor;
   const testbedHeight = testbedHeightMM * MM_TO_INCH * factor;
 
-  const { videoRef, pinchDetection, headShoulderDetection, loading, error, startWebcam, stopWebcam, detectedMarkers } = useDetection(true);
-  const pinchPos = pinchDetection.pinchPos;
+  const { videoRef, wristDetection, headShoulderDetection, loading, error, startWebcam, stopWebcam, detectedMarkers } = useDetection(true);
 
   const [isSilhouetteVisible, setIsSilhouetteVisible] = useState<boolean>(true);
   const [isROMVisible, setIsROMVisible] = useState<boolean>(false);
@@ -245,7 +243,7 @@ const SilhouetteVisualizer = () => {
           <div className="absolute inset-0">
             <ReactP5Wrapper
               sketch={sketch}
-              pinchPos={pinchPos}
+              wristPos={wristDetection}
               frameWidth={testbedWidth}
               frameHeight={testbedHeight}
               headShoulderDetection={headShoulderDetection}
