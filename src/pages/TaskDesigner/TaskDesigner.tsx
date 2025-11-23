@@ -117,7 +117,7 @@ const TaskDesigner = () => {
   const getStudyLink = () => {
     const encoded = encodeBase64(JSON.stringify(tasks));
     const currentWebsiteBeforeHash = window.location.href.split('#')[0];
-    return `${currentWebsiteBeforeHash}#/study?data=${encoded}`;
+    return `${currentWebsiteBeforeHash}#/prestudy?data=${encoded}`;
   };
 
   const copyStudyLink = () => {
