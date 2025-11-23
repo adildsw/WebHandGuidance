@@ -32,7 +32,7 @@ export const defaultFingerTips: FingerTips = {
   thumb: null,
 };
 
-const isMacbook = typeof navigator !== 'undefined' && /Macintosh/.test(navigator.userAgent) && 'ontouchend' in document;
+const isMacbook = typeof navigator !== 'undefined' && /Macintosh/.test(navigator.userAgent);
 
 export const defaultConfig: Config = {
   devicePPI: isMacbook ? 256 : 109,
