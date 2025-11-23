@@ -36,6 +36,7 @@ import TaskDesigner from './pages/TaskDesigner/TaskDesigner';
 import SilhouetteVisualizer from './pages/SilhouetteVisualizer';
 import { ArucoWebcam } from './pages/ArucoTest';
 import PreStudy from './pages/PreStudy';
+import { SYSTEM_VERSION } from './utils/constants';
 
 library.add(faCheck, faArrowRight, faChevronUp, faChevronDown, faLink, faHome, faSave, faFile, faChevronLeft, faChevronRight, faPlus, faTrash, faRedo, faFolderOpen, faDownload, faUpRightAndDownLeftFromCenter);
 
@@ -81,6 +82,8 @@ const App = () => {
       </ConfigProvider>
 
       <Toaster />
+
+      <span className="fixed bottom-2 left-2 text-xs text-gray-400 select-none">v{SYSTEM_VERSION}</span>
       
       <SerialConnector webSerial={webSerial} ble={ble} />
     </>
