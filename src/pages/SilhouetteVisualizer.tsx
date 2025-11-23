@@ -1,7 +1,7 @@
 import { ReactP5Wrapper, type Sketch } from '@p5-wrapper/react';
 import type p5 from 'p5';
 import { useEffect, useState } from 'react';
-import type { HeadShoulderDetectionResult } from '../types/detections';
+import type { HeadShoulderDetectionResult, Marker } from '../types/detections';
 import { type RomCalibrationParams, type SilhouetteParams } from '../types/config';
 import { defaultConfig, MM_TO_INCH, NOSE_Y_OFFSET, SHOULDER_X_OFFSET, SHOULDER_Y_OFFSET, SIL_IMG_HEIGHT, SIL_IMG_WIDTH } from '../utils/constants';
 import type { Pos } from '../types/task';
@@ -46,6 +46,8 @@ const sketch: Sketch = (p5) => {
   let isSilhouetteVisible = true;
   let romSafeMargin = 0.85;
 
+  let arucoMarkers: Marker[] = [];
+
   p5.preload = () => {
     f = p5.loadFont('./fonts/sf-ui-display-bold.otf');
     silImg = p5.loadImage('./assets/standing.png');
@@ -70,6 +72,7 @@ const sketch: Sketch = (p5) => {
     isSilhouetteVisible?: boolean;
     isROMVisible?: boolean;
     romSafeMargin?: number;
+    arucoMarkers?: Marker[];
   }) => {
     if (typeof props.frameWidth === 'number') width = props.frameWidth;
     if (typeof props.frameHeight === 'number') height = props.frameHeight;
@@ -103,6 +106,21 @@ const sketch: Sketch = (p5) => {
     isROMVisible = props.isROMVisible ?? false;
     isSilhouetteVisible = props.isSilhouetteVisible ?? true;
     romSafeMargin = props.romSafeMargin ?? 0.85;
+
+    arucoMarkers = props.arucoMarkers ?? [];
+  };
+
+  const drawArucoMarkers = () => {
+    p5.stroke(0, 255, 0);
+    p5.strokeWeight(2);
+    arucoMarkers.forEach((marker) => {
+      p5.noFill();
+      p5.beginShape();
+      marker.corners.forEach((corner) => {
+        p5.vertex(corner.x, corner.y);
+      });
+      p5.endShape(p5.CLOSE);
+    });
   };
 
   const drawSilhouette = () => {
@@ -183,6 +201,8 @@ const sketch: Sketch = (p5) => {
     if (isROMVisible) drawRomCircles();
 
     drawUserPinch();
+
+    drawArucoMarkers();
   };
 };
 
@@ -193,7 +213,7 @@ const SilhouetteVisualizer = () => {
   const testbedWidth = testbedWidthMM * MM_TO_INCH * factor;
   const testbedHeight = testbedHeightMM * MM_TO_INCH * factor;
 
-  const { videoRef, pinchDetection, headShoulderDetection, loading, error, startWebcam, stopWebcam } = useDetection(true);
+  const { videoRef, pinchDetection, headShoulderDetection, loading, error, startWebcam, stopWebcam, detectedMarkers } = useDetection(true);
   const pinchPos = pinchDetection.pinchPos;
 
   const [isSilhouetteVisible, setIsSilhouetteVisible] = useState<boolean>(true);
@@ -234,6 +254,7 @@ const SilhouetteVisualizer = () => {
               isROMVisible={isROMVisible}
               romCalibrationParams={romCalibrationParams}
               romSafeMargin={romSafeMargin}
+              arucoMarkers={detectedMarkers.allMarkers}
             />
           </div>
         </div>

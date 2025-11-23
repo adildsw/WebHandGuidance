@@ -54,6 +54,13 @@ const Config = () => {
     }
   };
 
+  const downloadMarkers = () => {
+    const link = document.createElement('a');
+    link.href = './assets/markers.zip';
+    link.download = 'markers.zip';
+    link.click();
+  };
+
   const [tempServerUrl, setTempServerURL] = useState<string>(config.serverURL);
 
   const testServerConnection = () => {
@@ -63,7 +70,7 @@ const Config = () => {
           setServerURL(tempServerUrl);
           alert('Connection successful!');
         } else {
-          setServerURL("");
+          setServerURL('');
           alert('Connection failed. Please check the server URL and try again.');
         }
       })
@@ -151,7 +158,7 @@ const Config = () => {
                 onChange={(e) => setDefaultStartDuration(toNumber(e.target.value) * 1000)}
               />
             </div>
-            
+
             <div className="flex items-center justify-between">
               <label className="text-sm text-gray-600">Minimum Vibration Threshold (mm)</label>
               <input
@@ -162,7 +169,7 @@ const Config = () => {
                 onChange={(e) => setMinVibrationThreshold(toNumber(e.target.value))}
               />
             </div>
-            
+
             <div className="flex items-center justify-between">
               <label className="text-sm text-gray-600">Maximum Vibration Threshold (mm)</label>
               <input
@@ -173,12 +180,12 @@ const Config = () => {
                 onChange={(e) => setMaxVibrationThreshold(toNumber(e.target.value))}
               />
             </div>
-            
+
             <div className="flex items-center justify-between gap-4">
               <label className="text-sm text-gray-600">ROM Safe Margin</label>
               {/* slider between 0 and 1 */}
               <input
-              className='grow'
+                className="grow"
                 type="range"
                 min="0.5"
                 max="1"
@@ -186,7 +193,7 @@ const Config = () => {
                 value={String(config.romSafeMargin)}
                 onChange={(e) => setRomSafeMargin(toNumber(e.target.value))}
               />
-              <label className='text-right shrink text-sm text-gray-400'>{(config.romSafeMargin * 100).toFixed(0)} % ROM</label>
+              <label className="text-right shrink text-sm text-gray-400">{(config.romSafeMargin * 100).toFixed(0)} % ROM</label>
             </div>
           </div>
 
@@ -283,17 +290,24 @@ const Config = () => {
                 onChange={(e) => setDefaultHoldDuration(toNumber(e.target.value) * 1000)}
               />
             </div>
-          <button
-            onClick={() => go('#/visualizer')}
-            className="w-full px-4 py-3 mt-4 rounded-lg border border-gray-300 bg-gray-100 text-gray-900 hover:bg-gray-800 hover:text-white font-bold cursor-pointer"
-          >
-            Silhouette Visualizer
-          </button>
+            
+            <button
+              onClick={() => downloadMarkers()}
+              className="w-full px-4 py-3 mt-4 rounded-lg border border-gray-300 bg-gray-100 text-gray-900 hover:bg-gray-800 hover:text-white font-bold cursor-pointer"
+            >
+              Download Markers
+            </button>
+
+            <button
+              onClick={() => go('#/visualizer')}
+              className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-gray-100 text-gray-900 hover:bg-gray-800 hover:text-white font-bold cursor-pointer"
+            >
+              Silhouette Visualizer
+            </button>
           </div>
         </div>
 
         <div className="flex flex-col gap-2 w-full">
-
           <button onClick={resetParams} className="w-full px-4 py-3 rounded-lg bg-white-300 border border-gray-200 text-gray-900 hover:bg-red-400 cursor-pointer">
             Reset to Default
           </button>

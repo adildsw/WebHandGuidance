@@ -4,22 +4,20 @@ import { useConfig } from '../utils/context';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import p5 from 'p5';
-import { LETTER_HEIGHT_INCH, MM_TO_INCH, NOSE_Y_OFFSET, SHOULDER_X_OFFSET, SHOULDER_Y_OFFSET, SIL_IMG_HEIGHT, SIL_IMG_WIDTH } from '../utils/constants';
+import { ARUCO_MARKER_SIZE_INCH, MM_TO_INCH, NOSE_Y_OFFSET, SHOULDER_X_OFFSET, SHOULDER_Y_OFFSET, SIL_IMG_HEIGHT, SIL_IMG_WIDTH } from '../utils/constants';
 import { distance } from '../utils/math';
 import useDetection from '../hooks/useMediaPipeHandDetection';
-import type { Pos } from '../types/task';
 import { go } from '../utils/navigation';
 import type { SilhouetteParams } from '../types/config';
 import MediaPlayer from '../components/MediaPlayer';
+import { type Marker, type MarkerOperationResult } from '../types/detections';
 
 const sketch: Sketch = (p5) => {
   let width = 200;
   let height = 400;
 
-  let pinchPos: { left: Pos | null; right: Pos | null } = { left: null, right: null };
-  let pinchReady = { left: false, right: false };
-  let calibrationReady = { left: false, right: false };
   let calibrationProgress = 0;
+  let calibrationMarker: Marker | null = null;
 
   let f: p5.Font;
 
@@ -36,21 +34,11 @@ const sketch: Sketch = (p5) => {
     p5.resizeCanvas(width, height);
   };
 
-  p5.updateWithProps = (props: {
-    frameWidth?: number;
-    frameHeight?: number;
-    pinchPos?: { left: Pos | null; right: Pos | null };
-    pinchReady?: { left: boolean; right: boolean };
-    calibrationReady?: { left: boolean; right: boolean };
-    calibrationProgress?: number;
-  }) => {
+  p5.updateWithProps = (props: { frameWidth?: number; frameHeight?: number; calibrationProgress?: number; calibrationMarker?: Marker | null }) => {
     if (typeof props.frameWidth === 'number') width = props.frameWidth;
     if (typeof props.frameHeight === 'number') height = props.frameHeight;
     p5.resizeCanvas(width, height);
-
-    pinchPos = props.pinchPos ?? { left: null, right: null };
-    pinchReady = props.pinchReady ?? { left: false, right: false };
-    calibrationReady = props.calibrationReady ?? { left: false, right: false };
+    calibrationMarker = props.calibrationMarker ?? null;
     calibrationProgress = props.calibrationProgress ?? 0;
   };
 
@@ -60,44 +48,23 @@ const sketch: Sketch = (p5) => {
     p5.noStroke();
     p5.fill(0, 0, 0, 128);
 
-    if (pinchReady.left) p5.fill(0, 255, 0, 192);
-    else p5.fill(0, 0, 0, 128);
-    if (pinchPos.left) p5.circle(pinchPos.left.x, pinchPos.left.y, pinchReady.left ? 12 : 6);
+    if (calibrationProgress > 0) {
+      p5.stroke(0, 255, 0, 192);
+      p5.strokeWeight(4);
 
-    if (pinchReady.right) p5.fill(0, 255, 0, 192);
-    else p5.fill(0, 0, 0, 128);
-    if (pinchPos.right) p5.circle(pinchPos.right.x, pinchPos.right.y, pinchReady.right ? 12 : 6);
+      p5.strokeWeight(16);
+      p5.line(-width / 2 + 10, -height / 2 + 10, p5.lerp(-width / 2 + 10, width / 2 - 10, calibrationProgress), -height / 2 + 10);
+    }
 
-    p5.fill(0, 255, 0, 64);
-    if (pinchPos.left && calibrationReady.left) p5.circle(pinchPos.left.x, pinchPos.left.y, 64);
-    if (pinchPos.right && calibrationReady.right) p5.circle(pinchPos.right.x, pinchPos.right.y, 64);
-
-    if (pinchPos.left && pinchPos.right && pinchReady.left && pinchReady.right) {
-      p5.stroke(255, 255, 255);
-      p5.strokeWeight(2);
-      p5.line(pinchPos.left.x, pinchPos.left.y, pinchPos.right.x, pinchPos.right.y);
-
-      const dist = distance(pinchPos.left.x, pinchPos.left.y, pinchPos.right.x, pinchPos.right.y);
-      p5.fill(255);
-      p5.textSize(12);
-      p5.textAlign(p5.CENTER, p5.BOTTOM);
-      p5.text(dist.toFixed(2) + ' px', (pinchPos.left.x + pinchPos.right.x) / 2, (pinchPos.left.y + pinchPos.right.y) / 2);
-
-      p5.fill(0, 0, 0, 128);
-      p5.textStyle(p5.BOLD);
-      p5.textAlign(p5.CENTER, p5.TOP);
-      p5.text(LETTER_HEIGHT_INCH + ' inches', (pinchPos.left.x + pinchPos.right.x) / 2, (pinchPos.left.y + pinchPos.right.y) / 2);
-
-      if (calibrationProgress > 0) {
-        p5.stroke(0, 255, 0, 192);
-        p5.strokeWeight(4);
-        const progressX = p5.lerp(pinchPos.left.x, pinchPos.right.x, calibrationProgress);
-        const progressY = p5.lerp(pinchPos.left.y, pinchPos.right.y, calibrationProgress);
-        p5.line(pinchPos.left.x, pinchPos.left.y, progressX, progressY);
-
-        p5.strokeWeight(16);
-        p5.line(-width / 2 + 10, -height / 2 + 10, p5.lerp(-width / 2 + 10, width / 2 - 10, calibrationProgress), -height / 2 + 10);
-      }
+    if (calibrationMarker) {
+      p5.noFill();
+      p5.stroke(0, 255, 0);
+      p5.strokeWeight(4);
+      p5.beginShape();
+      calibrationMarker.corners.forEach((c) => {
+        p5.vertex(c.x, c.y);
+      });
+      p5.endShape(p5.CLOSE);
     }
   };
 };
@@ -111,15 +78,12 @@ const CameraCalibration = () => {
 
   const [isTutorialVisible, setIsTutorialVisible] = useState(true);
 
-  const { videoRef, pinchDetection, headShoulderDetection, loading, error, startWebcam, stopWebcam } = useDetection(true);
+  const { videoRef, headShoulderDetection, loading, error, startWebcam, stopWebcam, detectedMarkers } = useDetection(true);
 
   const overlayRef = useRef<HTMLDivElement | null>(null);
 
-  const pinchPos = pinchDetection.pinchPos;
-  const latestPinchPos = useRef(pinchPos);
-
-  const pinchReady = pinchDetection.indexPinch;
-  const calibrationReady = pinchDetection.middlePinch;
+  const latestMarkerDetection = useRef<MarkerOperationResult>(detectedMarkers);
+  const { isCalibrationMarkerVisible, calibrationMarker } = detectedMarkers;
 
   const [calibrationStartTime, setCalibrationStartTime] = useState<number | null>(null);
   const [isCalibrated, setIsCalibrated] = useState(false);
@@ -159,28 +123,27 @@ const CameraCalibration = () => {
   }, [headShoulderDetection, silParams]);
 
   useEffect(() => {
-    latestPinchPos.current = pinchPos;
-  }, [pinchPos]);
+    latestMarkerDetection.current = detectedMarkers;
+  }, [detectedMarkers]);
 
   useEffect(() => {
-    const ready = calibrationReady.left && calibrationReady.right && pinchReady.left && pinchReady.right;
-    if (ready && timerRef.current == null && !isCalibrated) {
+    if (isCalibrationMarkerVisible && timerRef.current == null && !isCalibrated) {
       setCalibrationStartTime(Date.now());
       timerRef.current = window.setTimeout(() => {
-        const { left, right } = latestPinchPos.current;
-        if (left && right) {
-          const d = Math.round((distance(left.x, left.y, right.x, right.y) * 100) / LETTER_HEIGHT_INCH) / 100;
+        const { calibrationMarkerLength } = latestMarkerDetection.current;
+        if (calibrationMarkerLength !== null && calibrationMarkerLength > 0) {
+          const d = Math.round((calibrationMarkerLength * 100) / ARUCO_MARKER_SIZE_INCH) / 100;
           setWorldPPI(d);
           setIsCalibrated(true);
           setSilParams(getCalculatedSilParams());
         }
         timerRef.current = null;
-      }, 5000);
-    } else if (!ready && timerRef.current != null) {
+      }, CALIBRATION_TIMER);
+    } else if (!isCalibrationMarkerVisible && timerRef.current != null) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-  }, [calibrationReady, setWorldPPI, pinchReady, isCalibrated, getCalculatedSilParams, setSilParams]);
+  }, [isCalibrationMarkerVisible, setWorldPPI, isCalibrated, getCalculatedSilParams, setSilParams, CALIBRATION_TIMER]);
 
   useEffect(() => {
     if (isTutorialVisible) stopWebcam();
@@ -225,15 +188,7 @@ const CameraCalibration = () => {
         <div ref={overlayRef} className="absolute inset-0 overflow-hidden rounded-lg shadow-lg">
           {!loading && !error && <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />}
           <div className="absolute inset-0">
-            <ReactP5Wrapper
-              sketch={sketch}
-              pinchPos={pinchPos}
-              pinchReady={pinchReady}
-              calibrationReady={calibrationReady}
-              calibrationProgress={calibrationProgress}
-              frameWidth={testbedWidth}
-              frameHeight={testbedHeight}
-            />
+            <ReactP5Wrapper sketch={sketch} calibrationMarker={calibrationMarker} calibrationProgress={calibrationProgress} frameWidth={testbedWidth} frameHeight={testbedHeight} />
           </div>
         </div>
       </div>
@@ -241,12 +196,10 @@ const CameraCalibration = () => {
       <div className="flex flex-col text-center">
         {!isCalibrated && (
           <div className="pb-2">
-            {!pinchReady.left || !pinchReady.right ? (
-              <p className="text-gray-500 text-xl">Pinch paper horizontally using your thumb and index finger.</p>
-            ) : !calibrationReady.left || !calibrationReady.right ? (
-              <p className="text-gray-500 text-xl">Pinch using your middle finger to begin calibration.</p>
-            ) : (
+            {isCalibrationMarkerVisible ? (
               <p className="text-red-500 text-xl font-bold">Please hold steady for {Math.floor((CALIBRATION_TIMER - calibrationProgress * CALIBRATION_TIMER) / 1000)} seconds</p>
+            ) : (
+              <p className="text-gray-600 text-md italic">Please stand 10 feet away from the screen and hold the calibration marker.</p>
             )}
           </div>
         )}
@@ -265,7 +218,10 @@ const CameraCalibration = () => {
       </div>
 
       <div className="flex flex-row gap-2">
-        <button className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer" onClick={() => setIsTutorialVisible(true)}>
+        <button
+          className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"
+          onClick={() => setIsTutorialVisible(true)}
+        >
           Replay Video
         </button>
         <button

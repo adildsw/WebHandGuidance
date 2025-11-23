@@ -54,8 +54,9 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
   }, [webSerialIsConnected, bleIsConnected]);
   // #endregion Handling Device Communication
 
-  const { videoRef, error, loading, wristDetection, headShoulderDetection, startWebcam } = useDetection(true);
+  const { videoRef, error, loading, wristDetection, headShoulderDetection, startWebcam, detectedMarkers } = useDetection(true);
   const { leftWrist, rightWrist } = wristDetection;
+  const { isReplayMarkerVisible, isContinueMarkerVisible } = detectedMarkers;
 
   const [participantId, setParticipantId] = useState<string>('');
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -515,6 +516,8 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
           showHomeBtn={false}
           doneBtnTitle="Continue"
           doneCallback={() => progressTask()}
+          isReplayMarkerVisible={isReplayMarkerVisible}
+          isContinueMarkerVisible={isContinueMarkerVisible}
         />
       )}
       <div className="w-screen h-screen flex gap-6 flex-col items-center justify-center select-none">

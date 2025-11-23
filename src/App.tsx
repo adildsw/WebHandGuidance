@@ -34,6 +34,7 @@ import useBle from './hooks/useBle';
 import MediaPlayer from './components/MediaPlayer';
 import TaskDesigner from './pages/TaskDesigner/TaskDesigner';
 import SilhouetteVisualizer from './pages/SilhouetteVisualizer';
+import { ArucoWebcam } from './pages/ArucoTest';
 
 library.add(faCheck, faArrowRight, faChevronUp, faChevronDown, faLink, faHome, faSave, faFile, faChevronLeft, faChevronRight, faPlus, faTrash, faRedo, faFolderOpen, faDownload, faUpRightAndDownLeftFromCenter);
 
@@ -71,7 +72,8 @@ const App = () => {
             <Route path="/visualizer" element={<SilhouetteVisualizer />} />
             
             <Route path="/videotest" element={<MediaPlayer mediaUrl='https://webhandguidance.b-cdn.net/rom_calibration_demo_test.mp4' mediaTitle='Test Video' mediaSubtitle='This is a test video' doneBtnTitle='Begin Calibration' />} />
-            <Route path="imgtest" element={<MediaPlayer mediaUrl='https://webhandguidance.b-cdn.net/first_message_image_test.png' mediaTitle='Test Image' mediaSubtitle='This is a test image' />} />
+            <Route path="/imgtest" element={<MediaPlayer mediaUrl='https://webhandguidance.b-cdn.net/first_message_image_test.png' mediaTitle='Test Image' mediaSubtitle='This is a test image' />} />
+            <Route path="/arucotest" element={<ArucoWebcam />} />
           </Routes>
         </HashRouter>
       </ConfigProvider>

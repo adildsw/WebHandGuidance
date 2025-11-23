@@ -1,8 +1,11 @@
 import { FilesetResolver, HandLandmarker, PoseLandmarker } from '@mediapipe/tasks-vision';
 import type { PoseLandmarkerResult } from '@mediapipe/tasks-vision';
+import { AR } from 'js-aruco2';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import type { FingerTips, HeadShoulderDetectionResult, PinchDetectionResult, WristDetectionResult } from '../types/detections';
+import type { FingerTips, HeadShoulderDetectionResult, Marker, MarkerOperationResult, PinchDetectionResult, WristDetectionResult } from '../types/detections';
 import {
+  CALIBRATION_MARKER_ID,
+  CONTINUE_MARKER_ID,
   defaultFingerTips,
   defaultHeadShoulderResult,
   defaultPinchResult,
@@ -11,6 +14,7 @@ import {
   MM_TO_INCH,
   NOSE_Y_OFFSET,
   POSE_LANDMARKER_MODEL_PATH,
+  REPLAY_MARKER_ID,
   SHOULDER_X_OFFSET,
   SHOULDER_Y_OFFSET,
   SIL_IMG_HEIGHT,
@@ -229,6 +233,88 @@ const detectHeadAndShoulders = (detector: PoseLandmarker, video: HTMLVideoElemen
   }
 };
 
+const detectMarkers = (detector: AR.Detector, video: HTMLVideoElement, canvas: HTMLCanvasElement, testbedWidth: number, testbedHeight: number, prevResults: MarkerOperationResult): MarkerOperationResult => {
+  const result: MarkerOperationResult = {
+    allMarkers: [],
+    isCalibrationMarkerVisible: false,
+    isReplayMarkerVisible: false,
+    isContinueMarkerVisible: false,
+    calibrationMarker: null,
+    replayMarker: null,
+    continueMarker: null,
+    calibrationMarkerDetectionTime: null,
+    replayMarkerDetectionTime: null,
+    continueMarkerDetectionTime: null,
+    calibrationMarkerLength: null,
+  };
+  
+  const w = video.videoWidth;
+  const h = video.videoHeight;
+  if (!w || !h) return result;
+
+  if (canvas.width !== w) canvas.width = w;
+  if (canvas.height !== h) canvas.height = h;
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return result;
+
+  ctx.drawImage(video, 0, 0, w, h);
+  const imageData = ctx.getImageData(0, 0, w, h);
+  const detected = (detector.detect(imageData) || []) as Marker[];
+
+  const converted = detected.map((m) => {
+    const corners = m.corners
+      .map((c) => {
+        const xVideo = w - c.x;
+        const yVideo = c.y;
+        return mapVideoToTestbed(xVideo, yVideo, w, h, testbedWidth, testbedHeight);
+      })
+      .filter((pt): pt is { x: number; y: number } => !!pt);
+
+    return { id: m.id, corners };
+  });
+
+  result.allMarkers = converted;
+  result.isCalibrationMarkerVisible = converted.some((m) => m.id === CALIBRATION_MARKER_ID);
+  result.isReplayMarkerVisible = converted.some((m) => m.id === REPLAY_MARKER_ID);
+  result.isContinueMarkerVisible = converted.some((m) => m.id === CONTINUE_MARKER_ID);
+  result.calibrationMarker = converted.find((m) => m.id === CALIBRATION_MARKER_ID) || null;
+  result.replayMarker = converted.find((m) => m.id === REPLAY_MARKER_ID) || null;
+  result.continueMarker = converted.find((m) => m.id === CONTINUE_MARKER_ID) || null;
+  result.continueMarkerDetectionTime = result.isContinueMarkerVisible && !prevResults.isContinueMarkerVisible ? performance.now() : prevResults.continueMarkerDetectionTime;
+  result.calibrationMarkerDetectionTime = result.isCalibrationMarkerVisible && !prevResults.isCalibrationMarkerVisible ? performance.now() : prevResults.calibrationMarkerDetectionTime;
+  result.replayMarkerDetectionTime = result.isReplayMarkerVisible && !prevResults.isReplayMarkerVisible ? performance.now() : prevResults.replayMarkerDetectionTime;
+  if (result.calibrationMarker && result.calibrationMarker.corners.length === 4) {
+    const d1 = distance(
+      result.calibrationMarker.corners[0].x,
+      result.calibrationMarker.corners[0].y,
+      result.calibrationMarker.corners[1].x,
+      result.calibrationMarker.corners[1].y
+    );
+    const d2 = distance(
+      result.calibrationMarker.corners[1].x,
+      result.calibrationMarker.corners[1].y,
+      result.calibrationMarker.corners[2].x,
+      result.calibrationMarker.corners[2].y
+    );
+    const d3 = distance(
+      result.calibrationMarker.corners[2].x,
+      result.calibrationMarker.corners[2].y,
+      result.calibrationMarker.corners[3].x,
+      result.calibrationMarker.corners[3].y
+    );
+    const d4 = distance(
+      result.calibrationMarker.corners[3].x,
+      result.calibrationMarker.corners[3].y,
+      result.calibrationMarker.corners[0].x,
+      result.calibrationMarker.corners[0].y
+    );
+    result.calibrationMarkerLength = (d1 + d2 + d3 + d4) / 4;
+  }
+
+  return result;
+};
+
 const useDetection = (runOnStart: boolean = false) => {
   const { config } = useConfig();
   const { devicePPI, devicePixelRatio, testbedHeightMM, testbedWidthMM, silParams } = config;
@@ -242,6 +328,23 @@ const useDetection = (runOnStart: boolean = false) => {
   const streamRef = useRef<MediaStream | null>(null);
   const detectorRef = useRef<{ handDetector: HandLandmarker; poseDetector: PoseLandmarker } | null>(null);
   const animationFrameId = useRef<number | null>(null);
+
+  const arucoDetectorRef = useRef<AR.Detector | null>(null);
+  const arucoCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const [markerOperationResults, setMarkerOperationResults] = useState<MarkerOperationResult>({ 
+    allMarkers: [], 
+    isCalibrationMarkerVisible: false, 
+    isReplayMarkerVisible: false,
+    isContinueMarkerVisible: false, 
+    calibrationMarker: null, 
+    replayMarker: null, 
+    continueMarker: null ,
+    calibrationMarkerDetectionTime: null,
+    replayMarkerDetectionTime: null,
+    continueMarkerDetectionTime: null,
+    calibrationMarkerLength: null,
+  });
 
   const [pinchDetection, setPinchDetection] = useState<PinchDetectionResult>({
     pinchPos: { left: null, right: null },
@@ -295,10 +398,18 @@ const useDetection = (runOnStart: boolean = false) => {
       setPinchDetection(pinch);
       setWristDetection(wrist);
       setHeadShoulderDetection(headShoulder);
+
+      if (arucoDetectorRef.current) {
+        if (!arucoCanvasRef.current) {
+          arucoCanvasRef.current = document.createElement('canvas');
+        }
+        const detectedMarkers = detectMarkers(arucoDetectorRef.current, video, arucoCanvasRef.current, testbedWidth, testbedHeight, markerOperationResults);
+        setMarkerOperationResults(detectedMarkers);
+      }
     }
 
     animationFrameId.current = requestAnimationFrame(performDetectionLoop);
-  }, [testbedHeight, testbedWidth, isDetecting, factor, silParams]);
+  }, [testbedHeight, testbedWidth, isDetecting, factor, silParams, markerOperationResults]);
 
   const startWebcam = useCallback(async () => {
     if (loading || error) return;
@@ -336,6 +447,15 @@ const useDetection = (runOnStart: boolean = false) => {
       setLoading(true);
       setError(null);
       detectorRef.current = await initDetectors();
+
+      arucoDetectorRef.current = new AR.Detector({
+        dictionaryName: 'ARUCO_MIP_36h12',
+        maxHammingDistance: 5,
+      });
+      if (!arucoCanvasRef.current) {
+        arucoCanvasRef.current = document.createElement('canvas');
+      }
+
       setLoading(false);
     } catch (err) {
       console.error('Failed to initialize Object Detector:', err);
@@ -366,10 +486,13 @@ const useDetection = (runOnStart: boolean = false) => {
         detectorRef.current.handDetector.close();
         detectorRef.current = null;
       }
+
+      arucoDetectorRef.current = null;
+      arucoCanvasRef.current = null;
     };
     return cleanup;
   }, []);
-  return { videoRef, pinchDetection, wristDetection, headShoulderDetection, loading, error, startWebcam, stopWebcam, startDetecting, stopDetecting };
+  return { videoRef, pinchDetection, wristDetection, headShoulderDetection, detectedMarkers: markerOperationResults, loading, error, startWebcam, stopWebcam, startDetecting, stopDetecting };
 };
 
 export default useDetection;

@@ -15,6 +15,13 @@ export const LETTER_HEIGHT_INCH = 11;
 export const MM_TO_INCH = 1 / 25.4;
 export const INCH_TO_MM = 25.4;
 
+export const CALIBRATION_MARKER_ID = 0;
+export const REPLAY_MARKER_ID = 10;
+export const CONTINUE_MARKER_ID = 20;
+
+// export const ARUCO_MARKER_SIZE_MM = 200;
+export const ARUCO_MARKER_SIZE_INCH = 7.87402; // 200mm
+
 export const defaultFingerTips: FingerTips = {
   index: null,
   middle: null,

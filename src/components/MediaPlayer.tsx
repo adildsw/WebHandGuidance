@@ -1,5 +1,5 @@
-import { useRef } from 'react';
-import { MM_TO_INCH } from '../utils/constants'; 
+import { useEffect, useRef, useState } from 'react';
+import { MM_TO_INCH } from '../utils/constants';
 import { useConfig } from '../utils/context';
 import { go } from '../utils/navigation';
 
@@ -10,9 +10,20 @@ type MediaPlayerProps = {
   doneCallback?: () => void;
   doneBtnTitle?: string;
   showHomeBtn?: boolean;
+  isReplayMarkerVisible?: boolean;
+  isContinueMarkerVisible?: boolean;
 };
 
-const MediaPlayer = ({ mediaUrl, mediaTitle, mediaSubtitle, doneCallback, doneBtnTitle, showHomeBtn = false }: MediaPlayerProps) => {
+const MediaPlayer = ({
+  mediaUrl,
+  mediaTitle,
+  mediaSubtitle,
+  doneCallback,
+  doneBtnTitle,
+  showHomeBtn = false,
+  isReplayMarkerVisible,
+  isContinueMarkerVisible,
+}: MediaPlayerProps) => {
   const { config } = useConfig();
   const { devicePPI, devicePixelRatio, testbedHeightMM, testbedWidthMM } = config;
   const factor = devicePPI / devicePixelRatio;
@@ -21,7 +32,55 @@ const MediaPlayer = ({ mediaUrl, mediaTitle, mediaSubtitle, doneCallback, doneBt
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
+  const [actionStartTime, setActionStartTime] = useState<number | null>(null);
+  // const timerRef = useRef<number | null>(null);
+  const replayTimerRef = useRef<number | null>(null);
+  const continueTimerRef = useRef<number | null>(null);
+  const ACTION_TIMER = config.defaultStartDuration;
+
   const isMediaVideo = mediaUrl.match(/\.(mp4|webm|ogg)(\?.*)?$/i);
+
+  const actionProgress = (() => {
+    if (!actionStartTime || (!replayTimerRef.current && !continueTimerRef.current)) return 0;
+    const elapsed = Date.now() - actionStartTime;
+    return Math.min(elapsed / ACTION_TIMER, 1);
+  })();
+
+  useEffect(() => {
+    console.log(actionStartTime, replayTimerRef.current, continueTimerRef.current);
+  }, [actionStartTime]);
+
+  useEffect(() => {
+    if (isReplayMarkerVisible && replayTimerRef.current === null) {
+      console.log('Yes', ACTION_TIMER);
+      setActionStartTime(Date.now());
+      replayTimerRef.current = window.setTimeout(() => {
+        replayVideo();
+        replayTimerRef.current = null;
+        setActionStartTime(null);
+      }, ACTION_TIMER);
+    } else if (!isReplayMarkerVisible && replayTimerRef.current != null) {
+      console.log('STOPPED');
+      clearTimeout(replayTimerRef.current);
+      replayTimerRef.current = null;
+      setActionStartTime(null);
+    }
+  }, [isReplayMarkerVisible, ACTION_TIMER]);
+
+  useEffect(() => {
+    if (isContinueMarkerVisible && continueTimerRef.current === null && doneCallback) {
+      setActionStartTime(Date.now());
+      continueTimerRef.current = window.setTimeout(() => {
+        if (doneCallback) doneCallback();
+        continueTimerRef.current = null;
+        setActionStartTime(null);
+      }, ACTION_TIMER);
+    } else if (!isContinueMarkerVisible && continueTimerRef.current != null) {
+      clearTimeout(continueTimerRef.current);
+      continueTimerRef.current = null;
+      setActionStartTime(null);
+    }
+  }, [isContinueMarkerVisible, ACTION_TIMER, doneCallback]);
 
   const replayVideo = () => {
     if (!videoRef.current) return;
@@ -44,6 +103,10 @@ const MediaPlayer = ({ mediaUrl, mediaTitle, mediaSubtitle, doneCallback, doneBt
           ) : (
             <img src={mediaUrl} alt={mediaTitle} className="w-full h-full object-contain" />
           )}
+          <div
+            className="absolute bottom-0 left-0 h-2 bg-blue-500 transition-all"
+            style={{ width: `${actionProgress * 100}%`, transitionDuration: '100ms' }}
+          ></div>
         </div>
       </div>
 

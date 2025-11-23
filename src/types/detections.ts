@@ -34,3 +34,22 @@ export type PinchDetectionResult = {
   indexPinch: { left: boolean; right: boolean };
   middlePinch: { left: boolean; right: boolean };
 };
+
+export type Marker = {
+  id: number;
+  corners: { x: number; y: number }[];
+};
+
+export type MarkerOperationResult = {
+  replayMarker: Marker | null;
+  isReplayMarkerVisible: boolean;
+  calibrationMarker: Marker | null;
+  isCalibrationMarkerVisible: boolean;
+  continueMarker: Marker | null;
+  isContinueMarkerVisible: boolean;
+  calibrationMarkerDetectionTime: number | null;
+  replayMarkerDetectionTime: number | null;
+  continueMarkerDetectionTime: number | null;
+  calibrationMarkerLength: number | null;
+  allMarkers: Marker[];
+}
