@@ -180,13 +180,27 @@ const CameraCalibration = () => {
       ) : (
         <div className="w-full flex flex-col text-center gap-2">
           <h1 className="text-3xl font-bold">Calibrate Camera</h1>
+          
+        {!isCalibrated ? (
+          <div className="pb-2">
+            {isCalibrationMarkerVisible ? (
+              <p className="text-red-500 text-xl font-bold">Please hold steady for {Math.floor((CALIBRATION_TIMER - calibrationProgress * CALIBRATION_TIMER) / 1000)} seconds</p>
+            ) : (
+              <p className="text-gray-600 text-md italic">Please stand 10 feet away from the screen and hold the calibration marker.</p>
+            )}
+          </div>
+        ): (
+          <div className="pb-2">
+            <p className="text-green-600 text-xl font-bold">Calibration successful!</p>
+          </div>
+        )}
 
-          <div className="flex flex-col">
+          {/* <div className="flex flex-col">
             <p className="text-gray-500 text-md italic">
               Please pinch-grab a letter-sized paper horizontally on the edges using your thumb and index finger, and stand 5 feet away from the camera.
             </p>
             <p className="text-gray-500 text-md italic">Once in position, please hold steady and also pinch using your middle finger.</p>
-          </div>
+          </div> */}
         </div>
       )}
 
@@ -201,15 +215,6 @@ const CameraCalibration = () => {
       </div>
 
       <div className="flex flex-col text-center">
-        {!isCalibrated && (
-          <div className="pb-2">
-            {isCalibrationMarkerVisible ? (
-              <p className="text-red-500 text-xl font-bold">Please hold steady for {Math.floor((CALIBRATION_TIMER - calibrationProgress * CALIBRATION_TIMER) / 1000)} seconds</p>
-            ) : (
-              <p className="text-gray-600 text-md italic">Please stand 10 feet away from the screen and hold the calibration marker.</p>
-            )}
-          </div>
-        )}
         <span className="text-gray-600 text-center">
           <b>World-Pixel Factor:</b>{' '}
           <input
