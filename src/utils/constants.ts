@@ -41,7 +41,7 @@ export const defaultConfig: Config = {
   worldPPI: 24,
   markerDiameterMM: 5,
   testbedWidthMM: 200,
-  testbedHeightMM: 100,
+  testbedHeightMM: 120,
   defaultHand: 'Right',
   defaultTrials: 3,
   defaultRepetitions: 5,
