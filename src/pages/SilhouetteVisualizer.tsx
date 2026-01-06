@@ -186,7 +186,6 @@ const sketch: Sketch = (p5) => {
     p5.circle(leftShoulderX, shoulderY, romCalibrationParams.leftRadius * 2 * romSafeMargin);
     p5.circle(rightShoulderX, shoulderY, romCalibrationParams.rightRadius * 2 * romSafeMargin);
   };
-  
 
   p5.draw = () => {
     p5.clear();
@@ -223,16 +222,13 @@ const SilhouetteVisualizer = () => {
 
   return (
     <div className="w-screen h-screen flex gap-4 flex-col items-center justify-center p-16 py-8">
+      <div className="w-full flex flex-col text-center gap-2">
+        <h1 className="text-3xl font-bold">Silhouette/Calibration Visualizer</h1>
 
-        <div className="w-full flex flex-col text-center gap-2">
-          <h1 className="text-3xl font-bold">Silhouette/Calibration Visualizer</h1>
-
-          <div className="flex flex-col">
-            <p className="text-gray-500 text-md italic">
-              Interface for inspecting the silhouette alignment and range of motion calibration.
-            </p>
-          </div>
+        <div className="flex flex-col">
+          <p className="text-gray-500 text-md italic">Interface for inspecting the silhouette alignment and range of motion calibration.</p>
         </div>
+      </div>
 
       {/* Camera Feed */}
       <div className="md:col-span-3 bg-gray-100 flex items-center justify-center relative" style={{ width: `${testbedWidth}px`, height: `${testbedHeight}px` }}>
@@ -272,7 +268,7 @@ const SilhouetteVisualizer = () => {
         >
           Toggle ROM Indicators {isROMVisible ? 'Off' : 'On'}
         </button>
-        
+
         <button
           className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"
           onClick={() => {

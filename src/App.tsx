@@ -1,5 +1,5 @@
 import { HashRouter, Route, Routes } from 'react-router-dom';
-import ScreenCalibration from './pages/ScreenCalibration';
+import ScreenCalibration from './pages/Calibration/ScreenCalibration';
 import { ConfigProvider } from './utils/context';
 import Config from './pages/Config';
 import Home from './pages/Home';
@@ -23,22 +23,37 @@ import {
   faUpRightAndDownLeftFromCenter,
 } from '@fortawesome/free-solid-svg-icons';
 import Study from './pages/TaskExecutor/Study';
-import CameraCalibration from './pages/CameraCalibration';
+import CameraCalibration from './pages/Calibration/CameraCalibration';
 import { Toaster } from 'react-hot-toast';
 import SerialConnector from './components/SerialConnector';
 import useWebSerial from './hooks/useWebSerial';
 import NoMobileSupport from './pages/NoMobileSupport';
 import { useEffect, useState } from 'react';
-import RomCalibration from './pages/RomCalibration';
+import RomCalibration from './pages/Calibration/RomCalibration';
 import useBle from './hooks/useBle';
-import MediaPlayer from './components/MediaPlayer';
 import TaskDesigner from './pages/TaskDesigner/TaskDesigner';
 import SilhouetteVisualizer from './pages/SilhouetteVisualizer';
-import { ArucoWebcam } from './pages/ArucoTest';
 import PreStudy from './pages/PreStudy';
 import { SYSTEM_VERSION } from './utils/constants';
 
-library.add(faCheck, faArrowRight, faChevronUp, faChevronDown, faLink, faHome, faSave, faFile, faChevronLeft, faChevronRight, faPlus, faTrash, faRedo, faFolderOpen, faDownload, faUpRightAndDownLeftFromCenter);
+library.add(
+  faCheck,
+  faArrowRight,
+  faChevronUp,
+  faChevronDown,
+  faLink,
+  faHome,
+  faSave,
+  faFile,
+  faChevronLeft,
+  faChevronRight,
+  faPlus,
+  faTrash,
+  faRedo,
+  faFolderOpen,
+  faDownload,
+  faUpRightAndDownLeftFromCenter,
+);
 
 const App = () => {
   const webSerial = useWebSerial({ baudRate: 115200 });
@@ -73,10 +88,6 @@ const App = () => {
             <Route path="/config" element={<Config />} />
             <Route path="/create-study-tasks" element={<TaskDesigner />} />
             <Route path="/visualizer" element={<SilhouetteVisualizer />} />
-            
-            <Route path="/videotest" element={<MediaPlayer mediaUrl='https://webhandguidance.b-cdn.net/rom_calibration_demo_test.mp4' mediaTitle='Test Video' mediaSubtitle='This is a test video' doneBtnTitle='Begin Calibration' />} />
-            <Route path="/imgtest" element={<MediaPlayer mediaUrl='https://webhandguidance.b-cdn.net/first_message_image_test.png' mediaTitle='Test Image' mediaSubtitle='This is a test image' />} />
-            <Route path="/arucotest" element={<ArucoWebcam />} />
           </Routes>
         </HashRouter>
       </ConfigProvider>
@@ -84,7 +95,7 @@ const App = () => {
       <Toaster />
 
       <span className="fixed bottom-2 left-2 text-xs text-gray-400 select-none">v{SYSTEM_VERSION}</span>
-      
+
       <SerialConnector webSerial={webSerial} ble={ble} />
     </>
   );

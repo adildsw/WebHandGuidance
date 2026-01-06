@@ -1,13 +1,14 @@
 import { ReactP5Wrapper } from '@p5-wrapper/react';
 import type { Sketch } from '@p5-wrapper/react';
-import { useConfig } from '../utils/context';
+import { useConfig } from '../../utils/context';
 import { useEffect, useRef, useState } from 'react';
 
-import { CREDIT_CARD_HEIGHT_INCH, CREDIT_CARD_WIDTH_INCH, DOLLAR_BILL_HEIGHT_INCH, DOLLAR_BILL_WIDTH_INCH, MM_TO_INCH } from '../utils/constants';
+import { CREDIT_CARD_HEIGHT_INCH, CREDIT_CARD_WIDTH_INCH, defaultConfig, DOLLAR_BILL_HEIGHT_INCH, DOLLAR_BILL_WIDTH_INCH, MM_TO_INCH } from '../../utils/constants';
 import p5 from 'p5';
-import type { CalibrationTools } from '../types/config';
-import { go } from '../utils/navigation';
-import MediaPlayer from '../components/MediaPlayer'; 
+import type { CalibrationTools } from '../../types/config';
+import { go } from '../../utils/navigation';
+import MediaPlayer from '../../components/MediaPlayer';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 const sketch: Sketch = (p5) => {
   let width = 200;
@@ -205,12 +206,13 @@ const ScreenCalibration = () => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (isTutorialVisible) return;
       if (e.key === '+' || e.key === '=') {
         setDevicePPI(devicePPI + 1);
       } else if (e.key === '-' || e.key === '_') {
         setDevicePPI(devicePPI - 1);
       } else if (e.key === 'Enter') {
-        go('#/');
+        go('#/camera-calibration');
       }
     };
 
@@ -218,111 +220,126 @@ const ScreenCalibration = () => {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [config, devicePPI, setDevicePPI]);
-
-  // if (isTutorialVisible)
-  //   return (
-  //     <MediaPlayer
-  //       mediaUrl="https://webhandguidance.b-cdn.net/screen_calibration_demo_test.mp4"
-  //       mediaTitle="Screen Calibration Tutorial"
-  //       mediaSubtitle="This video will demonstrate how to calibrate your screen."
-  //       doneCallback={() => setIsTutorialVisible(false)}
-  //       doneBtnTitle="Begin Calibration"
-  //       showHomeBtn
-  //     />
-  //   );
+  }, [config, devicePPI, setDevicePPI, isTutorialVisible]);
 
   return (
     <>
-    {isTutorialVisible && (
-      <MediaPlayer
-        mediaUrl="https://webhandguidance.b-cdn.net/screen_calibration_demo_test.mp4"
-        mediaTitle="Screen Calibration Tutorial"
-        mediaSubtitle="This video will demonstrate how to calibrate your screen."
-        doneCallback={() => setIsTutorialVisible(false)}
-        doneBtnTitle="Begin Calibration"
-        showHomeBtn
-      />
-    )}
-    <div className="w-screen h-screen flex gap-4 flex-col items-center justify-center p-16 py-8">
-      <div className="w-full flex flex-col text-center gap-2">
-        <h1 className="text-3xl font-bold">Calibrate Display</h1>
+      {isTutorialVisible && (
+        <MediaPlayer
+          mediaUrl="https://webhandguidance.b-cdn.net/screen_calibration_demo_test.mp4"
+          mediaTitle="Screen Calibration Tutorial"
+          mediaSubtitle="This video will demonstrate how to calibrate your screen."
+          doneCallback={() => setIsTutorialVisible(false)}
+          doneBtnTitle="Begin Calibration"
+          showHomeBtn
+        />
+      )}
+      <div className="w-screen h-screen flex gap-4 flex-col items-center justify-center p-16 py-8">
+        <div className="w-full flex flex-col text-center gap-2">
+          <h1 className="text-3xl font-bold">
+            Calibration #1: <span className="font-normal italic">Calibrate Display</span>
+          </h1>
 
-        <div className="flex flex-row gap-2 justify-center items-center">
-          <span className="text-sm font-bold">Select Calibration Tool:</span>
-          <button
-            className={`text-sm px-4 py-1 rounded hover:bg-gray-300 cursor-pointer select-none font-bold active:bg-gray-400 ${
-              calibrationTool === 'RULER' ? 'bg-gray-200' : 'border-1 border-gray-200'
-            }`}
-            onClick={() => setCalibrationTool('RULER')}
-          >
-            Ruler
-          </button>
-          <button
-            className={`text-sm px-4 py-1 rounded hover:bg-gray-300 cursor-pointer select-none font-bold active:bg-gray-400 ${
-              calibrationTool === 'CREDIT' ? 'bg-gray-300' : 'border-1 border-gray-200'
-            }`}
-            onClick={() => setCalibrationTool('CREDIT')}
-          >
-            Credit Card
-          </button>
-          <button
-            className={`text-sm px-4 py-1 rounded hover:bg-gray-300 cursor-pointer select-none font-bold active:bg-gray-400 ${
-              calibrationTool === 'DOLLAR' ? 'bg-gray-300' : 'border-1 border-gray-200'
-            }`}
-            onClick={() => setCalibrationTool('DOLLAR')}
-          >
-            Dollar Bill
-          </button>
+          <div className="flex flex-row gap-2 justify-center items-center">
+            <span className="text-sm font-bold">Select Calibration Tool:</span>
+            <button
+              className={`text-sm px-4 py-1 rounded hover:bg-gray-300 cursor-pointer select-none font-bold active:bg-gray-400 ${
+                calibrationTool === 'RULER' ? 'bg-gray-200' : 'border-1 border-gray-200'
+              }`}
+              onClick={() => setCalibrationTool('RULER')}
+            >
+              Ruler
+            </button>
+            <button
+              className={`text-sm px-4 py-1 rounded hover:bg-gray-300 cursor-pointer select-none font-bold active:bg-gray-400 ${
+                calibrationTool === 'CREDIT' ? 'bg-gray-300' : 'border-1 border-gray-200'
+              }`}
+              onClick={() => setCalibrationTool('CREDIT')}
+            >
+              Credit Card
+            </button>
+            <button
+              className={`text-sm px-4 py-1 rounded hover:bg-gray-300 cursor-pointer select-none font-bold active:bg-gray-400 ${
+                calibrationTool === 'DOLLAR' ? 'bg-gray-300' : 'border-1 border-gray-200'
+              }`}
+              onClick={() => setCalibrationTool('DOLLAR')}
+            >
+              Dollar Bill
+            </button>
+          </div>
+          <div className="flex flex-col">
+            <p className="text-gray-500 text-md italic">
+              Please adjust the slider so that{' '}
+              {calibrationTool === 'RULER'
+                ? `the dimensions of the ruler on screen match the size of a standard ruler.`
+                : calibrationTool === 'CREDIT'
+                  ? `the rectangle on the screen matches the size of a standard credit card.`
+                  : `the rectangle on the screen matches the size of a US dollar bill.`}
+            </p>
+            <p className="text-gray-500 text-md italic">
+              You can also use the <kbd className="bg-gray-100 font-bold px-2 rounded">+</kbd> and <kbd className="bg-gray-100 font-bold px-2 rounded">-</kbd> keys to adjust the
+              scale factor, and press{' '}
+              <kbd className="bg-gray-100 font-bold px-2 rounded">
+                ↵ <span className="not-italic">Return</span>
+              </kbd>{' '}
+              key to continue to the next step.
+            </p>
+          </div>
         </div>
+
+        <div ref={calibrationDivRef} className="flex flex-col w-full grow border border-gray rounded-lg z-64">
+          <ReactP5Wrapper sketch={sketch} size={canvasSize} devicePPI={devicePPI} devicePixelRatio={devicePixelRatio} calibrationTool={calibrationTool} />
+        </div>
+
         <div className="flex flex-col">
-          <p className="text-gray-500 text-md italic">
-            Please adjust the slider so that{' '}
-            {calibrationTool === 'RULER'
-              ? `the dimensions of the ruler on screen match the size of a standard ruler.`
-              : calibrationTool === 'CREDIT'
-              ? `the rectangle on the screen matches the size of a standard credit card.`
-              : `the rectangle on the screen matches the size of a US dollar bill.`}
-          </p>
-          <p className="text-gray-500 text-md italic">
-            You can also use the <kbd className="bg-gray-100 font-bold px-2 rounded">+</kbd> and <kbd className="bg-gray-100 font-bold px-2 rounded">-</kbd> keys to adjust the
-            scale factor, and press <kbd className="bg-gray-100 font-bold px-2 rounded">↵</kbd> to complete the calibration.
-          </p>
+          <span className="text-gray-600 text-center">
+            <b>Display PPI:</b> {devicePPI}
+          </span>
+          <div className="flex flex-row gap-2">
+            <div className="bg-gray-200 px-2 rounded hover:bg-gray-300 cursor-pointer select-none font-bold active:bg-gray-400" onClick={() => setDevicePPI(devicePPI - 1)}>
+              -
+            </div>
+            <input type="range" min="100" max="300" step="1" value={devicePPI} className="w-64" onChange={(e) => setDevicePPI(parseFloat(e.target.value))} />
+            <div className="bg-gray-200 px-2 rounded hover:bg-gray-300 cursor-pointer select-none font-bold active:bg-gray-400" onClick={() => setDevicePPI(devicePPI + 1)}>
+              +
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div ref={calibrationDivRef} className="flex flex-col w-full grow border border-gray rounded-lg z-64">
-        <ReactP5Wrapper sketch={sketch} size={canvasSize} devicePPI={devicePPI} devicePixelRatio={devicePixelRatio} calibrationTool={calibrationTool} />
-      </div>
-
-      <div className="flex flex-col">
-        <span className="text-gray-600 text-center">
-          <b>Display PPI:</b> {devicePPI}
-        </span>
         <div className="flex flex-row gap-2">
-          <div className="bg-gray-200 px-2 rounded hover:bg-gray-300 cursor-pointer select-none font-bold active:bg-gray-400" onClick={() => setDevicePPI(devicePPI - 1)}>
-            -
-          </div>
-          <input type="range" min="100" max="300" step="1" value={devicePPI} className="w-64" onChange={(e) => setDevicePPI(parseFloat(e.target.value))} />
-          <div className="bg-gray-200 px-2 rounded hover:bg-gray-300 cursor-pointer select-none font-bold active:bg-gray-400" onClick={() => setDevicePPI(devicePPI + 1)}>
-            +
-          </div>
+          <button
+            className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"
+            onClick={() => setIsTutorialVisible(true)}
+          >
+            Replay Video
+          </button>
+
+          {/*add reset button which fetches default value*/}
+          <button
+            className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"
+            onClick={() => {
+              setDevicePPI(defaultConfig.devicePPI);
+              setCalibrationTool(defaultConfig.calibrationTool);
+            }}
+          >
+            Reset
+          </button>
+
+          <button
+            className="absolute top-4 left-4 bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"
+            onClick={() => go('#/')}
+          >
+            <FontAwesomeIcon icon="chevron-left" /> Back
+          </button>
+
+          <button
+            className="bg-slate-600 border border-slate-300 text-white font-bold px-4 py-2 rounded hover:bg-slate-800 hover:text-white cursor-pointer"
+            onClick={() => go('#/camera-calibration')}
+          >
+            Continue to Camera Calibration
+          </button>
         </div>
       </div>
-
-      <div className="flex flex-row gap-2">
-        <button
-          className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"
-          onClick={() => setIsTutorialVisible(true)}
-        >
-          Replay Video
-        </button>
-
-        <button className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer" onClick={() => go('#/')}>
-          Done
-        </button>
-      </div>
-    </div>
     </>
   );
 };

@@ -1,16 +1,14 @@
 import { FilesetResolver, HandLandmarker, PoseLandmarker } from '@mediapipe/tasks-vision';
 import type { NormalizedLandmark, PoseLandmarkerResult } from '@mediapipe/tasks-vision';
 import { AR } from 'js-aruco2';
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import type { HeadShoulderDetectionResult, Marker, MarkerOperationResult, WristDetectionResult } from '../types/detections';
 import {
   CALIBRATION_MARKER_ID,
   CONTINUE_MARKER_ID,
-  // defaultFingerTips,
   defaultHeadShoulderResult,
   defaultWristResult,
   HAND_LANDMARKER_MODEL_PATH,
-  MM_TO_INCH,
   NOSE_Y_OFFSET,
   POSE_LANDMARKER_MODEL_PATH,
   REPLAY_MARKER_ID,
@@ -23,9 +21,6 @@ import {
 import { distance, mapVideoToTestbed } from '../utils/math';
 import { useConfig } from '../utils/context';
 import type { SilhouetteParams } from '../types/config';
-
-// const PINCH_INDICES: Record<keyof FingerTips, number> = { thumb: 4, index: 8, middle: 12, ring: 16, pinky: 20 };
-// const WRIST_INDICES = { wrist1: 0, wrist2: 5, wrist3: 17 };
 
 const HEAD_SHOULDER_INDICES = { nose: 0, leftShoulder: 11, rightShoulder: 12 };
 const LANDMARK_WRIST_INDICES = {
@@ -62,55 +57,6 @@ const initDetectors = async () => {
   return { handDetector, poseDetector };
 };
 
-// |-------------------------
-// | MODEL DETECTIONS
-// |-------------------------
-// const detectWrist = (detector: HandLandmarker, video: HTMLVideoElement, testbedWidth: number, testbedHeight: number) => {
-//   const leftFingerTips: FingerTips = { ...defaultFingerTips };
-//   const rightFingerTips: FingerTips = { ...defaultFingerTips };
-//   const wrist: WristDetectionResult = { ...defaultWristResult };
-
-//   try {
-//     const detections = detector.detectForVideo(video, performance.now());
-//     const vw = video.videoWidth;
-//     const vh = video.videoHeight;
-//     const hands = detections.landmarks || [];
-
-//     for (let i = 0; i < hands.length; i++) {
-//       const handed = (detections.handedness?.[i]?.[0]?.categoryName || detections.handedness?.[i]?.[0]?.displayName || '').toLowerCase();
-//       const side = handed === 'left' ? 'left' : handed === 'right' ? 'right' : hands.length === 1 ? ((hands[i]?.[0]?.x ?? 0.5) < 0.5 ? 'left' : 'right') : null;
-//       if (!side) continue;
-//       for (const k of Object.keys(PINCH_INDICES) as (keyof FingerTips)[]) {
-//         const lm = hands[i]?.[PINCH_INDICES[k]];
-//         if (!lm) continue;
-//         const x = 1 - lm.x;
-//         const y = lm.y;
-//         const pt = mapVideoToTestbed(x * vw, y * vh, vw, vh, testbedWidth, testbedHeight);
-//         if (!pt) continue;
-//         if (side === 'left') leftFingerTips[k] = pt;
-//         else rightFingerTips[k] = pt;
-//       }
-
-//       const w1 = hands[i]?.[WRIST_INDICES.wrist1];
-//       const w2 = hands[i]?.[WRIST_INDICES.wrist2];
-//       const w3 = hands[i]?.[WRIST_INDICES.wrist3];
-//       if (w1 && w2 && w3) {
-//         const x = 1 - (w1.x + w2.x + w3.x) / 3;
-//         const y = (w1.y + w2.y + w3.y) / 3;
-//         const pt = mapVideoToTestbed(x * vw, y * vh, vw, vh, testbedWidth, testbedHeight);
-
-//         if (side === 'left') wrist.leftWrist = pt;
-//         else wrist.rightWrist = pt;
-//       }
-//     }
-
-//   } catch (err) {
-//     console.error('Error during hand detection:', err);
-//   }
-
-//   return wrist;
-// };
-
 const processWristLandmarks = (detections: PoseLandmarkerResult, video: HTMLVideoElement, testbedWidth: number, testbedHeight: number) => {
   const wristResult: WristDetectionResult = { ...defaultWristResult };
   if (detections.landmarks.length < 1) return wristResult;
@@ -135,7 +81,6 @@ const processWristLandmarks = (detections: PoseLandmarkerResult, video: HTMLVide
     const y = (R1.y + R2.y + R3.y) / 3;
     wristResult.rightWrist = mapVideoToTestbed((1 - x) * vw, y * vh, vw, vh, testbedWidth, testbedHeight);
   }
-  // console.log("LEFT:", L1.visibility, L2.visibility, L3.visibility, "RIGHT: ", R1.visibility, R2.visibility, R3.visibility);
 
   return wristResult;
 };
@@ -228,14 +173,21 @@ const detectBodyLandmarks = (detector: PoseLandmarker, video: HTMLVideoElement, 
     return {
       headShoulder,
       wrist,
-    }
+    };
   } catch (err) {
     console.error('Error during head and shoulders detection:', err);
     return { headShoulder: { ...defaultHeadShoulderResult }, wrist: { ...defaultWristResult } };
   }
 };
 
-const detectMarkers = (detector: AR.Detector, video: HTMLVideoElement, canvas: HTMLCanvasElement, testbedWidth: number, testbedHeight: number, prevResults: MarkerOperationResult): MarkerOperationResult => {
+const detectMarkers = (
+  detector: AR.Detector,
+  video: HTMLVideoElement,
+  canvas: HTMLCanvasElement,
+  testbedWidth: number,
+  testbedHeight: number,
+  prevResults: MarkerOperationResult,
+): MarkerOperationResult => {
   const result: MarkerOperationResult = {
     allMarkers: [],
     isCalibrationMarkerVisible: false,
@@ -249,7 +201,7 @@ const detectMarkers = (detector: AR.Detector, video: HTMLVideoElement, canvas: H
     continueMarkerDetectionTime: null,
     calibrationMarkerLength: null,
   };
-  
+
   const w = video.videoWidth;
   const h = video.videoHeight;
   if (!w || !h) return result;
@@ -284,44 +236,35 @@ const detectMarkers = (detector: AR.Detector, video: HTMLVideoElement, canvas: H
   result.replayMarker = converted.find((m) => m.id === REPLAY_MARKER_ID) || null;
   result.continueMarker = converted.find((m) => m.id === CONTINUE_MARKER_ID) || null;
   result.continueMarkerDetectionTime = result.isContinueMarkerVisible && !prevResults.isContinueMarkerVisible ? performance.now() : prevResults.continueMarkerDetectionTime;
-  result.calibrationMarkerDetectionTime = result.isCalibrationMarkerVisible && !prevResults.isCalibrationMarkerVisible ? performance.now() : prevResults.calibrationMarkerDetectionTime;
+  result.calibrationMarkerDetectionTime =
+    result.isCalibrationMarkerVisible && !prevResults.isCalibrationMarkerVisible ? performance.now() : prevResults.calibrationMarkerDetectionTime;
   result.replayMarkerDetectionTime = result.isReplayMarkerVisible && !prevResults.isReplayMarkerVisible ? performance.now() : prevResults.replayMarkerDetectionTime;
   if (result.calibrationMarker && result.calibrationMarker.corners.length === 4) {
-    const d1 = distance(
-      result.calibrationMarker.corners[0].x,
-      result.calibrationMarker.corners[0].y,
-      result.calibrationMarker.corners[1].x,
-      result.calibrationMarker.corners[1].y
-    );
-    const d2 = distance(
-      result.calibrationMarker.corners[1].x,
-      result.calibrationMarker.corners[1].y,
-      result.calibrationMarker.corners[2].x,
-      result.calibrationMarker.corners[2].y
-    );
-    const d3 = distance(
-      result.calibrationMarker.corners[2].x,
-      result.calibrationMarker.corners[2].y,
-      result.calibrationMarker.corners[3].x,
-      result.calibrationMarker.corners[3].y
-    );
-    const d4 = distance(
-      result.calibrationMarker.corners[3].x,
-      result.calibrationMarker.corners[3].y,
-      result.calibrationMarker.corners[0].x,
-      result.calibrationMarker.corners[0].y
-    );
+    const d1 = distance(result.calibrationMarker.corners[0].x, result.calibrationMarker.corners[0].y, result.calibrationMarker.corners[1].x, result.calibrationMarker.corners[1].y);
+    const d2 = distance(result.calibrationMarker.corners[1].x, result.calibrationMarker.corners[1].y, result.calibrationMarker.corners[2].x, result.calibrationMarker.corners[2].y);
+    const d3 = distance(result.calibrationMarker.corners[2].x, result.calibrationMarker.corners[2].y, result.calibrationMarker.corners[3].x, result.calibrationMarker.corners[3].y);
+    const d4 = distance(result.calibrationMarker.corners[3].x, result.calibrationMarker.corners[3].y, result.calibrationMarker.corners[0].x, result.calibrationMarker.corners[0].y);
     result.calibrationMarkerLength = (d1 + d2 + d3 + d4) / 4;
   }
 
   return result;
 };
 
-const useDetection = (runOnStart: boolean = false) => {
-  const { config } = useConfig();
-  const { devicePPI, devicePixelRatio, testbedHeightMM, testbedWidthMM, silParams } = config;
-  const testbedHeight = useMemo(() => (testbedHeightMM * MM_TO_INCH * devicePPI) / devicePixelRatio, [testbedHeightMM, devicePPI, devicePixelRatio]);
-  const testbedWidth = useMemo(() => (testbedWidthMM * MM_TO_INCH * devicePPI) / devicePixelRatio, [testbedWidthMM, devicePPI, devicePixelRatio]);
+const useDetection = (runOnStart: boolean = false, testbedDimensions?: { width: number; height: number }) => {
+  const { silParams } = useConfig().config;
+
+  const testbedWidth = testbedDimensions?.width ?? 640;
+  const testbedHeight = testbedDimensions?.height ?? 480;
+  const testbedWidthRef = useRef(testbedWidth);
+  const testbedHeightRef = useRef(testbedHeight);
+  const silParamsRef = useRef(silParams);
+
+  // Keep refs in sync with latest values
+  useEffect(() => {
+    testbedWidthRef.current = testbedWidth;
+    testbedHeightRef.current = testbedHeight;
+    silParamsRef.current = silParams;
+  }, [testbedWidth, testbedHeight, silParams]);
 
   const isDetecting = useRef<boolean>(runOnStart);
 
@@ -333,14 +276,14 @@ const useDetection = (runOnStart: boolean = false) => {
   const arucoDetectorRef = useRef<AR.Detector | null>(null);
   const arucoCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  const [markerOperationResults, setMarkerOperationResults] = useState<MarkerOperationResult>({ 
-    allMarkers: [], 
-    isCalibrationMarkerVisible: false, 
+  const [markerOperationResults, setMarkerOperationResults] = useState<MarkerOperationResult>({
+    allMarkers: [],
+    isCalibrationMarkerVisible: false,
     isReplayMarkerVisible: false,
-    isContinueMarkerVisible: false, 
-    calibrationMarker: null, 
-    replayMarker: null, 
-    continueMarker: null ,
+    isContinueMarkerVisible: false,
+    calibrationMarker: null,
+    replayMarker: null,
+    continueMarker: null,
     calibrationMarkerDetectionTime: null,
     replayMarkerDetectionTime: null,
     continueMarkerDetectionTime: null,
@@ -389,10 +332,12 @@ const useDetection = (runOnStart: boolean = false) => {
     }
 
     if (isDetecting.current) {
-      // const wrist = detectWrist(detector.handDetector, video, testbedWidth, testbedHeight);
-      // const headShoulder = detectHeadAndShoulders(detector.poseDetector, video, testbedWidth, testbedHeight, silParams);
-      // setPinchDetection(pinch);
-      const { wrist, headShoulder } = detectBodyLandmarks(detector.poseDetector, video, testbedWidth, testbedHeight, silParams);
+      // Read latest values from refs
+      const currentWidth = testbedWidthRef.current;
+      const currentHeight = testbedHeightRef.current;
+      const currentSilParams = silParamsRef.current;
+
+      const { wrist, headShoulder } = detectBodyLandmarks(detector.poseDetector, video, currentWidth, currentHeight, currentSilParams);
       setWristDetection(wrist);
       setHeadShoulderDetection(headShoulder);
 
@@ -400,13 +345,12 @@ const useDetection = (runOnStart: boolean = false) => {
         if (!arucoCanvasRef.current) {
           arucoCanvasRef.current = document.createElement('canvas');
         }
-        const detectedMarkers = detectMarkers(arucoDetectorRef.current, video, arucoCanvasRef.current, testbedWidth, testbedHeight, markerOperationResults);
-        setMarkerOperationResults(detectedMarkers);
+        setMarkerOperationResults((prevResults) => detectMarkers(arucoDetectorRef.current!, video, arucoCanvasRef.current!, currentWidth, currentHeight, prevResults));
       }
     }
 
     animationFrameId.current = requestAnimationFrame(performDetectionLoop);
-  }, [testbedHeight, testbedWidth, isDetecting, silParams, markerOperationResults]);
+  }, []);
 
   const startWebcam = useCallback(async () => {
     if (loading || error) return;
@@ -467,6 +411,7 @@ const useDetection = (runOnStart: boolean = false) => {
 
   useEffect(() => {
     const cleanup = () => {
+      console.log('[INFO] Unloading Camera');
       if (animationFrameId.current) {
         cancelAnimationFrame(animationFrameId.current);
         animationFrameId.current = null;

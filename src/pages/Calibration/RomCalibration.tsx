@@ -1,15 +1,15 @@
 import { ReactP5Wrapper, type Sketch } from '@p5-wrapper/react';
 import type p5 from 'p5';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { HeadShoulderDetectionResult, WristDetectionResult } from '../types/detections';
-import { type SilhouetteParams } from '../types/config';
-import { defaultConfig, MM_TO_INCH, NOSE_Y_OFFSET, SHOULDER_X_OFFSET, SHOULDER_Y_OFFSET, SIL_IMG_HEIGHT, SIL_IMG_WIDTH } from '../utils/constants';
-import type { PolarPos, Pos } from '../types/task';
-import { useConfig } from '../utils/context';
-import useDetection from '../hooks/useMediaPipeHandDetection';
-import { forceRoot } from '../utils/navigation';
-import { cartesianToPolar, polarToCartesian } from '../utils/math';
-import MediaPlayer from '../components/MediaPlayer';
+import type { HeadShoulderDetectionResult, WristDetectionResult } from '../../types/detections';
+import { type SilhouetteParams } from '../../types/config';
+import { defaultConfig, MM_TO_INCH, NOSE_Y_OFFSET, SHOULDER_X_OFFSET, SHOULDER_Y_OFFSET, SIL_IMG_HEIGHT, SIL_IMG_WIDTH } from '../../utils/constants';
+import type { PolarPos, Pos } from '../../types/task';
+import { useConfig } from '../../utils/context';
+import useDetection from '../../hooks/useMediaPipeHandDetection';
+import { forceRoot } from '../../utils/navigation';
+import { cartesianToPolar, polarToCartesian } from '../../utils/math';
+import MediaPlayer from '../../components/MediaPlayer';
 
 type RomCalibrationStages = 'preinit' | 'init' | 'leftStretch' | 'rightStretch' | 'leftRaised' | 'rightRaised' | 'done';
 
@@ -240,7 +240,7 @@ const sketch: Sketch = (p5) => {
     p5.stroke(0, 255, 0, 192);
     p5.strokeWeight(16);
     p5.line(-width / 2 + 10, -height / 2 + 10, p5.lerp(-width / 2 + 10, width / 2 - 10, calibrationProgress), -height / 2 + 10);
-  }
+  };
 
   p5.draw = () => {
     p5.clear();
@@ -371,7 +371,7 @@ const RomCalibration = () => {
 
   useEffect(() => {
     if (calibrationStage === 'done' && !isCalibrated) {
-      console.log("Yes");
+      console.log('Yes');
       const averageLeftRomRadius = leftStretchedRom && leftRaisedRom ? (leftStretchedRom.radius + leftRaisedRom.radius) / 2 : null;
       const averageRightRomRadius = rightStretchedRom && rightRaisedRom ? (rightStretchedRom.radius + rightRaisedRom.radius) / 2 : null;
       if (averageLeftRomRadius !== null && averageRightRomRadius !== null) setRomCalibrationParams({ leftRadius: averageLeftRomRadius, rightRadius: averageRightRomRadius });
