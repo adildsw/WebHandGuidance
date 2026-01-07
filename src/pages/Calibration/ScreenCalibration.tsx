@@ -314,7 +314,6 @@ const ScreenCalibration = () => {
             Replay Video
           </button>
 
-          {/*add reset button which fetches default value*/}
           <button
             className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"
             onClick={() => {

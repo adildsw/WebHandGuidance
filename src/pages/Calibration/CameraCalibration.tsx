@@ -7,13 +7,13 @@ import p5 from 'p5';
 import { ARUCO_MARKER_SIZE_INCH, NOSE_Y_OFFSET, SHOULDER_X_OFFSET, SHOULDER_Y_OFFSET, SIL_IMG_HEIGHT, SIL_IMG_WIDTH } from '../../utils/constants';
 import { distance } from '../../utils/math';
 import useDetection from '../../hooks/useMediaPipeHandDetection';
-import { forceGo, forceRoot, go } from '../../utils/navigation';
+import { forceRoot } from '../../utils/navigation';
 import type { SilhouetteParams } from '../../types/config';
 import MediaPlayer from '../../components/MediaPlayer';
 import AdjustableCameraView from '../../components/AdjustableCameraView';
 import { type Marker, type MarkerOperationResult } from '../../types/detections';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 const sketch: Sketch = (p5) => {
   let width = 200;
@@ -87,19 +87,25 @@ const CameraCalibration = () => {
   const { worldPPI, silParams } = config;
 
   const navigate = useNavigate();
+  const [urlParams] = useSearchParams();
+  const homeEnabled = urlParams.get('homeEnabled') !== 'false';
 
-  const [isTutorialVisible, setIsTutorialVisible] = useState(false);
+  const [isTutorialVisible, setIsTutorialVisible] = useState(true);
   const [videoDimensions, setVideoDimensions] = useState({ width: 640, height: 480 });
 
   const { videoRef, headShoulderDetection, loading, error, startWebcam, stopWebcam, detectedMarkers } = useDetection(true, videoDimensions);
 
   const latestMarkerDetection = useRef<MarkerOperationResult>(detectedMarkers);
-  const { isCalibrationMarkerVisible, calibrationMarker } = detectedMarkers;
+  const { isCalibrationMarkerVisible, calibrationMarker, isContinueMarkerVisible, isReplayMarkerVisible } = detectedMarkers;
 
   const [calibrationStartTime, setCalibrationStartTime] = useState<number | null>(null);
   const [isCalibrated, setIsCalibrated] = useState(false);
   const timerRef = useRef<number | null>(null);
   const CALIBRATION_TIMER = config.defaultStartDuration;
+
+  // // const [continueStartTime, setContinueStartTime] = useState<number | null>(null);
+  // const continueTimerRef = useRef<number | null>(null);
+  // const CONTINUE_TIMER = 1000; // 1 second
 
   // Redirect timer state
   const [redirectStartTime, setRedirectStartTime] = useState<number | null>(null);
@@ -160,7 +166,7 @@ const CameraCalibration = () => {
   }, [detectedMarkers]);
 
   useEffect(() => {
-    if (isCalibrationMarkerVisible && timerRef.current == null && !isCalibrated) {
+    if (!isTutorialVisible && isCalibrationMarkerVisible && timerRef.current == null && !isCalibrated) {
       setCalibrationStartTime(Date.now());
       timerRef.current = window.setTimeout(() => {
         const { calibrationMarkerLength } = latestMarkerDetection.current;
@@ -176,7 +182,20 @@ const CameraCalibration = () => {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-  }, [isCalibrationMarkerVisible, setWorldPPI, isCalibrated, getCalculatedSilParams, setSilParams, CALIBRATION_TIMER]);
+  }, [isTutorialVisible, isCalibrationMarkerVisible, setWorldPPI, isCalibrated, getCalculatedSilParams, setSilParams, CALIBRATION_TIMER]);
+
+  // // Auto-dismiss tutorial when continue marker is visible for 1 second
+  // useEffect(() => {
+  //   if (isTutorialVisible && isContinueMarkerVisible && continueTimerRef.current == null) {
+  //     continueTimerRef.current = window.setTimeout(() => {
+  //       setIsTutorialVisible(false);
+  //       continueTimerRef.current = null;
+  //     }, CONTINUE_TIMER);
+  //   } else if (!isContinueMarkerVisible && continueTimerRef.current != null) {
+  //     clearTimeout(continueTimerRef.current);
+  //     continueTimerRef.current = null;
+  //   }
+  // }, [isTutorialVisible, isContinueMarkerVisible, CONTINUE_TIMER]);
 
   // Clear redirect timer helper
   const clearRedirectTimer = useCallback(() => {
@@ -193,7 +212,7 @@ const CameraCalibration = () => {
 
   // Start redirect timer when calibration completes
   useEffect(() => {
-    if (isCalibrated && !redirectTimerRef.current) {
+    if (!isTutorialVisible && isCalibrated && !redirectTimerRef.current) {
       setRedirectStartTime(Date.now());
 
       // Update every 100ms for smooth progress bar
@@ -213,24 +232,31 @@ const CameraCalibration = () => {
       if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
       if (redirectIntervalRef.current) clearInterval(redirectIntervalRef.current);
     };
-  }, [isCalibrated, navigate, stopWebcam, REDIRECT_TIMER]);
+  }, [isTutorialVisible, isCalibrated, navigate, stopWebcam, REDIRECT_TIMER]);
 
   useEffect(() => {
-    if (isTutorialVisible) stopWebcam();
-    else startWebcam();
-  }, [isTutorialVisible, startWebcam, stopWebcam]);
+    startWebcam();
+    return () => {
+      stopWebcam();
+    };
+  }, [startWebcam, stopWebcam]);
 
-  if (isTutorialVisible)
-    return (
-      <MediaPlayer
-        mediaUrl="https://webhandguidance.b-cdn.net/camera_calibration_demo_test.mp4"
-        mediaTitle="Camera Calibration Tutorial"
-        mediaSubtitle="This video will demonstrate how to calibrate your camera."
-        doneCallback={() => setIsTutorialVisible(false)}
-        doneBtnTitle="Begin Calibration"
-        showHomeBtn
-      />
-    );
+  // useEffect(() => {
+  //   if (isTutorialVisible) stopWebcam();
+  //   else startWebcam();
+  // }, [isTutorialVisible, startWebcam, stopWebcam]);
+
+  // if (isTutorialVisible)
+  //   return (
+  //     <MediaPlayer
+  //       mediaUrl="https://webhandguidance.b-cdn.net/camera_calibration_demo_test.mp4"
+  //       mediaTitle="Camera Calibration Tutorial"
+  //       mediaSubtitle="This video will demonstrate how to calibrate your camera."
+  //       doneCallback={() => setIsTutorialVisible(false)}
+  //       doneBtnTitle="Begin Calibration"
+  //       showHomeBtn
+  //     />
+  //   );
 
   const topContent = (
     <div className="w-full flex flex-col text-center gap-2 pb-4">
@@ -302,12 +328,14 @@ const CameraCalibration = () => {
           Recalibrate
         </button>
 
-        <button
-          className="absolute top-4 left-4 bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"
-          onClick={() => forceRoot()}
-        >
-          <FontAwesomeIcon icon="chevron-left" /> Back
-        </button>
+        {homeEnabled && (
+          <button
+            className="absolute top-4 left-4 bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"
+            onClick={() => forceRoot()}
+          >
+            <FontAwesomeIcon icon="chevron-left" /> Home
+          </button>
+        )}
 
         <button
           className={
@@ -328,28 +356,42 @@ const CameraCalibration = () => {
   );
 
   return (
-    <div className="w-screen h-screen p-16 py-8">
-      <AdjustableCameraView
-        videoRef={videoRef}
-        loading={loading}
-        error={error}
-        className="w-full"
-        onDimensionsChange={setVideoDimensions}
-        topContent={topContent}
-        bottomContent={bottomContent}
-      >
-        {(dimensions) => (
-          <ReactP5Wrapper
-            sketch={sketch}
-            calibrationMarker={calibrationMarker}
-            calibrationProgress={calibrationProgress}
-            redirectProgress={redirectProgress}
-            frameWidth={dimensions.width}
-            frameHeight={dimensions.height}
-          />
-        )}
-      </AdjustableCameraView>
-    </div>
+    <>
+      {isTutorialVisible && (
+        <MediaPlayer
+          mediaUrl="https://webhandguidance.b-cdn.net/camera_calibration_demo_test.mp4"
+          mediaTitle="Camera Calibration Tutorial"
+          mediaSubtitle="This video will demonstrate how to calibrate your camera."
+          doneCallback={() => setIsTutorialVisible(false)}
+          doneBtnTitle="Begin Calibration"
+          showHomeBtn
+          isContinueMarkerVisible={isContinueMarkerVisible}
+          isReplayMarkerVisible={isReplayMarkerVisible}
+        />
+      )}
+      <div className="w-screen h-screen p-16 py-8">
+        <AdjustableCameraView
+          videoRef={videoRef}
+          loading={loading}
+          error={error}
+          className="w-full"
+          onDimensionsChange={setVideoDimensions}
+          topContent={topContent}
+          bottomContent={bottomContent}
+        >
+          {(dimensions) => (
+            <ReactP5Wrapper
+              sketch={sketch}
+              calibrationMarker={calibrationMarker}
+              calibrationProgress={calibrationProgress}
+              redirectProgress={redirectProgress}
+              frameWidth={dimensions.width}
+              frameHeight={dimensions.height}
+            />
+          )}
+        </AdjustableCameraView>
+      </div>
+    </>
   );
 };
 
