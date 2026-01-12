@@ -5,7 +5,7 @@ export type CollectedData = {
   time_sec: number;
   participant_id: string;
   task_tag: string;
-  task_type: 'HOLD' | 'MOVE' | 'ROM_HOLD' | 'ROM_MOVE';
+  task_type: 'HOLD' | 'MOVE' | 'ROM_HOLD' | 'ROM_MOVE' | 'PAUSED' | 'RESUMED';
   user_hand: Handedness;
   task_idx: number;
   trial_idx: number;
@@ -26,7 +26,7 @@ export type CollectedRawData = {
   time_sec: number;
   participant_id: string;
   task_tag: string;
-  task_type: 'HOLD' | 'MOVE' | 'ROM_HOLD' | 'ROM_MOVE';
+  task_type: 'HOLD' | 'MOVE' | 'ROM_HOLD' | 'ROM_MOVE' | 'PAUSED' | 'RESUMED';
   user_hand: Handedness;
   task_idx: number;
   trial_idx: number;
@@ -49,7 +49,7 @@ export type CollectedIMUData = {
   time_sec: number;
   participant_id: string;
   task_tag: string;
-  task_type: 'HOLD' | 'MOVE' | 'ROM_HOLD' | 'ROM_MOVE';
+  task_type: 'HOLD' | 'MOVE' | 'ROM_HOLD' | 'ROM_MOVE' | 'PAUSED' | 'RESUMED';
   task_idx: number;
   trial_idx: number;
   repetition_idx: number;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ReactP5Wrapper } from '@p5-wrapper/react';
 import type { PolarPos, Pos, Task } from '../../types/task';
 import { useConfig } from '../../utils/context';
@@ -65,6 +65,13 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
   const [currentTaskIndex, setCurrentTaskIndex] = useState<number | null>(null);
   const [currentTrial, setCurrentTrial] = useState<number | null>(null);
   const [currentRepetition, setCurrentRepetition] = useState<number | null>(null);
+  const [isPaused, setIsPaused] = useState<boolean>(false);
+
+  // Marker-based pause/resume
+  const PAUSE_MARKER_DURATION = 2000; // 2 seconds
+  const pauseMarkerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [pauseMarkerStartTime, setPauseMarkerStartTime] = useState<number | null>(null);
+  const [pauseMarkerProgress, setPauseMarkerProgress] = useState<number>(0);
 
   //#region Derived Task Params
   const currentTask: Task | null = useMemo(() => (currentTaskIndex !== null && tasks.length > currentTaskIndex ? tasks[currentTaskIndex] : null), [tasks, currentTaskIndex]);
@@ -179,6 +186,8 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
   }, [directionPoint, activeWrist, worldPPI]);
 
   const [taskStartTime, setTaskStartTime] = useState<number | null>(null);
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const holdProgress = (() => {
     if (!taskStartTime) return 0;
     const elapsed = Date.now() - taskStartTime;
@@ -196,13 +205,217 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
     if (window.confirm('Are you sure you want to return to the home page?')) go('#/');
   };
 
+  const togglePauseStudy = useCallback(() => {
+    const unixTimestamp = Date.now();
+    const taskTag = currentTask?.tag || (isPaused ? 'RESUMED' : 'PAUSED');
+    const taskType = isPaused ? 'RESUMED' : 'PAUSED';
+
+    // Create data entries
+    const dataInstance: CollectedData = {
+      unix_timestamp: unixTimestamp,
+      time_sec: -1,
+      participant_id: participantId,
+      task_tag: taskTag,
+      task_type: taskType,
+      user_hand: hand,
+      task_idx: currentTaskIndex ?? -1,
+      trial_idx: currentTrial ?? -1,
+      repetition_idx: currentRepetition ?? -1,
+      target_idx: currentTarget ?? -1,
+      target_x_mm: -1,
+      target_y_mm: -1,
+      target_threshold_mm: -1,
+      user_left_x_mm: -1,
+      user_left_y_mm: -1,
+      user_right_x_mm: -1,
+      user_right_y_mm: -1,
+      target_dist_mm: -1,
+    };
+    const rawDataInstance: CollectedRawData = {
+      unix_timestamp: unixTimestamp,
+      time_sec: -1,
+      participant_id: participantId,
+      task_tag: taskTag,
+      task_type: taskType,
+      user_hand: hand,
+      task_idx: currentTaskIndex ?? -1,
+      trial_idx: currentTrial ?? -1,
+      repetition_idx: currentRepetition ?? -1,
+      target_idx: currentTarget ?? -1,
+      target_x_px: -1,
+      target_y_px: -1,
+      target_threshold_px: -1,
+      user_left_x_px: -1,
+      user_left_y_px: -1,
+      user_right_x_px: -1,
+      user_right_y_px: -1,
+      target_dist_px: -1,
+      world_ppi: worldPPI,
+      scaling_factor: MM_TO_INCH * worldPPI,
+    };
+    const imuDataInstance: CollectedIMUData = {
+      unix_timestamp: unixTimestamp,
+      time_sec: -1,
+      participant_id: participantId,
+      task_tag: taskTag,
+      task_type: taskType,
+      task_idx: currentTaskIndex ?? -1,
+      trial_idx: currentTrial ?? -1,
+      repetition_idx: currentRepetition ?? -1,
+      target_idx: currentTarget ?? -1,
+      ax: latestImuVal?.ax ?? null,
+      ay: latestImuVal?.ay ?? null,
+      az: latestImuVal?.az ?? null,
+    };
+
+    // Add to full study data
+    setCollectedData((prev) => [...prev, dataInstance]);
+    setCollectedRawData((prev) => [...prev, rawDataInstance]);
+    setCollectedIMUData((prev) => [...prev, imuDataInstance]);
+    // Add to current task data
+    setCurrentTaskData((prev) => [...prev, dataInstance]);
+    setCurrentTaskRawData((prev) => [...prev, rawDataInstance]);
+    setCurrentTaskIMUData((prev) => [...prev, imuDataInstance]);
+
+    if (isPaused) {
+      // Resume: reset current repetition and target to start of task
+      setCurrentRepetition(0);
+      setCurrentTarget(0);
+      setPreviousTarget(null);
+      setTaskStartTime(null);
+      setIsPaused(false);
+    } else {
+      // Cancel hold timer if running
+      if (holdTimerRef.current) {
+        clearTimeout(holdTimerRef.current);
+        holdTimerRef.current = null;
+      }
+      setIsPaused(true);
+    }
+  }, [
+    currentTask?.tag,
+    isPaused,
+    participantId,
+    hand,
+    currentTaskIndex,
+    currentTrial,
+    currentRepetition,
+    currentTarget,
+    worldPPI,
+    latestImuVal,
+  ]);
+
+  // Handle continue marker for pause/resume toggle
+  useEffect(() => {
+    if (isContinueMarkerVisible && pauseMarkerTimerRef.current === null) {
+      // Start the timer when marker becomes visible
+      setPauseMarkerStartTime(Date.now());
+      pauseMarkerTimerRef.current = setTimeout(() => {
+        togglePauseStudy();
+        pauseMarkerTimerRef.current = null;
+        setPauseMarkerStartTime(null);
+        setPauseMarkerProgress(0);
+      }, PAUSE_MARKER_DURATION);
+    } else if (!isContinueMarkerVisible && pauseMarkerTimerRef.current !== null) {
+      // Cancel the timer when marker is no longer visible
+      clearTimeout(pauseMarkerTimerRef.current);
+      pauseMarkerTimerRef.current = null;
+      setPauseMarkerStartTime(null);
+      setPauseMarkerProgress(0);
+    }
+  }, [isContinueMarkerVisible, PAUSE_MARKER_DURATION, togglePauseStudy]);
+
+  // Update progress bar animation
+  useEffect(() => {
+    if (pauseMarkerStartTime === null) return;
+
+    const intervalId = setInterval(() => {
+      const elapsed = Date.now() - pauseMarkerStartTime;
+      const progress = Math.min(elapsed / PAUSE_MARKER_DURATION, 1);
+      setPauseMarkerProgress(progress);
+    }, 50);
+
+    return () => clearInterval(intervalId);
+  }, [pauseMarkerStartTime, PAUSE_MARKER_DURATION]);
+
   //#region Data Collection
   const [isDataSent, setIsDataSent] = useState<boolean>(false);
   const [isDataSentSuccessfully, setIsDataSentSuccessfully] = useState<boolean>(false);
 
+  // Full study data (accumulated across all tasks)
   const [collectedData, setCollectedData] = useState<CollectedData[]>([]);
   const [collectedRawData, setCollectedRawData] = useState<CollectedRawData[]>([]);
   const [collectedIMUData, setCollectedIMUData] = useState<CollectedIMUData[]>([]);
+
+  // Current task data (reset after each task upload)
+  const [currentTaskData, setCurrentTaskData] = useState<CollectedData[]>([]);
+  const [currentTaskRawData, setCurrentTaskRawData] = useState<CollectedRawData[]>([]);
+  const [currentTaskIMUData, setCurrentTaskIMUData] = useState<CollectedIMUData[]>([]);
+
+  // Refs to always get latest task data (avoids stale closure in setTimeout)
+  const currentTaskDataRef = useRef<CollectedData[]>([]);
+  const currentTaskRawDataRef = useRef<CollectedRawData[]>([]);
+  const currentTaskIMUDataRef = useRef<CollectedIMUData[]>([]);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    currentTaskDataRef.current = currentTaskData;
+  }, [currentTaskData]);
+  useEffect(() => {
+    currentTaskRawDataRef.current = currentTaskRawData;
+  }, [currentTaskRawData]);
+  useEffect(() => {
+    currentTaskIMUDataRef.current = currentTaskIMUData;
+  }, [currentTaskIMUData]);
+
+  const uploadTaskData = useCallback(
+    (taskIdx: number, taskTag: string, task: Task) => {
+      if (config.serverURL === '') return;
+
+      // Read from refs to get latest data (avoids stale closure issue)
+      const taskData = currentTaskDataRef.current;
+      const taskRawData = currentTaskRawDataRef.current;
+      const taskIMUData = currentTaskIMUDataRef.current;
+
+      if (taskData.length === 0 && taskRawData.length === 0) return;
+
+      const taskDataPackage = {
+        dataCsv: taskData.length > 0 ? toCSV<CollectedData>(taskData, Object.keys(taskData[0]) as (keyof CollectedData)[]) : '',
+        rawDataCsv: taskRawData.length > 0 ? toCSV<CollectedRawData>(taskRawData, Object.keys(taskRawData[0]) as (keyof CollectedRawData)[]) : '',
+        imuDataCsv: taskIMUData.length > 0 ? toCSV<CollectedIMUData>(taskIMUData, Object.keys(taskIMUData[0]) as (keyof CollectedIMUData)[]) : '',
+        participantId,
+        taskTag,
+        taskIdx,
+        timestamp: new Date().toISOString(),
+        task: JSON.stringify(task, null, 2),
+      };
+
+      fetch(config.serverURL + '/uploadTaskData', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(taskDataPackage),
+      })
+        .then((response) => {
+          if (!response.ok) {
+            console.error('Failed to upload task data for task:', taskTag);
+          } else {
+            console.log('Task data uploaded successfully for task:', taskTag);
+          }
+        })
+        .catch((error) => {
+          console.error('Error uploading task data:', error);
+        });
+
+      // Reset current task data after upload
+      setCurrentTaskData([]);
+      setCurrentTaskRawData([]);
+      setCurrentTaskIMUData([]);
+      currentTaskDataRef.current = [];
+      currentTaskRawDataRef.current = [];
+      currentTaskIMUDataRef.current = [];
+    },
+    [config.serverURL, participantId]
+  );
 
   const saveDataAsCSV = () => {
     if (collectedData.length === 0 || collectedRawData.length === 0) return;
@@ -320,6 +533,10 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
       setCurrentTarget(0);
       BEEP_SOUND.play();
     } else {
+      // Upload current task data before moving to next task
+      if (currentTask.type !== 'MEDIA') {
+        uploadTaskData(currentTaskIndex, currentTask.tag, currentTask);
+      }
       setCurrentTaskIndex(currentTaskIndex + 1);
       setCurrentTrial(0);
       setCurrentRepetition(0);
@@ -327,7 +544,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
       setCurrentTarget(0);
       BEEP_SOUND.play();
     }
-  }, [currentTarget, currentRepetition, currentTrial, currentTaskIndex, currentTask, repetitions, trials, markers]);
+  }, [currentTarget, currentRepetition, currentTrial, currentTaskIndex, currentTask, repetitions, trials, markers, uploadTaskData]);
 
   useEffect(() => {
     if (currentTaskIndex === null) return;
@@ -337,6 +554,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
     if (currentRepetition === null) return;
     if (currentTrial === null) return;
     if (isStudyComplete) return;
+    if (isPaused) return;
 
     if (activeWrist === null) return;
 
@@ -417,9 +635,14 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
           az: latestImuVal?.az ?? null,
         };
         setCollectedIMUData((prev) => [...prev, imuDataInstance]);
+        setCurrentTaskIMUData((prev) => [...prev, imuDataInstance]);
       }
+      // Add to full study data
       setCollectedData((prev) => [...prev, dataInstance]);
       setCollectedRawData((prev) => [...prev, rawDataInstance]);
+      // Add to current task data
+      setCurrentTaskData((prev) => [...prev, dataInstance]);
+      setCurrentTaskRawData((prev) => [...prev, rawDataInstance]);
     }
 
     // Facilitating Task Progression
@@ -427,7 +650,9 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
 
     if (taskStartTime === null) {
       setTaskStartTime(Date.now());
-      if (['HOLD', 'ROM_HOLD'].includes(currentTask.type) && holdDuration !== null) setTimeout(() => progressTask(), holdDuration);
+      if (['HOLD', 'ROM_HOLD'].includes(currentTask.type) && holdDuration !== null) {
+        holdTimerRef.current = setTimeout(() => progressTask(), holdDuration);
+      }
     }
     if (['MOVE', 'ROM_MOVE'].includes(currentTask.type)) progressTask();
   }, [
@@ -441,6 +666,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
     worldPPI,
     taskStartTime,
     isStudyComplete,
+    isPaused,
     participantId,
     progressTask,
     latestImuVal,
@@ -534,6 +760,17 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
               ))}
             </div>
             
+            <button
+              className={`px-4 py-2 rounded-lg font-bold cursor-pointer ${
+                isPaused
+                  ? 'bg-green-600 text-white hover:bg-green-800'
+                  : 'bg-yellow-500 text-white hover:bg-yellow-600'
+              }`}
+              onClick={togglePauseStudy}
+            >
+              <FontAwesomeIcon icon={isPaused ? 'play' : 'pause'} className="mr-2" />
+              {isPaused ? 'Resume Study' : 'Pause Study'}
+            </button>
             <button
               className="px-4 py-2 rounded-lg bg-red-600 text-white font-bold hover:bg-red-800 cursor-pointer"
               onClick={() => {
@@ -650,6 +887,40 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
                     </>
                   )}
                 </div>
+
+                {/* Pause overlay */}
+                {isPaused && (
+                  <div className="absolute inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-10">
+                    <div className="text-white text-4xl font-bold flex flex-col items-center gap-4">
+                      <FontAwesomeIcon icon="pause" className="text-6xl" />
+                      <span>Study Paused</span>
+                      {pauseMarkerStartTime !== null && (
+                        <div className="flex flex-col items-center gap-2 mt-4">
+                          <span className="text-lg font-normal">Resuming...</span>
+                          <div className="w-48 h-3 bg-gray-600 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-green-500 transition-all duration-50"
+                              style={{ width: `${pauseMarkerProgress * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Marker progress indicator (when not paused) */}
+                {!isPaused && pauseMarkerStartTime !== null && (
+                  <div className="absolute top-4 right-4 z-10 bg-black/70 rounded-lg px-4 py-3 flex flex-col items-center gap-2">
+                    <span className="text-white text-sm font-semibold">Pausing...</span>
+                    <div className="w-32 h-2 bg-gray-600 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-yellow-500 transition-all duration-50"
+                        style={{ width: `${pauseMarkerProgress * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

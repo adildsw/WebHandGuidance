@@ -2,7 +2,7 @@ import type { Config } from '../types/config';
 import type { FingerTips, HeadShoulderDetectionResult, WristDetectionResult } from '../types/detections';
 import type { Task } from '../types/task';
 
-export const SYSTEM_VERSION = '0.2.1';
+export const SYSTEM_VERSION = '0.2.2';
 
 export const CREDIT_CARD_WIDTH_INCH = 3.37;
 export const CREDIT_CARD_HEIGHT_INCH = 2.13;
@@ -54,7 +54,7 @@ export const defaultConfig: Config = {
   defaultTaskType: 'ROM_MOVE',
   silParams: { silY: 0, silScaleX: 1, silScaleY: 1, silCalibrated: false },
   romCalibrationParams: null,
-  romSafeMargin: 0.85,
+  romSafeMargin: 0.95,
   serverURL: "https://xia9elgwbl.execute-api.us-east-2.amazonaws.com/",
   version: "0.1",
 };

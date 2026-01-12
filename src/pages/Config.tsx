@@ -111,7 +111,7 @@ const Config = () => {
           </div>
 
           <div className="flex flex-col gap-2">
-            <div className="text-sm font-bold text-gray-600 mb-1">Testbed Parameters</div>
+            {/* <div className="text-sm font-bold text-gray-600 mb-1">Testbed Parameters</div>
             <div className="flex items-center justify-between">
               <label className="text-sm text-gray-600">Testbed Width (mm)</label>
               <input
@@ -132,7 +132,7 @@ const Config = () => {
                 value={String(config.testbedHeightMM)}
                 onChange={(e) => setTestbedHeight(toNumber(e.target.value))}
               />
-            </div>
+            </div> */}
 
             <div className="flex items-center justify-between">
               <label className="text-sm text-gray-600">Marker Diameter (mm)</label>

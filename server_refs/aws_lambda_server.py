@@ -119,6 +119,9 @@ def handler(event, context):
     if path == "/upload" and method == "POST":
         return upload_handler(event)
 
+    if path == "/uploadTaskData" and method == "POST":
+        return upload_task_data_handler(event)
+
     try:
         require_auth(event)
     except PermissionError:
@@ -166,7 +169,7 @@ def upload_handler(event):
 
     safe_pid = safe_fragment(participant_id)
     safe_ts = safe_fragment(timestamp)
-    filename = f"{safe_pid}_{safe_ts}.zip"
+    filename = f"{safe_pid}_fulldata_{safe_ts}.zip"
     key = PREFIX + filename
 
     participation_info = {
@@ -182,6 +185,66 @@ def upload_handler(event):
             zf.writestr("imuData.csv", imu_data_csv)
         zf.writestr("task.json", task_str)
         zf.writestr("participation_info.json", json.dumps(participation_info))
+
+    zipped_bytes = buf.getvalue()
+
+    s3.put_object(
+        Bucket=BUCKET,
+        Key=key,
+        Body=zipped_bytes,
+        ContentType="application/zip"
+    )
+
+    return response(200, {"status": "ok", "key": key, "size": len(zipped_bytes)})
+
+
+def upload_task_data_handler(event):
+    body_bytes = get_body_bytes(event)
+    try:
+        payload = json.loads(body_bytes.decode("utf-8"))
+    except json.JSONDecodeError:
+        return response(400, "Invalid JSON", {"Content-Type": "text/plain"})
+
+    if not isinstance(payload, dict):
+        return response(400, "Invalid JSON body", {"Content-Type": "text/plain"})
+
+    data_csv = payload.get("dataCsv") or ""
+    raw_data_csv = payload.get("rawDataCsv") or ""
+    imu_data_csv = payload.get("imuDataCsv") or ""
+    participant_id = payload.get("participantId") or ""
+    task_tag = payload.get("taskTag") or ""
+    task_idx = payload.get("taskIdx") or ""
+    timestamp = payload.get("timestamp") or ""
+    task_str = payload.get("task") or ""
+
+    if not all([participant_id, timestamp, task_tag]):
+        return response(400, "Missing required fields (participantId, timestamp, taskTag)", {"Content-Type": "text/plain"})
+
+    safe_pid = safe_fragment(participant_id)
+    safe_tag = safe_fragment(task_tag)
+    safe_idx = safe_fragment(str(task_idx))
+    safe_ts = safe_fragment(timestamp)
+    filename = f"{safe_pid}_task{safe_idx}_{safe_tag}_{safe_ts}.zip"
+    key = PREFIX + filename
+
+    task_info = {
+        "participant_id": participant_id,
+        "task_tag": task_tag,
+        "task_idx": task_idx,
+        "timestamp": timestamp
+    }
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        if data_csv.strip():
+            zf.writestr("data.csv", data_csv)
+        if raw_data_csv.strip():
+            zf.writestr("rawData.csv", raw_data_csv)
+        if imu_data_csv.strip():
+            zf.writestr("imuData.csv", imu_data_csv)
+        if task_str.strip():
+            zf.writestr("task.json", task_str)
+        zf.writestr("task_info.json", json.dumps(task_info))
 
     zipped_bytes = buf.getvalue()
 

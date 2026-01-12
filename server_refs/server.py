@@ -84,14 +84,12 @@ def upload():
     timestamp = payload.get("timestamp", "")
     task_str = payload.get("task", "")
 
-    
-
     if not all([data_csv, raw_data_csv, participant_id, timestamp, task_str]):
         return Response("Missing required fields", status=400, mimetype="text/plain")
 
     safe_pid = safe_fragment(participant_id)
     safe_ts = safe_fragment(timestamp)
-    filename = f"{safe_pid}_{safe_ts}.zip"
+    filename = f"{safe_pid}_fulldata_{safe_ts}.zip"
     path = DATA_DIR / filename
 
     participation_info = {
@@ -106,6 +104,57 @@ def upload():
             zf.writestr("imuData.csv", imu_data_csv)
         zf.writestr("task.json", task_str)
         zf.writestr("participation_info.json", json.dumps(participation_info))
+
+    size = path.stat().st_size
+    key = f"data/{filename}"
+    return jsonify({"status": "ok", "key": key, "size": size})
+
+
+@app.route("/uploadTaskData", methods=["POST", "OPTIONS"])
+def upload_task_data():
+    if request.method == "OPTIONS":
+        return Response("", status=204)
+
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return Response("Invalid JSON", status=400, mimetype="text/plain")
+
+    data_csv = payload.get("dataCsv", "")
+    raw_data_csv = payload.get("rawDataCsv", "")
+    imu_data_csv = payload.get("imuDataCsv", "") or ""
+    participant_id = payload.get("participantId", "")
+    task_tag = payload.get("taskTag", "")
+    task_idx = payload.get("taskIdx", "")
+    timestamp = payload.get("timestamp", "")
+    task_str = payload.get("task", "")
+
+    if not all([participant_id, timestamp, task_tag]):
+        return Response("Missing required fields (participantId, timestamp, taskTag)", status=400, mimetype="text/plain")
+
+    safe_pid = safe_fragment(participant_id)
+    safe_tag = safe_fragment(task_tag)
+    safe_idx = safe_fragment(str(task_idx))
+    safe_ts = safe_fragment(timestamp)
+    filename = f"{safe_pid}_task{safe_idx}_{safe_tag}_{safe_ts}.zip"
+    path = DATA_DIR / filename
+
+    task_info = {
+        "participant_id": participant_id,
+        "task_tag": task_tag,
+        "task_idx": task_idx,
+        "timestamp": timestamp,
+    }
+
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
+        if data_csv.strip():
+            zf.writestr("data.csv", data_csv)
+        if raw_data_csv.strip():
+            zf.writestr("rawData.csv", raw_data_csv)
+        if imu_data_csv.strip():
+            zf.writestr("imuData.csv", imu_data_csv)
+        if task_str.strip():
+            zf.writestr("task.json", task_str)
+        zf.writestr("task_info.json", json.dumps(task_info))
 
     size = path.stat().st_size
     key = f"data/{filename}"
