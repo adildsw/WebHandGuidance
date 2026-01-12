@@ -1,20 +1,20 @@
 import { ReactP5Wrapper, type Sketch } from '@p5-wrapper/react';
 import type p5 from 'p5';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { HeadShoulderDetectionResult, WristDetectionResult } from '../types/detections';
-import { type SilhouetteParams } from '../types/config';
-import { defaultConfig, MM_TO_INCH, NOSE_Y_OFFSET, SHOULDER_X_OFFSET, SHOULDER_Y_OFFSET, SIL_IMG_HEIGHT, SIL_IMG_WIDTH } from '../utils/constants';
-import type { PolarPos, Pos } from '../types/task';
-import { useConfig } from '../utils/context';
-import useDetection from '../hooks/useMediaPipeHandDetection';
-import { forceRoot } from '../utils/navigation';
-import { cartesianToPolar, polarToCartesian } from '../utils/math';
-import MediaPlayer from '../components/MediaPlayer';
+import type { HeadShoulderDetectionResult, WristDetectionResult } from '../../types/detections';
+import { type SilhouetteParams } from '../../types/config';
+import { defaultConfig, MM_TO_INCH, NOSE_Y_OFFSET, SHOULDER_X_OFFSET, SHOULDER_Y_OFFSET, SIL_IMG_HEIGHT, SIL_IMG_WIDTH } from '../../utils/constants';
+import type { PolarPos, Pos } from '../../types/task';
+import { useConfig } from '../../utils/context';
+import useDetection from '../../hooks/useMediaPipeHandDetection';
+import { forceRoot } from '../../utils/navigation';
+import { cartesianToPolar, polarToCartesian } from '../../utils/math';
+import MediaPlayer from '../../components/MediaPlayer';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
-type RomCalibrationStages = 'preinit' | 'init' | 'leftStretch' | 'rightStretch' | 'leftRaised' | 'rightRaised' | 'done';
+type RomCalibrationStages = 'init' | 'leftStretch' | 'rightStretch' | 'leftRaised' | 'rightRaised' | 'done';
 
 const CALIBRATION_MESSAGES: { [key in RomCalibrationStages]: string } = {
-  preinit: 'Press Start Calibration to begin.',
   init: 'Please get in position so that the silhouette matches your body.',
   leftStretch: 'Please stretch your left hand out to the side as far as possible and hold.',
   rightStretch: 'Please stretch your right hand out to the side as far as possible and hold.',
@@ -240,7 +240,7 @@ const sketch: Sketch = (p5) => {
     p5.stroke(0, 255, 0, 192);
     p5.strokeWeight(16);
     p5.line(-width / 2 + 10, -height / 2 + 10, p5.lerp(-width / 2 + 10, width / 2 - 10, calibrationProgress), -height / 2 + 10);
-  }
+  };
 
   p5.draw = () => {
     p5.clear();
@@ -273,13 +273,17 @@ const RomCalibration = () => {
   const testbedWidth = testbedWidthMM * MM_TO_INCH * factor;
   const testbedHeight = testbedHeightMM * MM_TO_INCH * factor;
 
-  const [areWeDone, setAreWeDone] = useState(false);
+  const navigate = useNavigate();
+  const [urlParams] = useSearchParams();
+  const homeEnabled = urlParams.get('homeEnabled') !== 'false';
+  const participantId = urlParams.get('participantId') || '';
+  const dataParam = urlParams.get('data') || '';
 
+  const [areWeDone, setAreWeDone] = useState(false);
   const [isTutorialVisible, setIsTutorialVisible] = useState(true);
 
-  const overlayRef = useRef<HTMLDivElement | null>(null);
-
-  const { videoRef, wristDetection, headShoulderDetection, loading, error, startWebcam, stopWebcam } = useDetection(true);
+  const { videoRef, wristDetection, headShoulderDetection, loading, error, startWebcam, stopWebcam, detectedMarkers } = useDetection(true);
+  const { isContinueMarkerVisible, isReplayMarkerVisible } = detectedMarkers;
 
   const isUserInPos = useMemo(() => {
     if (headShoulderDetection.posErrorX === null || headShoulderDetection.posErrorZ === null) return false;
@@ -298,7 +302,7 @@ const RomCalibration = () => {
     if (wristDetection.rightWrist && headShoulderDetection.rightShoulder) rightRomRef.current = cartesianToPolar(headShoulderDetection.rightShoulder, wristDetection.rightWrist);
   }, [wristDetection, headShoulderDetection]);
 
-  const [calibrationStage, setCalibrationStage] = useState<RomCalibrationStages>('preinit');
+  const [calibrationStage, setCalibrationStage] = useState<RomCalibrationStages>('init');
   const [calibrationStartTime, setCalibrationStartTime] = useState<number | null>(null);
   const [isCalibrated, setIsCalibrated] = useState(false);
   const timerRef = useRef<number | null>(null);
@@ -311,8 +315,44 @@ const RomCalibration = () => {
     return Math.min(elapsed / 5000, 1);
   })();
 
+  const resetRomCalibration = () => {
+    setRomCalibrationParams(null);
+    setIsCalibrated(false);
+    setCalibrationStage('init');
+    setLeftStretchedRom(null);
+    setLeftRaisedRom(null);
+    setRightStretchedRom(null);
+    setRightRaisedRom(null);
+    leftRomRef.current = null;
+    rightRomRef.current = null;
+  };
+
+  // Reset calibration state when tutorial becomes visible
   useEffect(() => {
-    if (calibrationStage === 'preinit' || calibrationStage === 'done') {
+    if (isTutorialVisible) {
+      // Clear any running timer
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      // Reset all calibration state
+      setCalibrationStage('init');
+      setCalibrationStartTime(null);
+      setIsCalibrated(false);
+      setLeftStretchedRom(null);
+      setLeftRaisedRom(null);
+      setRightStretchedRom(null);
+      setRightRaisedRom(null);
+      leftRomRef.current = null;
+      rightRomRef.current = null;
+    }
+  }, [isTutorialVisible]);
+
+  useEffect(() => {
+    // Don't run calibration logic when tutorial is visible
+    if (isTutorialVisible) return;
+
+    if (calibrationStage === 'done') {
       if (timerRef.current !== null) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
@@ -367,127 +407,142 @@ const RomCalibration = () => {
         timerRef.current = null;
       }, 5000);
     }
-  }, [calibrationStage, isUserInPos]);
+  }, [isTutorialVisible, calibrationStage, isUserInPos]);
 
   useEffect(() => {
-    if (calibrationStage === 'done' && !isCalibrated) {
-      console.log("Yes");
+    if (!isTutorialVisible && calibrationStage === 'done' && !isCalibrated) {
+      console.log('Yes');
       const averageLeftRomRadius = leftStretchedRom && leftRaisedRom ? (leftStretchedRom.radius + leftRaisedRom.radius) / 2 : null;
       const averageRightRomRadius = rightStretchedRom && rightRaisedRom ? (rightStretchedRom.radius + rightRaisedRom.radius) / 2 : null;
       if (averageLeftRomRadius !== null && averageRightRomRadius !== null) setRomCalibrationParams({ leftRadius: averageLeftRomRadius, rightRadius: averageRightRomRadius });
       else setRomCalibrationParams(null);
       setIsCalibrated(true);
     }
-  }, [calibrationStage, leftStretchedRom, leftRaisedRom, rightStretchedRom, rightRaisedRom, setRomCalibrationParams, isCalibrated]);
+  }, [isTutorialVisible, calibrationStage, leftStretchedRom, leftRaisedRom, rightStretchedRom, rightRaisedRom, setRomCalibrationParams, isCalibrated]);
 
   useEffect(() => {
-    if (isTutorialVisible) stopWebcam();
-    else startWebcam();
-  }, [isTutorialVisible, startWebcam, stopWebcam]);
+    startWebcam();
+    return () => {
+      stopWebcam();
+    };
+  }, [startWebcam, stopWebcam]);
 
-  if (isTutorialVisible)
-    return (
-      <MediaPlayer
-        mediaUrl="https://webhandguidance.b-cdn.net/rom_calibration_demo_test.mp4"
-        mediaTitle="Range of Motion Calibration Tutorial"
-        mediaSubtitle="This video will demonstrate how to calibrate your range of motion."
-        doneCallback={() => setIsTutorialVisible(false)}
-        doneBtnTitle="Begin Calibration"
-        showHomeBtn
-      />
-    );
+  useEffect(() => {
+    if (calibrationStage === 'done' && participantId && dataParam) {
+      const REDIRECT_TIMER = 1000;
+      const redirectTimer = window.setTimeout(() => {
+        stopWebcam();
+        navigate(`/study?participantId=${participantId}&data=${dataParam}`);
+      }, REDIRECT_TIMER);
+
+      return () => {
+        clearTimeout(redirectTimer);
+      };
+    }
+  }, [calibrationStage, participantId, dataParam, navigate, stopWebcam]);
 
   return (
-    <div className="w-screen h-screen flex gap-4 flex-col items-center justify-center p-16 py-8">
-      {isCalibrated ? (
-        <div className="w-full flex flex-col text-center gap-2">
-          <h1 className="text-3xl font-bold">Calibration Complete</h1>
+    <>
+      {isTutorialVisible && (
+        <MediaPlayer
+          // mediaUrl="https://webhandguidance.b-cdn.net/rom_calibration_demo_test.mp4"
+          mediaUrl="https://webhandguidance.b-cdn.net/phase2_videos/ROMCalibrationTutorial.mp4"
+          mediaTitle="Range of Motion Calibration Tutorial"
+          mediaSubtitle="This video will demonstrate how to calibrate your range of motion."
+          doneCallback={() => setIsTutorialVisible(false)}
+          doneBtnTitle="Begin Calibration"
+          showHomeBtn={homeEnabled}
+          isContinueMarkerVisible={isContinueMarkerVisible}
+          isReplayMarkerVisible={isReplayMarkerVisible}
+        />
+      )}
+      <div className="w-screen h-screen flex gap-4 flex-col items-center justify-center p-16 py-8">
+        {isCalibrated ? (
+          <div className="w-full flex flex-col text-center gap-2">
+            <h1 className="text-3xl font-bold">Calibration Complete</h1>
 
-          <p className="text-gray-500 text-md italic">You can now return to the main screen.</p>
-        </div>
-      ) : (
-        <div className="w-full flex flex-col text-center gap-2">
-          <h1 className="text-3xl font-bold">Calibrate Range of Motion</h1>
+            <p className="text-gray-500 text-md italic">You can now return to the main screen.</p>
+          </div>
+        ) : (
+          <div className="w-full flex flex-col text-center gap-2">
+            <h1 className="text-3xl font-bold">Calibrate Range of Motion</h1>
 
-          <div className="flex flex-col">
-            <p className="text-gray-500 text-md italic">
-              Please press the <strong>Start Calibration</strong> button below to begin calibration, and <strong>follow the on-screen instructions</strong>.
-            </p>
+            <div className="flex flex-col">
+              <p className="text-gray-500 text-md italic">
+                Please press the <strong>Start Calibration</strong> button below to begin calibration, and <strong>follow the on-screen instructions</strong>.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Camera Feed */}
+        <div className="md:col-span-3 bg-gray-100 flex items-center justify-center relative" style={{ width: `${testbedWidth}px`, height: `${testbedHeight}px` }}>
+          <div className="absolute inset-0 overflow-hidden rounded-lg shadow-lg">
+            {videoRef !== null && !loading && !error && (
+              <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
+            )}
+            {!areWeDone && (
+              <div className="absolute inset-0">
+                <ReactP5Wrapper
+                  sketch={sketch}
+                  wristPos={wristDetection}
+                  frameWidth={testbedWidth}
+                  frameHeight={testbedHeight}
+                  headShoulderDetection={headShoulderDetection}
+                  silParams={silParams}
+                  isCalibrated={isCalibrated}
+                  calibrationStage={calibrationStage}
+                  leftStretchedRom={leftStretchedRom}
+                  leftRaisedRom={leftRaisedRom}
+                  rightStretchedRom={rightStretchedRom}
+                  rightRaisedRom={rightRaisedRom}
+                  romCalibrationParams={romCalibrationParams}
+                  romSafeMargin={romSafeMargin}
+                  calibrationProgress={calibrationProgress}
+                />
+              </div>
+            )}
           </div>
         </div>
-      )}
 
-      {/* Camera Feed */}
-      <div className="md:col-span-3 bg-gray-100 flex items-center justify-center relative" style={{ width: `${testbedWidth}px`, height: `${testbedHeight}px` }}>
-        <div ref={overlayRef} className="absolute inset-0 overflow-hidden rounded-lg shadow-lg">
-          {videoRef !== null && !loading && !error && (
-            <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
-          )}
-          {!areWeDone && (
-            <div className="absolute inset-0">
-              <ReactP5Wrapper
-                sketch={sketch}
-                wristPos={wristDetection}
-                frameWidth={testbedWidth}
-                frameHeight={testbedHeight}
-                headShoulderDetection={headShoulderDetection}
-                silParams={silParams}
-                isCalibrated={isCalibrated}
-                calibrationStage={calibrationStage}
-                leftStretchedRom={leftStretchedRom}
-                leftRaisedRom={leftRaisedRom}
-                rightStretchedRom={rightStretchedRom}
-                rightRaisedRom={rightRaisedRom}
-                romCalibrationParams={romCalibrationParams}
-                romSafeMargin={romSafeMargin}
-                calibrationProgress={calibrationProgress}
-              />
-            </div>
+        <div className="flex flex-col text-center">
+          <p className="text-gray-500 text-md">{CALIBRATION_MESSAGES[calibrationStage]}</p>
+          {timerRef.current ? (
+            <p className="text-red-500 text-md font-bold">Please hold steady for {Math.floor((CALIBRATION_TIMER - calibrationProgress * CALIBRATION_TIMER) / 1000)} seconds</p>
+          ) : (
+            <p className="text-red-500 text-md font-bold">{'⠀'}</p>
           )}
         </div>
-      </div>
 
-      <div className="flex flex-col text-center">
-        <p className="text-gray-500 text-md">{CALIBRATION_MESSAGES[calibrationStage]}</p>
-        {timerRef.current && (
-          <p className="text-red-500 text-md font-bold">Please hold steady for {Math.floor((CALIBRATION_TIMER - calibrationProgress * CALIBRATION_TIMER) / 1000)} seconds</p>
-        )}
-      </div>
-
-      <div className="flex flex-row gap-2">
-        <button
-          className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"
-          onClick={() => setIsTutorialVisible(true)}
-        >
-          Replay Video
-        </button>
-        {calibrationStage === 'preinit' ? (
+        <div className="flex flex-row gap-2">
           <button
             className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"
-            onClick={() => setCalibrationStage('init')}
+            onClick={() => setIsTutorialVisible(true)}
           >
-            Start Calibration
+            Replay Video
           </button>
-        ) : (
+
           <button
             className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"
-            onClick={() => setCalibrationStage('preinit')}
+            onClick={() => resetRomCalibration()}
           >
             Reset
           </button>
-        )}
-        <button
-          className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"
-          onClick={() => {
-            stopWebcam();
-            setAreWeDone(true);
-            forceRoot();
-          }}
-        >
-          Done
-        </button>
+          {homeEnabled && (
+            <button
+              className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"
+              onClick={() => {
+                stopWebcam();
+                setAreWeDone(true);
+                forceRoot();
+              }}
+            >
+              Done
+            </button>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

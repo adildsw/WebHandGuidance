@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { MM_TO_INCH } from '../utils/constants';
 import { useConfig } from '../utils/context';
-import { go } from '../utils/navigation';
+import { forceRoot } from '../utils/navigation';
 
 type MediaPlayerProps = {
   mediaUrl: string;
@@ -36,7 +36,7 @@ const MediaPlayer = ({
   // const timerRef = useRef<number | null>(null);
   const replayTimerRef = useRef<number | null>(null);
   const continueTimerRef = useRef<number | null>(null);
-  const ACTION_TIMER = config.defaultStartDuration;
+  const ACTION_TIMER = 2000;
 
   const isMediaVideo = mediaUrl.match(/\.(mp4|webm|ogg)(\?.*)?$/i);
 
@@ -99,14 +99,11 @@ const MediaPlayer = ({
       <div className="md:col-span-3 bg-gray-100 flex items-center justify-center relative" style={{ width: `${testbedWidth}px`, height: `${testbedHeight}px` }}>
         <div className="absolute inset-0 overflow-hidden rounded-lg shadow-lg border border-gray-300 bg-black">
           {isMediaVideo ? (
-            <video ref={videoRef} key={mediaUrl} src={mediaUrl} className="w-full h-full object-cover" autoPlay playsInline controls />
+            <video ref={videoRef} key={mediaUrl} src={mediaUrl} className="w-full h-full object-cover" autoPlay={true} playsInline controls loop />
           ) : (
             <img src={mediaUrl} alt={mediaTitle} className="w-full h-full object-contain" />
           )}
-          <div
-            className="absolute bottom-0 left-0 h-2 bg-blue-500 transition-all"
-            style={{ width: `${actionProgress * 100}%`, transitionDuration: '100ms' }}
-          ></div>
+          <div className="absolute bottom-0 left-0 h-2 bg-blue-500 transition-all" style={{ width: `${actionProgress * 100}%`, transitionDuration: '100ms' }}></div>
         </div>
       </div>
 
@@ -127,7 +124,7 @@ const MediaPlayer = ({
         {showHomeBtn && (
           <button
             className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"
-            onClick={() => go('/home')}
+            onClick={() => forceRoot()}
           >
             Home
           </button>

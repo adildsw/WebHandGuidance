@@ -9,7 +9,7 @@ import useDetection from '../../hooks/useMediaPipeHandDetection';
 import { decodeBase64 } from '../../utils/encoder';
 import { closestPointOnLine, directionalMap, distance, polarToCartesian } from '../../utils/math';
 import type { CollectedData, CollectedIMUData, CollectedRawData } from '../../types/datacollection';
-import { go } from '../../utils/navigation';
+import { forceRoot, go } from '../../utils/navigation';
 import { downloadZip, toCSV } from '../../utils/datacollection';
 import type useBle from '../../hooks/useBle';
 import type useWebSerial from '../../hooks/useWebSerial';
@@ -494,18 +494,6 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
       </div>
     );
 
-  // if (currentTask && currentTask.type === 'MEDIA')
-  //   return (
-  //     <MediaPlayer
-  //       mediaUrl={currentTask.mediaPayload.mediaUrl}
-  //       mediaTitle={currentTask.mediaPayload.mediaTitle}
-  //       mediaSubtitle={currentTask.mediaPayload.mediaSubtitle}
-  //       showHomeBtn={false}
-  //       doneBtnTitle="Continue"
-  //       doneCallback={() => progressTask()}
-  //     />
-  //   );
-
   return (
     <>
       {currentTask && currentTask.type === 'MEDIA' && (
@@ -521,8 +509,47 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
         />
       )}
       <div className="w-screen h-screen flex gap-6 flex-col items-center justify-center select-none">
+        {/* Task List Viewer */}
+        <div className="w-32 h-full fixed left-0 top-0 flex flex-col p-4">
+          <div className="flex flex-col grow gap-2">
+            <span className="p-1 py-2 items-center text-center text-xl font-bold bg-gray-800 text-white rounded-lg">Task List</span>
+
+            {/* Task List */}
+            <div className="flex flex-col grow border border-gray-200 rounded-lg gap-0 p-2">
+              {tasks.map((task, i) => (
+                <div key={i}>
+                  <div
+                    className={
+                      'flex flex-col mb-2 rounded text-center font-semibold border border-gray-300 overflow-hidden ' +
+                      (i === currentTaskIndex ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-800')
+                    }
+                  >
+                    <div className="bg-gray-800 rounded-t flex flex-col gap-1">
+                      <span className="text-white text-sm">Task #{i + 1}</span>
+                    </div>
+                    <span className="text-sm">{task.type}</span>
+                    <span className="text-xs font-light overflow-hidden">{task.tag}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <button
+              className="px-4 py-2 rounded-lg bg-red-600 text-white font-bold hover:bg-red-800 cursor-pointer"
+              onClick={() => {
+                if (window.confirm('Are you sure you want to stop the study? All progress will be lost.')) {
+                  forceRoot();
+                }
+              }}
+            >
+              <FontAwesomeIcon icon="stop" className="mr-2" />
+              Stop Study
+            </button>
+          </div>
+        </div>
+
         <div className="flex flex-col gap-2" style={{ width: `${testbedWidth}px` }}>
-          <div className="w-full bg-gray-200 rounded-lg shadow flex items-center justify-between px-2 py-2">
+          {/* <div className="w-full bg-gray-200 rounded-lg shadow flex items-center justify-between px-2 py-2">
             <div className="flex items-center px-1 gap-2">
               <span className="text-xl font-semibold">Hand Guidance Study</span>
             </div>
@@ -531,9 +558,9 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
                 <FontAwesomeIcon icon="home" />
               </button>
             </div>
-          </div>
+          </div> */}
 
-          <div className="flex flex-row gap-2">
+          {/* <div className="flex flex-row gap-2">
             <div className="flex flex-row p-2 bg-white rounded-lg shadow gap-3 border border-gray-100 justify-center">
               <div className="flex flex-col items-center justify-between">
                 <label className="text-sm font-bold text-gray-600">Status</label>
@@ -584,7 +611,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
                 </span>
               </div>
             </div>
-          </div>
+          </div> */}
 
           <div className="md:col-span-3 bg-gray-100 flex items-center justify-center relative" style={{ width: `${testbedWidth}px`, height: `${testbedHeight}px` }}>
             <div className="absolute inset-0 overflow-hidden rounded-lg shadow-lg">
@@ -614,6 +641,15 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
                   headShoulderDetection={headShoulderDetection}
                   silParams={silParams}
                 />
+
+                {/* add trial number text in the bottom left */}
+                <div className="absolute bottom-2 left-2 bg-gray-800 bg-opacity-50 text-white px-3 py-1 rounded-lg text-4xl font-semibold border border-white">
+                  {currentTask && currentTrial !== null && currentRepetition !== null && (
+                    <>
+                      Trial: {currentTrial + 1} / {trials}
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>

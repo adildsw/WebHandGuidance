@@ -222,8 +222,10 @@ const taskVisualizationSketch: Sketch = (p5) => {
     p5.noStroke();
 
     // Wrist Marker
-    p5.fill(0, 0, 255, 128);
-    if (activeWristPos) p5.circle(activeWristPos.x, activeWristPos.y, 12);
+    p5.strokeWeight(1);
+    p5.stroke(255);
+    p5.fill(255, 255, 0, 200);
+    if (activeWristPos) p5.circle(activeWristPos.x, activeWristPos.y, 24);
 
     // Wrist Label
     p5.fill(255);

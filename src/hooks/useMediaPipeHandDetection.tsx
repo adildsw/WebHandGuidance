@@ -323,6 +323,17 @@ const useDetection = (runOnStart: boolean = false) => {
   const testbedHeight = useMemo(() => (testbedHeightMM * MM_TO_INCH * devicePPI) / devicePixelRatio, [testbedHeightMM, devicePPI, devicePixelRatio]);
   const testbedWidth = useMemo(() => (testbedWidthMM * MM_TO_INCH * devicePPI) / devicePixelRatio, [testbedWidthMM, devicePPI, devicePixelRatio]);
 
+  const testbedWidthRef = useRef(testbedWidth);
+  const testbedHeightRef = useRef(testbedHeight);
+  const silParamsRef = useRef(silParams);
+
+  // Keep refs in sync with latest values
+  useEffect(() => {
+    testbedWidthRef.current = testbedWidth;
+    testbedHeightRef.current = testbedHeight;
+    silParamsRef.current = silParams;
+  }, [testbedWidth, testbedHeight, silParams]);
+
   const isDetecting = useRef<boolean>(runOnStart);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -389,10 +400,12 @@ const useDetection = (runOnStart: boolean = false) => {
     }
 
     if (isDetecting.current) {
-      // const wrist = detectWrist(detector.handDetector, video, testbedWidth, testbedHeight);
-      // const headShoulder = detectHeadAndShoulders(detector.poseDetector, video, testbedWidth, testbedHeight, silParams);
-      // setPinchDetection(pinch);
-      const { wrist, headShoulder } = detectBodyLandmarks(detector.poseDetector, video, testbedWidth, testbedHeight, silParams);
+      // Read latest values from refs
+      const currentWidth = testbedWidthRef.current;
+      const currentHeight = testbedHeightRef.current;
+      const currentSilParams = silParamsRef.current;
+
+      const { wrist, headShoulder } = detectBodyLandmarks(detector.poseDetector, video, currentWidth, currentHeight, currentSilParams);
       setWristDetection(wrist);
       setHeadShoulderDetection(headShoulder);
 
@@ -400,19 +413,24 @@ const useDetection = (runOnStart: boolean = false) => {
         if (!arucoCanvasRef.current) {
           arucoCanvasRef.current = document.createElement('canvas');
         }
-        const detectedMarkers = detectMarkers(arucoDetectorRef.current, video, arucoCanvasRef.current, testbedWidth, testbedHeight, markerOperationResults);
-        setMarkerOperationResults(detectedMarkers);
+        setMarkerOperationResults((prevResults) => detectMarkers(arucoDetectorRef.current!, video, arucoCanvasRef.current!, currentWidth, currentHeight, prevResults));
       }
     }
 
     animationFrameId.current = requestAnimationFrame(performDetectionLoop);
-  }, [testbedHeight, testbedWidth, isDetecting, silParams, markerOperationResults]);
+  }, []);
 
   const startWebcam = useCallback(async () => {
     if (loading || error) return;
     if (streamRef.current) return;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: false,
+      });
       if (!videoRef.current) return;
       if (runOnStart) isDetecting.current = true;
       videoRef.current.srcObject = stream;
@@ -428,6 +446,7 @@ const useDetection = (runOnStart: boolean = false) => {
   }, [loading, error, performDetectionLoop, runOnStart]);
 
   const stopWebcam = useCallback(() => {
+    console.log('[INFO] Stopping Webcam');
     stopDetecting();
     if (animationFrameId.current) {
       cancelAnimationFrame(animationFrameId.current);
@@ -467,6 +486,7 @@ const useDetection = (runOnStart: boolean = false) => {
 
   useEffect(() => {
     const cleanup = () => {
+      console.log('[INFO] Unloading Camera');
       if (animationFrameId.current) {
         cancelAnimationFrame(animationFrameId.current);
         animationFrameId.current = null;

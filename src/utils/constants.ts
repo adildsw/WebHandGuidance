@@ -32,16 +32,17 @@ export const defaultFingerTips: FingerTips = {
   thumb: null,
 };
 
-const isMacbook = typeof navigator !== 'undefined' && /Macintosh/.test(navigator.userAgent);
+// const isMacbook = typeof navigator !== 'undefined' && /Macintosh/.test(navigator.userAgent);
+const isHighPPI = typeof window !== 'undefined' && window.devicePixelRatio >= 2;
 
 export const defaultConfig: Config = {
-  devicePPI: isMacbook ? 256 : 109,
+  devicePPI: isHighPPI ? 256 : 109,
   devicePixelRatio: typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1,
   calibrationTool: 'CREDIT',
   worldPPI: 24,
   markerDiameterMM: 5,
   testbedWidthMM: 200,
-  testbedHeightMM: 120,
+  testbedHeightMM: 112.5,
   defaultHand: 'Right',
   defaultTrials: 3,
   defaultRepetitions: 5,

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { decodeBase64 } from '../utils/encoder';
+import { decodeBase64 } from '../../utils/encoder';
 import { uid } from 'uid/single';
-import type useWebSerial from '../hooks/useWebSerial';
-import type useBle from '../hooks/useBle';
+import type useWebSerial from '../../hooks/useWebSerial';
+import type useBle from '../../hooks/useBle';
 
 const PreStudy = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>; ble: ReturnType<typeof useBle> }) => {
   const [participantId, setParticipantId] = useState<string>('');
@@ -104,9 +104,26 @@ const PreStudy = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSeria
         </span>
         <div className="w-128 flex flex-row gap-2 items-center pb-4">
           <button
-            disabled={!participantId}
+            disabled={!participantId || selectedDevice === 'None'}
+            onClick={() => window.location.replace(`#/camera-calibration?participantId=${participantId}&data=${encodedData}&homeEnabled=false`)}
+            className={
+              "grow px-4 py-2 text-white rounded-lg font-bold " + 
+              (!participantId || selectedDevice === 'None'
+                ? 'bg-gray-300 cursor-not-allowed'
+                : 'border border-blue-700 bg-blue-600 hover:bg-blue-700 cursor-pointer') 
+            }
+          >
+            Calibrate and Start Study
+          </button>
+          <button
+            disabled={!participantId || selectedDevice === 'None'}
             onClick={() => window.location.replace(`#/study?participantId=${participantId}&data=${encodedData}`)}
-            className="grow px-4 py-2 bg-blue-600 border border-blue-700 text-white rounded-lg hover:bg-blue-700 cursor-pointer font-bold"
+            className={
+              "grow px-4 py-2 text-white rounded-lg font-bold " + 
+              (!participantId || selectedDevice === 'None'
+                ? 'bg-gray-300 cursor-not-allowed'
+                : 'border border-blue-700 bg-blue-600 hover:bg-blue-700 cursor-pointer') 
+            }
           >
             Start Study
           </button>

@@ -16,14 +16,14 @@ export const generateRandomRomMarkers = (numMarkers: number, romLimit: number): 
 
 export const generateLatRaiseMarkers = (hand: Handedness, romLimit: number): PolarPos[] => {
   return [
-    { radius: 0, angle: 0 },
-    { radius: romLimit, angle: Math.PI / 2 },
+    // { radius: 0, angle: 0 },
+    { radius: romLimit, angle: -Math.PI / 2 },
     { radius: romLimit, angle: hand === 'Right' ? 0 : Math.PI }
   ];
 }
 
 export const generateRoundRaiseMarkers = (hand: Handedness, Markers: number, romLimit: number): PolarPos[] => {
-  const markers: PolarPos[] = [{ radius: 0, angle: 0 }];
+  const markers: PolarPos[] = [];
   for (let i = 0; i < Markers; i++) {
     const angle = Math.PI / 2 + (i / (Markers - 1)) * Math.PI;
     markers.push({ radius: romLimit, angle: hand === 'Left' ? angle : Math.PI - angle });
@@ -32,7 +32,8 @@ export const generateRoundRaiseMarkers = (hand: Handedness, Markers: number, rom
 }
 
 export const generateFullCircleMarkers = (hand: Handedness, Markers: number, romLimit: number): PolarPos[] => {
-  const markers: PolarPos[] = [{ radius: 0, angle: 0 }];
+  // const markers: PolarPos[] = [{ radius: 0, angle: 0 }];
+  const markers: PolarPos[] = [];
   for (let i = 0; i < Markers; i++) {
     const angle = (i / Markers) * 2 * Math.PI;
     markers.push({ radius: romLimit, angle: hand === 'Right' ? angle : Math.PI - angle });
