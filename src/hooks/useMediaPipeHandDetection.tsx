@@ -286,30 +286,57 @@ const detectMarkers = (detector: AR.Detector, video: HTMLVideoElement, canvas: H
   result.continueMarkerDetectionTime = result.isContinueMarkerVisible && !prevResults.isContinueMarkerVisible ? performance.now() : prevResults.continueMarkerDetectionTime;
   result.calibrationMarkerDetectionTime = result.isCalibrationMarkerVisible && !prevResults.isCalibrationMarkerVisible ? performance.now() : prevResults.calibrationMarkerDetectionTime;
   result.replayMarkerDetectionTime = result.isReplayMarkerVisible && !prevResults.isReplayMarkerVisible ? performance.now() : prevResults.replayMarkerDetectionTime;
-  if (result.calibrationMarker && result.calibrationMarker.corners.length === 4) {
+  // if (result.calibrationMarker && result.calibrationMarker.corners.length === 4) {
+  //   const d1 = distance(
+  //     result.calibrationMarker.corners[0].x,
+  //     result.calibrationMarker.corners[0].y,
+  //     result.calibrationMarker.corners[1].x,
+  //     result.calibrationMarker.corners[1].y
+  //   );
+  //   const d2 = distance(
+  //     result.calibrationMarker.corners[1].x,
+  //     result.calibrationMarker.corners[1].y,
+  //     result.calibrationMarker.corners[2].x,
+  //     result.calibrationMarker.corners[2].y
+  //   );
+  //   const d3 = distance(
+  //     result.calibrationMarker.corners[2].x,
+  //     result.calibrationMarker.corners[2].y,
+  //     result.calibrationMarker.corners[3].x,
+  //     result.calibrationMarker.corners[3].y
+  //   );
+  //   const d4 = distance(
+  //     result.calibrationMarker.corners[3].x,
+  //     result.calibrationMarker.corners[3].y,
+  //     result.calibrationMarker.corners[0].x,
+  //     result.calibrationMarker.corners[0].y
+  //   );
+  //   result.calibrationMarkerLength = (d1 + d2 + d3 + d4) / 4;
+  // }
+  if (result.continueMarker && result.continueMarker.corners.length === 4) {
     const d1 = distance(
-      result.calibrationMarker.corners[0].x,
-      result.calibrationMarker.corners[0].y,
-      result.calibrationMarker.corners[1].x,
-      result.calibrationMarker.corners[1].y
+      result.continueMarker.corners[0].x,
+      result.continueMarker.corners[0].y,
+      result.continueMarker.corners[1].x,
+      result.continueMarker.corners[1].y
     );
     const d2 = distance(
-      result.calibrationMarker.corners[1].x,
-      result.calibrationMarker.corners[1].y,
-      result.calibrationMarker.corners[2].x,
-      result.calibrationMarker.corners[2].y
+      result.continueMarker.corners[1].x,
+      result.continueMarker.corners[1].y,
+      result.continueMarker.corners[2].x,
+      result.continueMarker.corners[2].y
     );
     const d3 = distance(
-      result.calibrationMarker.corners[2].x,
-      result.calibrationMarker.corners[2].y,
-      result.calibrationMarker.corners[3].x,
-      result.calibrationMarker.corners[3].y
+      result.continueMarker.corners[2].x,
+      result.continueMarker.corners[2].y,
+      result.continueMarker.corners[3].x,
+      result.continueMarker.corners[3].y
     );
     const d4 = distance(
-      result.calibrationMarker.corners[3].x,
-      result.calibrationMarker.corners[3].y,
-      result.calibrationMarker.corners[0].x,
-      result.calibrationMarker.corners[0].y
+      result.continueMarker.corners[3].x,
+      result.continueMarker.corners[3].y,
+      result.continueMarker.corners[0].x,
+      result.continueMarker.corners[0].y
     );
     result.calibrationMarkerLength = (d1 + d2 + d3 + d4) / 4;
   }

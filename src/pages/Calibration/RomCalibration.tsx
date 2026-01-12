@@ -58,6 +58,7 @@ const sketch: Sketch = (p5) => {
   let romCalibrationParams: { leftRadius: number; rightRadius: number } | null = null;
   let romSafeMargin = 0.85;
   let calibrationProgress = 0;
+  let isCalibrationPaused = false;
 
   // Silhouette Params
   let silH = SIL_IMG_HEIGHT * silParams.silScaleY;
@@ -100,6 +101,7 @@ const sketch: Sketch = (p5) => {
     romCalibrationParams?: { leftRadius: number; rightRadius: number } | null;
     romSafeMargin?: number;
     calibrationProgress?: number;
+    isCalibrationPaused?: boolean;
   }) => {
     if (typeof props.frameWidth === 'number') width = props.frameWidth;
     if (typeof props.frameHeight === 'number') height = props.frameHeight;
@@ -127,6 +129,7 @@ const sketch: Sketch = (p5) => {
     romCalibrationParams = props.romCalibrationParams ?? null;
     romSafeMargin = props.romSafeMargin ?? 0.85;
     calibrationProgress = props.calibrationProgress ?? 0;
+    isCalibrationPaused = props.isCalibrationPaused ?? false;
 
     silParams = props.silParams ?? defaultConfig.silParams;
     silH = SIL_IMG_HEIGHT * silParams.silScaleY;
@@ -236,7 +239,7 @@ const sketch: Sketch = (p5) => {
   };
 
   const drawCalibrationProgress = () => {
-    if (calibrationProgress <= 0 || calibrationStage === 'done') return;
+    if (calibrationProgress <= 0 || calibrationStage === 'done' || isCalibrationPaused) return;
     p5.stroke(0, 255, 0, 192);
     p5.strokeWeight(16);
     p5.line(-width / 2 + 10, -height / 2 + 10, p5.lerp(-width / 2 + 10, width / 2 - 10, calibrationProgress), -height / 2 + 10);
@@ -305,19 +308,57 @@ const RomCalibration = () => {
   const [calibrationStage, setCalibrationStage] = useState<RomCalibrationStages>('init');
   const [calibrationStartTime, setCalibrationStartTime] = useState<number | null>(null);
   const [isCalibrated, setIsCalibrated] = useState(false);
+  const [isCalibrationPaused, setIsCalibrationPaused] = useState(false);
+  const [elapsedBeforePause, setElapsedBeforePause] = useState(0);
   const timerRef = useRef<number | null>(null);
   const CALIBRATION_TIMER = config.defaultStartDuration;
 
+  // Determine if the required hand is visible for current stage
+  const isRequiredHandVisible = useMemo(() => {
+    if (calibrationStage === 'leftStretch' || calibrationStage === 'leftRaised') {
+      return wristDetection.leftWrist !== null;
+    }
+    if (calibrationStage === 'rightStretch' || calibrationStage === 'rightRaised') {
+      return wristDetection.rightWrist !== null;
+    }
+    return true; // For 'init' and 'done' stages, no specific hand is required
+  }, [calibrationStage, wristDetection.leftWrist, wristDetection.rightWrist]);
+
   const calibrationProgress = (() => {
     if (isCalibrated) return 1;
+    if (isCalibrationPaused) return Math.min(elapsedBeforePause / 5000, 1);
     if (!calibrationStartTime || !timerRef.current) return 0;
-    const elapsed = Date.now() - calibrationStartTime;
+    const elapsed = Date.now() - calibrationStartTime + elapsedBeforePause;
     return Math.min(elapsed / 5000, 1);
   })();
+
+  // Handle pause/resume based on hand visibility during calibration stages
+  useEffect(() => {
+    // Only handle pause for active calibration stages (not init or done)
+    if (!['leftStretch', 'leftRaised', 'rightStretch', 'rightRaised'].includes(calibrationStage)) {
+      return;
+    }
+
+    if (!isRequiredHandVisible && !isCalibrationPaused && timerRef.current !== null) {
+      // Hand lost - pause calibration
+      const elapsed = calibrationStartTime ? Date.now() - calibrationStartTime : 0;
+      setElapsedBeforePause((prev) => prev + elapsed);
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+      setCalibrationStartTime(null);
+      setIsCalibrationPaused(true);
+    } else if (isRequiredHandVisible && isCalibrationPaused) {
+      // Hand regained - resume calibration
+      setIsCalibrationPaused(false);
+      // The main calibration effect will restart the timer
+    }
+  }, [isRequiredHandVisible, isCalibrationPaused, calibrationStage, calibrationStartTime]);
 
   const resetRomCalibration = () => {
     setRomCalibrationParams(null);
     setIsCalibrated(false);
+    setIsCalibrationPaused(false);
+    setElapsedBeforePause(0);
     setCalibrationStage('init');
     setLeftStretchedRom(null);
     setLeftRaisedRom(null);
@@ -339,6 +380,8 @@ const RomCalibration = () => {
       setCalibrationStage('init');
       setCalibrationStartTime(null);
       setIsCalibrated(false);
+      setIsCalibrationPaused(false);
+      setElapsedBeforePause(0);
       setLeftStretchedRom(null);
       setLeftRaisedRom(null);
       setRightStretchedRom(null);
@@ -349,8 +392,9 @@ const RomCalibration = () => {
   }, [isTutorialVisible]);
 
   useEffect(() => {
-    // Don't run calibration logic when tutorial is visible
+    // Don't run calibration logic when tutorial is visible or when paused
     if (isTutorialVisible) return;
+    if (isCalibrationPaused) return;
 
     if (calibrationStage === 'done') {
       if (timerRef.current !== null) {
@@ -361,12 +405,15 @@ const RomCalibration = () => {
       return;
     }
 
+    const remainingTime = 5000 - elapsedBeforePause;
+
     if (calibrationStage === 'init') {
       if (isUserInPos && timerRef.current === null) {
         setCalibrationStartTime(Date.now());
         timerRef.current = window.setTimeout(() => {
           setCalibrationStage('leftStretch');
           setCalibrationStartTime(null);
+          setElapsedBeforePause(0);
           timerRef.current = null;
         }, 5000);
       } else if (!isUserInPos && timerRef.current !== null) {
@@ -380,34 +427,38 @@ const RomCalibration = () => {
         setLeftStretchedRom(leftRomRef.current);
         setCalibrationStage('leftRaised');
         setCalibrationStartTime(null);
+        setElapsedBeforePause(0);
         timerRef.current = null;
-      }, 5000);
+      }, remainingTime);
     } else if (calibrationStage === 'rightStretch' && timerRef.current === null) {
       setCalibrationStartTime(Date.now());
       timerRef.current = window.setTimeout(() => {
         setRightStretchedRom(rightRomRef.current);
         setCalibrationStage('rightRaised');
         setCalibrationStartTime(null);
+        setElapsedBeforePause(0);
         timerRef.current = null;
-      }, 5000);
+      }, remainingTime);
     } else if (calibrationStage === 'leftRaised' && timerRef.current === null) {
       setCalibrationStartTime(Date.now());
       timerRef.current = window.setTimeout(() => {
         setLeftRaisedRom(leftRomRef.current);
         setCalibrationStage('rightStretch');
         setCalibrationStartTime(null);
+        setElapsedBeforePause(0);
         timerRef.current = null;
-      }, 5000);
+      }, remainingTime);
     } else if (calibrationStage === 'rightRaised' && timerRef.current === null) {
       setCalibrationStartTime(Date.now());
       timerRef.current = window.setTimeout(() => {
         setRightRaisedRom(rightRomRef.current);
         setCalibrationStage('done');
         setCalibrationStartTime(null);
+        setElapsedBeforePause(0);
         timerRef.current = null;
-      }, 5000);
+      }, remainingTime);
     }
-  }, [isTutorialVisible, calibrationStage, isUserInPos]);
+  }, [isTutorialVisible, calibrationStage, isUserInPos, isCalibrationPaused, elapsedBeforePause]);
 
   useEffect(() => {
     if (!isTutorialVisible && calibrationStage === 'done' && !isCalibrated) {
@@ -499,7 +550,15 @@ const RomCalibration = () => {
                   romCalibrationParams={romCalibrationParams}
                   romSafeMargin={romSafeMargin}
                   calibrationProgress={calibrationProgress}
+                  isCalibrationPaused={isCalibrationPaused}
                 />
+
+                {/* Hand tracking lost message */}
+                {isCalibrationPaused && (
+                  <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+                    <span className="text-white text-3xl font-bold drop-shadow-lg">Hand Tracking Lost</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -523,14 +582,14 @@ const RomCalibration = () => {
           </button>
 
           <button
-            className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"
+            className="absolute top-4 left-4 bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"
             onClick={() => resetRomCalibration()}
           >
             Reset
           </button>
           {homeEnabled && (
             <button
-              className="bg-gray-100 border border-gray-300 text-black font-bold px-4 py-2 rounded hover:bg-gray-800 hover:text-white cursor-pointer"
+              className="bg-green-700 border border-green-800 text-white font-bold px-4 py-2 rounded hover:bg-green-800 hover:text-white cursor-pointer"
               onClick={() => {
                 stopWebcam();
                 setAreWeDone(true);

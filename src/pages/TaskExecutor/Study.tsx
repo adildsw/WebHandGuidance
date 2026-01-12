@@ -563,7 +563,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
     const cx = markers[currentTarget].x;
     const cy = markers[currentTarget].y;
 
-    if (isConnected && directionPoint) {
+    if (isConnected && directionPoint && !isPaused) {
       const px = directionPoint.x;
       const py = directionPoint.y;
       const dx = px - ax;

@@ -98,7 +98,8 @@ const CameraCalibration = () => {
   const { videoRef, headShoulderDetection, loading, error, startWebcam, stopWebcam, detectedMarkers } = useDetection(true);
 
   const latestMarkerDetection = useRef<MarkerOperationResult>(detectedMarkers);
-  const { isCalibrationMarkerVisible, calibrationMarker, isContinueMarkerVisible, isReplayMarkerVisible } = detectedMarkers;
+  // const { isCalibrationMarkerVisible, calibrationMarker, isContinueMarkerVisible, isReplayMarkerVisible } = detectedMarkers;
+  const { continueMarker, isContinueMarkerVisible, isReplayMarkerVisible } = detectedMarkers;
 
   const [calibrationStartTime, setCalibrationStartTime] = useState<number | null>(null);
   const [isCalibrated, setIsCalibrated] = useState(false);
@@ -164,7 +165,7 @@ const CameraCalibration = () => {
   }, [detectedMarkers]);
 
   useEffect(() => {
-    if (!isTutorialVisible && isCalibrationMarkerVisible && timerRef.current == null && !isCalibrated) {
+    if (!isTutorialVisible && isContinueMarkerVisible && timerRef.current == null && !isCalibrated) {
       setCalibrationStartTime(Date.now());
       timerRef.current = window.setTimeout(() => {
         const { calibrationMarkerLength } = latestMarkerDetection.current;
@@ -176,11 +177,11 @@ const CameraCalibration = () => {
         }
         timerRef.current = null;
       }, CALIBRATION_TIMER);
-    } else if (!isCalibrationMarkerVisible && timerRef.current != null) {
+    } else if (!isContinueMarkerVisible && timerRef.current != null) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-  }, [isTutorialVisible, isCalibrationMarkerVisible, setWorldPPI, isCalibrated, getCalculatedSilParams, setSilParams, CALIBRATION_TIMER]);
+  }, [isTutorialVisible, isContinueMarkerVisible, setWorldPPI, isCalibrated, getCalculatedSilParams, setSilParams, CALIBRATION_TIMER]);
 
   // Clear redirect timer helper
   const clearRedirectTimer = useCallback(() => {
@@ -257,7 +258,7 @@ const CameraCalibration = () => {
               <h1 className="text-3xl font-bold">
                 Calibration #2: <span className="font-normal italic">Calibrate Camera</span>
               </h1>
-              {isCalibrationMarkerVisible ? (
+              {isContinueMarkerVisible ? (
                 <p className="text-red-500 text-xl font-bold">Please hold steady for {Math.floor((CALIBRATION_TIMER - calibrationProgress * CALIBRATION_TIMER) / 1000)} seconds</p>
               ) : (
                 <p className="text-gray-600 text-md italic">Please stand 10 feet away from the screen and hold the calibration marker.</p>
@@ -273,7 +274,7 @@ const CameraCalibration = () => {
             <div className="absolute inset-0">
               <ReactP5Wrapper
                 sketch={sketch}
-                calibrationMarker={calibrationMarker}
+                calibrationMarker={continueMarker}
                 calibrationProgress={calibrationProgress}
                 frameWidth={testbedWidth}
                 frameHeight={testbedHeight}
