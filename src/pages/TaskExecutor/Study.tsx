@@ -736,12 +736,12 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
       )}
       <div className="w-screen h-screen flex gap-6 flex-col items-center justify-center select-none">
         {/* Task List Viewer */}
-        <div className="w-32 h-full fixed left-0 top-0 flex flex-col p-4">
-          <div className="flex flex-col grow gap-2">
+        <div className="w-32 h-full fixed left-0 top-0 flex flex-col p-4 overflow-auto">
+          <div className="flex flex-col grow gap-2 overflow-auto">
             <span className="p-1 py-2 items-center text-center text-xl font-bold bg-gray-800 text-white rounded-lg">Task List</span>
 
             {/* Task List */}
-            <div className="flex flex-col grow border border-gray-200 rounded-lg gap-0 p-2">
+            <div className="flex flex-col grow border border-gray-200 rounded-lg gap-0 p-2 overflow-auto">
               {tasks.map((task, i) => (
                 <div key={i}>
                   <div
