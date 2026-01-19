@@ -292,18 +292,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
       }
       setIsPaused(true);
     }
-  }, [
-    currentTask?.tag,
-    isPaused,
-    participantId,
-    hand,
-    currentTaskIndex,
-    currentTrial,
-    currentRepetition,
-    currentTarget,
-    worldPPI,
-    latestImuVal,
-  ]);
+  }, [currentTask?.tag, isPaused, participantId, hand, currentTaskIndex, currentTrial, currentRepetition, currentTarget, worldPPI, latestImuVal]);
 
   // Handle continue marker for pause/resume toggle
   useEffect(() => {
@@ -414,7 +403,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
       currentTaskRawDataRef.current = [];
       currentTaskIMUDataRef.current = [];
     },
-    [config.serverURL, participantId]
+    [config.serverURL, participantId],
   );
 
   const saveDataAsCSV = () => {
@@ -547,16 +536,30 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
   }, [currentTarget, currentRepetition, currentTrial, currentTaskIndex, currentTask, repetitions, trials, markers, uploadTaskData]);
 
   useEffect(() => {
-    if (currentTaskIndex === null) return;
-    if (currentTask === null) return;
-    if (currentTask.type === 'MEDIA') return;
-    if (currentTarget === null) return;
-    if (currentRepetition === null) return;
-    if (currentTrial === null) return;
-    if (isStudyComplete) return;
-    if (isPaused) return;
+    if (
+      currentTaskIndex === null ||
+      currentTask === null ||
+      currentTask.type === 'MEDIA' ||
+      currentTarget === null ||
+      currentRepetition === null ||
+      currentTrial === null ||
+      isStudyComplete ||
+      isPaused ||
+      activeWrist === null
+    ) {
+      if (isConnected) writeDirection(0, 0);
+      return;
+    }
 
-    if (activeWrist === null) return;
+    // if (currentTaskIndex === null) return;
+    // if (currentTask === null) return;
+    // if (currentTask.type === 'MEDIA') return;
+    // if (currentTarget === null) return;
+    // if (currentRepetition === null) return;
+    // if (currentTrial === null) return;
+    // if (isStudyComplete) return;
+    // if (isPaused) return;
+    // if (activeWrist === null) return;
 
     const ax = (activeWrist.x * INCH_TO_MM) / worldPPI;
     const ay = (activeWrist.y * INCH_TO_MM) / worldPPI;
@@ -759,12 +762,10 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
                 </div>
               ))}
             </div>
-            
+
             <button
               className={`px-4 py-2 rounded-lg font-bold cursor-pointer ${
-                isPaused
-                  ? 'bg-green-600 text-white hover:bg-green-800'
-                  : 'bg-yellow-500 text-white hover:bg-yellow-600'
+                isPaused ? 'bg-green-600 text-white hover:bg-green-800' : 'bg-yellow-500 text-white hover:bg-yellow-600'
               }`}
               onClick={togglePauseStudy}
             >
@@ -898,10 +899,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
                         <div className="flex flex-col items-center gap-2 mt-4">
                           <span className="text-lg font-normal">Resuming...</span>
                           <div className="w-48 h-3 bg-gray-600 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-green-500 transition-all duration-50"
-                              style={{ width: `${pauseMarkerProgress * 100}%` }}
-                            />
+                            <div className="h-full bg-green-500 transition-all duration-50" style={{ width: `${pauseMarkerProgress * 100}%` }} />
                           </div>
                         </div>
                       )}
@@ -914,10 +912,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
                   <div className="absolute top-4 right-4 z-10 bg-black/70 rounded-lg px-4 py-3 flex flex-col items-center gap-2">
                     <span className="text-white text-sm font-semibold">Pausing...</span>
                     <div className="w-32 h-2 bg-gray-600 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-yellow-500 transition-all duration-50"
-                        style={{ width: `${pauseMarkerProgress * 100}%` }}
-                      />
+                      <div className="h-full bg-yellow-500 transition-all duration-50" style={{ width: `${pauseMarkerProgress * 100}%` }} />
                     </div>
                   </div>
                 )}
