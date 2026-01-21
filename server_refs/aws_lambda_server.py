@@ -6,6 +6,7 @@ import zipfile
 import urllib.parse
 from datetime import datetime
 import re
+import hashlib
 
 import boto3
 
@@ -13,6 +14,10 @@ s3 = boto3.client("s3", region_name="us-east-1")
 BUCKET = os.environ["BUCKET"]
 API_PASSWORD = os.environ["API_PASSWORD"]
 PREFIX = "data/"
+STUDY_CONFIG_PREFIX = "study_configs/"
+REDIRECT_BASE = "https://adildsw.com/WebHandGuidance/#/prestudy"
+
+# NOTE: Directories data/* and study_configs/* must be added in IAM S3 permissions.
 
 
 def response(status, body, headers=None, is_binary=False):
@@ -121,6 +126,15 @@ def handler(event, context):
 
     if path == "/uploadTaskData" and method == "POST":
         return upload_task_data_handler(event)
+
+    if path == "/study-config" and method == "GET":
+        return study_config_page_handler()
+
+    if path == "/upload-study-config" and method == "POST":
+        return upload_study_config_handler(event)
+
+    if path == "/study" and method == "GET":
+        return study_redirect_handler(event)
 
     try:
         require_auth(event)
@@ -301,10 +315,87 @@ def download_all_handler(event):
 
 def files_page_handler():
     here = os.path.dirname(os.path.abspath(__file__))
-    path = os.path.join(here, "files.html")
+    path = os.path.join(here, "templates", "files.html")
     try:
         with open(path, "r", encoding="utf-8") as f:
             html = f.read()
     except FileNotFoundError:
         html = "<html><body><h1>files.html not found</h1></body></html>"
     return response(200, html, {"Content-Type": "text/html; charset=utf-8"})
+
+
+def study_config_page_handler():
+    here = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.join(here, "templates", "study_config.html")
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            html = f.read()
+    except FileNotFoundError:
+        html = "<html><body><h1>study_config.html not found</h1></body></html>"
+    return response(200, html, {"Content-Type": "text/html; charset=utf-8"})
+
+
+def upload_study_config_handler(event):
+    body_bytes = get_body_bytes(event)
+    try:
+        payload = json.loads(body_bytes.decode("utf-8"))
+    except json.JSONDecodeError:
+        return response(400, "Invalid JSON", {"Content-Type": "text/plain"})
+
+    json_content = payload.get("jsonContent")
+    participant_id = payload.get("participantId", "P1")
+
+    if not json_content:
+        return response(400, "Missing jsonContent field", {"Content-Type": "text/plain"})
+
+    try:
+        parsed = json.loads(json_content)
+        normalized = json.dumps(parsed, sort_keys=True, separators=(",", ":"))
+    except json.JSONDecodeError:
+        return response(400, "Invalid JSON content in jsonContent field", {"Content-Type": "text/plain"})
+
+    content_hash = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
+
+    key = STUDY_CONFIG_PREFIX + content_hash + ".json"
+
+    s3.put_object(
+        Bucket=BUCKET,
+        Key=key,
+        Body=normalized.encode("utf-8"),
+        ContentType="application/json"
+    )
+
+    return response(200, {
+        "status": "ok",
+        "hash": content_hash,
+        "participantId": participant_id
+    })
+
+
+def study_redirect_handler(event):
+    config_hash = get_query_param(event, "hash")
+    participant_id = get_query_param(event, "participantId") or "P1"
+
+    if not config_hash:
+        return response(400, "Missing hash parameter", {"Content-Type": "text/plain"})
+
+    key = STUDY_CONFIG_PREFIX + config_hash + ".json"
+
+    try:
+        obj = s3.get_object(Bucket=BUCKET, Key=key)
+        json_content = obj["Body"].read().decode("utf-8")
+    except s3.exceptions.NoSuchKey:
+        return response(404, "Study configuration not found for the given hash", {"Content-Type": "text/plain"})
+    except Exception as e:
+        if "NoSuchKey" in str(e) or "404" in str(e):
+            return response(404, "Study configuration not found for the given hash", {"Content-Type": "text/plain"})
+        raise
+
+    data_b64 = base64.b64encode(json_content.encode("utf-8")).decode("ascii")
+
+    redirect_url = f"{REDIRECT_BASE}?participantId={urllib.parse.quote(participant_id)}&data={urllib.parse.quote(data_b64)}"
+
+    return response(302, "", {
+        "Location": redirect_url,
+        "Content-Type": "text/plain"
+    })

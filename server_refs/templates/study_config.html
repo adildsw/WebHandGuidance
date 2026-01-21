@@ -1,0 +1,128 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>WebHandGuidance Study Config Upload</title>
+  <style>
+    body { font-family: system-ui, sans-serif; padding: 1rem; max-width: 960px; margin: 0 auto; }
+    h1 { margin-bottom: 0.5rem; }
+    #status { margin: 0.5rem 0; font-size: 0.9rem; color: #555; }
+    label { font-size: 0.9rem; display: block; margin-bottom: 0.5rem; }
+    input[type=text] { padding: 0.3rem 0.4rem; font-size: 0.9rem; width: 200px; }
+    input[type=file] { font-size: 0.9rem; }
+    button { padding: 0.35rem 0.7rem; font-size: 0.9rem; cursor: pointer; }
+    .form-group { margin-bottom: 1rem; }
+    #result { margin-top: 1.5rem; padding: 1rem; border: 1px solid #ccc; border-radius: 4px; display: none; background: #f9f9f9; }
+    #result a { word-break: break-all; }
+    .error { color: #c00; }
+    .success { color: #080; }
+  </style>
+</head>
+<body>
+  <h1>WebHandGuidance Study Config Upload</h1>
+  <p>Upload a JSON study configuration file to generate a shareable study link.</p>
+
+  <div id="status"></div>
+
+  <div class="form-group">
+    <label>Participant ID:
+      <input type="text" id="participant-id" value="P1" />
+    </label>
+  </div>
+
+  <div class="form-group">
+    <label>JSON Configuration File:
+      <input type="file" id="json-file" accept=".json,application/json" />
+    </label>
+  </div>
+
+  <button id="upload-button">Upload and Generate Link</button>
+
+  <div id="result">
+    <p><strong>Study Link:</strong></p>
+    <p><a id="study-link" href="#" target="_blank"></a></p>
+    <p style="margin-top: 0.5rem;"><button id="copy-button">Copy Link</button></p>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const participantIdInput = document.getElementById('participant-id');
+    const jsonFileInput = document.getElementById('json-file');
+    const uploadButton = document.getElementById('upload-button');
+    const resultDiv = document.getElementById('result');
+    const studyLinkEl = document.getElementById('study-link');
+    const copyButton = document.getElementById('copy-button');
+
+    function setStatus(msg, isError) {
+      statusEl.textContent = msg || '';
+      statusEl.className = isError ? 'error' : '';
+    }
+
+    uploadButton.addEventListener('click', async () => {
+      const file = jsonFileInput.files[0];
+      const participantId = participantIdInput.value.trim() || 'P1';
+
+      if (!file) {
+        setStatus('Please select a JSON file.', true);
+        return;
+      }
+
+      setStatus('Reading file...');
+
+      try {
+        const jsonContent = await file.text();
+
+        // Validate JSON
+        try {
+          JSON.parse(jsonContent);
+        } catch (e) {
+          setStatus('Invalid JSON file: ' + e.message, true);
+          return;
+        }
+
+        setStatus('Uploading...');
+
+        const res = await fetch('/upload-study-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonContent: jsonContent,
+            participantId: participantId
+          })
+        });
+
+        if (!res.ok) {
+          const text = await res.text();
+          setStatus('Upload failed: ' + text, true);
+          return;
+        }
+
+        const data = await res.json();
+        const hash = data.hash;
+
+        // Build the study URL
+        const baseUrl = window.location.origin;
+        const studyUrl = `${baseUrl}/study?participantId=${encodeURIComponent(participantId)}&hash=${encodeURIComponent(hash)}`;
+
+        studyLinkEl.href = studyUrl;
+        studyLinkEl.textContent = studyUrl;
+        resultDiv.style.display = 'block';
+        setStatus('Upload successful!');
+
+      } catch (e) {
+        setStatus('Error: ' + e.message, true);
+      }
+    });
+
+    copyButton.addEventListener('click', () => {
+      const url = studyLinkEl.href;
+      navigator.clipboard.writeText(url).then(() => {
+        copyButton.textContent = 'Copied!';
+        setTimeout(() => { copyButton.textContent = 'Copy Link'; }, 2000);
+      }).catch(() => {
+        setStatus('Failed to copy to clipboard', true);
+      });
+    });
+  </script>
+</body>
+</html>

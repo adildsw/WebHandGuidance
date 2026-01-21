@@ -1,7 +1,10 @@
-from flask import Flask, request, Response, jsonify, send_file, render_template
+from flask import Flask, request, Response, jsonify, send_file, render_template, redirect
 import os
 import io
 import zipfile
+import base64
+import hashlib
+import urllib.parse
 from pathlib import Path
 from datetime import datetime
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -16,7 +19,10 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 DATA_DIR = Path("data")
 DATA_DIR.mkdir(exist_ok=True)
+STUDY_CONFIG_DIR = Path("study_configs")
+STUDY_CONFIG_DIR.mkdir(exist_ok=True)
 API_PASSWORD = os.environ.get("API_PASSWORD", "devpassword")
+REDIRECT_BASE = "https://adildsw.com/WebHandGuidance/#/prestudy"
 
 
 def require_auth():
@@ -240,5 +246,72 @@ def files_page():
     return render_template("files.html")
 
 
+@app.route("/study-config", methods=["GET", "OPTIONS"])
+def study_config_page():
+    if request.method == "OPTIONS":
+        return Response("", status=204)
+    return render_template("study_config.html")
+
+
+@app.route("/upload-study-config", methods=["POST", "OPTIONS"])
+def upload_study_config():
+    if request.method == "OPTIONS":
+        return Response("", status=204)
+
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return Response("Invalid JSON", status=400, mimetype="text/plain")
+
+    json_content = payload.get("jsonContent")
+    participant_id = payload.get("participantId", "P1")
+
+    if not json_content:
+        return Response("Missing jsonContent field", status=400, mimetype="text/plain")
+
+    try:
+        parsed = json.loads(json_content)
+        normalized = json.dumps(parsed, sort_keys=True, separators=(",", ":"))
+    except json.JSONDecodeError:
+        return Response("Invalid JSON content in jsonContent field", status=400, mimetype="text/plain")
+
+    content_hash = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
+
+    path = STUDY_CONFIG_DIR / (content_hash + ".json")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(normalized)
+
+    return jsonify({
+        "status": "ok",
+        "hash": content_hash,
+        "participantId": participant_id
+    })
+
+
+@app.route("/study", methods=["GET", "OPTIONS"])
+def study_redirect():
+    if request.method == "OPTIONS":
+        return Response("", status=204)
+
+    config_hash = request.args.get("hash")
+    participant_id = request.args.get("participantId", "P1")
+
+    if not config_hash:
+        return Response("Missing hash parameter", status=400, mimetype="text/plain")
+
+    path = STUDY_CONFIG_DIR / (config_hash + ".json")
+
+    if not path.exists() or not path.is_file():
+        return Response("Study configuration not found for the given hash", status=404, mimetype="text/plain")
+
+    with open(path, "r", encoding="utf-8") as f:
+        json_content = f.read()
+
+    data_b64 = base64.b64encode(json_content.encode("utf-8")).decode("ascii")
+
+    redirect_url = f"{REDIRECT_BASE}?participantId={urllib.parse.quote(participant_id)}&data={urllib.parse.quote(data_b64)}"
+
+    return redirect(redirect_url, code=302)
+
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5002, debug=True)
