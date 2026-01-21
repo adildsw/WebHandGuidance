@@ -33,7 +33,7 @@ const useBle = () => {
     setIsSupported(true);
 
     const device = await navigator.bluetooth.requestDevice({
-      filters: [{ name: 'HapticDevice' }],
+      filters: [{ name: 'HapticDevice' }, { name: 'HandGuidanceDevice' }],
       optionalServices: [SERVICE_UUID],
     });
 
