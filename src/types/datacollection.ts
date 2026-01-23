@@ -19,6 +19,7 @@ export type CollectedData = {
   user_right_x_mm: number;
   user_right_y_mm: number;
   target_dist_mm: number;
+  haptic: 0 | 1;
 };
 
 export type CollectedRawData = {
@@ -42,6 +43,7 @@ export type CollectedRawData = {
   target_dist_px: number;
   world_ppi: number;
   scaling_factor: number;
+  haptic: 0 | 1;
 };
 
 export type CollectedIMUData = {

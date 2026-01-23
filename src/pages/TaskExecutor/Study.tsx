@@ -230,6 +230,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
       user_right_x_mm: -1,
       user_right_y_mm: -1,
       target_dist_mm: -1,
+      haptic: 0,
     };
     const rawDataInstance: CollectedRawData = {
       unix_timestamp: unixTimestamp,
@@ -252,6 +253,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
       target_dist_px: -1,
       world_ppi: worldPPI,
       scaling_factor: MM_TO_INCH * worldPPI,
+      haptic: 0,
     };
     const imuDataInstance: CollectedIMUData = {
       unix_timestamp: unixTimestamp,
@@ -551,21 +553,12 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
       return;
     }
 
-    // if (currentTaskIndex === null) return;
-    // if (currentTask === null) return;
-    // if (currentTask.type === 'MEDIA') return;
-    // if (currentTarget === null) return;
-    // if (currentRepetition === null) return;
-    // if (currentTrial === null) return;
-    // if (isStudyComplete) return;
-    // if (isPaused) return;
-    // if (activeWrist === null) return;
-
     const ax = (activeWrist.x * INCH_TO_MM) / worldPPI;
     const ay = (activeWrist.y * INCH_TO_MM) / worldPPI;
     const cx = markers[currentTarget].x;
     const cy = markers[currentTarget].y;
 
+    let hapticActive: 0 | 1 = 0;
     if (isConnected && directionPoint && !isPaused) {
       const px = directionPoint.x;
       const py = directionPoint.y;
@@ -574,6 +567,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
       const vx = directionalMap(dx, config.minVibrationThresholdMM, config.maxVibrationThresholdMM);
       const vy = directionalMap(dy, config.minVibrationThresholdMM, config.maxVibrationThresholdMM);
       writeDirection(vx, vy);
+      hapticActive = (vx !== 0 || vy !== 0) ? 1 : 0;
     }
 
     const d = distance(ax, ay, cx, cy);
@@ -599,6 +593,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
         user_right_x_mm: ax,
         user_right_y_mm: ay,
         target_dist_mm: d,
+        haptic: hapticActive,
       };
       const rawDataInstance: CollectedRawData = {
         unix_timestamp: unixTimestamp,
@@ -621,6 +616,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
         target_dist_px: d * MM_TO_INCH * worldPPI,
         world_ppi: worldPPI,
         scaling_factor: MM_TO_INCH * worldPPI,
+        haptic: hapticActive,
       };
       if (isConnected) {
         const imuDataInstance: CollectedIMUData = {
