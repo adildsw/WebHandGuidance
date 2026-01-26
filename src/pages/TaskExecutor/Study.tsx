@@ -772,6 +772,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
               className="px-4 py-2 rounded-lg bg-red-600 text-white font-bold hover:bg-red-800 cursor-pointer"
               onClick={() => {
                 if (window.confirm('Are you sure you want to stop the study? All progress will be lost.')) {
+                  if (isConnected) writeDirection(0, 0);
                   forceRoot();
                 }
               }}
