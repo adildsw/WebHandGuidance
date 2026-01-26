@@ -66,6 +66,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
   const [currentTrial, setCurrentTrial] = useState<number | null>(null);
   const [currentRepetition, setCurrentRepetition] = useState<number | null>(null);
   const [isPaused, setIsPaused] = useState<boolean>(false);
+  const [isStopConfirmVisible, setIsStopConfirmVisible] = useState<boolean>(false);
 
   // Marker-based pause/resume
   const PAUSE_MARKER_DURATION = 2000; // 2 seconds
@@ -169,9 +170,13 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
     if (currentTask === null || currentTask.type === 'MEDIA') return null;
     if (currentTarget === null) return null;
     if (currentTask.type === 'HOLD' || currentTask.type === 'ROM_HOLD') return markers[0];
-    if (currentTarget === null || previousTarget === null) return null;
     if (activeWrist === null) return null;
     if (activeWrist.x === undefined || activeWrist.y === undefined) return null;
+
+    // For the first target (when previousTarget is null), guide directly to the target
+    if (previousTarget === null) {
+      return markers[currentTarget];
+    }
 
     const ax = (activeWrist.x * INCH_TO_MM) / worldPPI;
     const ay = (activeWrist.y * INCH_TO_MM) / worldPPI;
@@ -206,6 +211,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
   };
 
   const togglePauseStudy = useCallback(() => {
+    if (currentTask?.type === 'MEDIA') return;
     const unixTimestamp = Date.now();
     const taskTag = currentTask?.tag || (isPaused ? 'RESUMED' : 'PAUSED');
     const taskType = isPaused ? 'RESUMED' : 'PAUSED';
@@ -294,7 +300,23 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
       }
       setIsPaused(true);
     }
-  }, [currentTask?.tag, isPaused, participantId, hand, currentTaskIndex, currentTrial, currentRepetition, currentTarget, worldPPI, latestImuVal]);
+  }, [currentTask?.tag, isPaused, participantId, hand, currentTaskIndex, currentTrial, currentRepetition, currentTarget, worldPPI, latestImuVal, currentTask?.type]);
+
+  const showStopConfirmation = useCallback(() => {
+    if (!isPaused) {
+      togglePauseStudy(); // This will pause and stop haptic feedback
+    }
+    setIsStopConfirmVisible(true);
+  }, [isPaused, togglePauseStudy]);
+
+  const cancelStopConfirmation = useCallback(() => {
+    setIsStopConfirmVisible(false);
+    togglePauseStudy(); // Resume the study
+  }, [togglePauseStudy]);
+
+  const confirmStopStudy = useCallback(() => {
+    forceRoot();
+  }, []);
 
   // Handle continue marker for pause/resume toggle
   useEffect(() => {
@@ -770,12 +792,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
             </button>
             <button
               className="px-4 py-2 rounded-lg bg-red-600 text-white font-bold hover:bg-red-800 cursor-pointer"
-              onClick={() => {
-                if (window.confirm('Are you sure you want to stop the study? All progress will be lost.')) {
-                  if (isConnected) writeDirection(0, 0);
-                  forceRoot();
-                }
-              }}
+              onClick={showStopConfirmation}
             >
               <FontAwesomeIcon icon="stop" className="mr-2" />
               Stop Study
@@ -889,18 +906,42 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
                 {/* Pause overlay */}
                 {isPaused && (
                   <div className="absolute inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-10">
-                    <div className="text-white text-4xl font-bold flex flex-col items-center gap-4">
-                      <FontAwesomeIcon icon="pause" className="text-6xl" />
-                      <span>Study Paused</span>
-                      {pauseMarkerStartTime !== null && (
-                        <div className="flex flex-col items-center gap-2 mt-4">
-                          <span className="text-lg font-normal">Resuming...</span>
-                          <div className="w-48 h-3 bg-gray-600 rounded-full overflow-hidden">
-                            <div className="h-full bg-green-500 transition-all duration-50" style={{ width: `${pauseMarkerProgress * 100}%` }} />
-                          </div>
+                    {isStopConfirmVisible ? (
+                      <div className="text-white text-4xl font-bold flex flex-col items-center gap-4">
+                        <FontAwesomeIcon icon="stop" className="text-6xl text-red-500" />
+                        <span>Stop Study?</span>
+                        <span className="text-lg font-normal text-gray-300">All progress will be lost.</span>
+                        <div className="flex flex-row gap-4 mt-4">
+                          <button
+                            className="px-6 py-3 rounded-lg bg-green-600 text-white font-bold hover:bg-green-700 cursor-pointer text-xl"
+                            onClick={cancelStopConfirmation}
+                          >
+                            <FontAwesomeIcon icon="play" className="mr-2" />
+                            Continue Study
+                          </button>
+                          <button
+                            className="px-6 py-3 rounded-lg bg-red-600 text-white font-bold hover:bg-red-700 cursor-pointer text-xl"
+                            onClick={confirmStopStudy}
+                          >
+                            <FontAwesomeIcon icon="sign-out-alt" className="mr-2" />
+                            Stop Study
+                          </button>
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    ) : (
+                      <div className="text-white text-4xl font-bold flex flex-col items-center gap-4">
+                        <FontAwesomeIcon icon="pause" className="text-6xl" />
+                        <span>Study Paused</span>
+                        {pauseMarkerStartTime !== null && (
+                          <div className="flex flex-col items-center gap-2 mt-4">
+                            <span className="text-lg font-normal">Resuming...</span>
+                            <div className="w-48 h-3 bg-gray-600 rounded-full overflow-hidden">
+                              <div className="h-full bg-green-500 transition-all duration-50" style={{ width: `${pauseMarkerProgress * 100}%` }} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 

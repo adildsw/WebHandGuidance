@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { decodeBase64 } from '../../utils/encoder';
 import { uid } from 'uid/single';
 import type useWebSerial from '../../hooks/useWebSerial';
@@ -10,11 +10,26 @@ const PreStudy = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSeria
   const [encodedData, setEncodedData] = useState<string>('');
 
   const [selectedDevice, setSelectedDevice] = useState<string>('None');
+  const wasConnectedRef = useRef(false);
+
   useEffect(() => {
     if (webSerial.isConnected) setSelectedDevice('USB Device');
     else if (ble.isConnected) setSelectedDevice('Bluetooth Device');
     else setSelectedDevice('None');
   }, [webSerial.isConnected, ble.isConnected]);
+
+  // Play a short vibration on device connection
+  useEffect(() => {
+    const isConnected = webSerial.isConnected || ble.isConnected;
+    const writeDirection = ble.isConnected ? ble.writeDirection : webSerial.writeDirection;
+
+    if (isConnected && !wasConnectedRef.current) {
+      // Device just connected - play 100ms vibration at 10%
+      writeDirection(0.1, 0.1);
+      setTimeout(() => writeDirection(0, 0), 200);
+    }
+    wasConnectedRef.current = isConnected;
+  }, [webSerial.isConnected, ble.isConnected, webSerial.writeDirection, ble.writeDirection]);
 
   useEffect(() => {
     const hash = window.location.hash;

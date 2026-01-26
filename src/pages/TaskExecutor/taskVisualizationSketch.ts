@@ -40,7 +40,6 @@ const taskVisualizationSketch: Sketch = (p5) => {
 
   let currentTarget: number = -1;
   let isRepeating: boolean = false;
-  let isTaskRunning: boolean = false;
   let holdProgress: number = 0;
 
   // Silhouette Params
@@ -102,7 +101,6 @@ const taskVisualizationSketch: Sketch = (p5) => {
     if (props.activeWristPos) activeWristPos = props.activeWristPos;
     currentTarget = typeof props.currentTarget === 'number' ? props.currentTarget : -1;
     isRepeating = typeof props.isRepeating === 'boolean' ? props.isRepeating : false;
-    isTaskRunning = typeof props.isTaskRunning === 'boolean' ? props.isTaskRunning : false;
     holdProgress = typeof props.holdProgress === 'number' ? props.holdProgress : 0;
     directionPoint = props.directionPoint || null;
     directionPointDistanceMM = props.directionPointDistanceMM || null;
@@ -233,8 +231,7 @@ const taskVisualizationSketch: Sketch = (p5) => {
     p5.textSize(6);
     if (activeWristPos) p5.text(hand === 'Left' ? 'L' : 'R', activeWristPos.x, activeWristPos.y);
 
-    // Wrist to Target Line
-    if (!isTaskRunning) return;
+    // Wrist to Target Line (shown even before task starts for guidance)
     if (directionPointDistanceMM !== null && directionPoint && activeWristPos !== null) {
       const { x, y } = directionPoint;
       p5.fill(255, 255, 255);
