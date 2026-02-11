@@ -10,6 +10,7 @@ import { decodeBase64 } from '../../utils/encoder';
 import { closestPointOnLine, directionalMap, distance, polarToCartesian } from '../../utils/math';
 import type { CollectedData, CollectedIMUData, CollectedRawData } from '../../types/datacollection';
 import { forceRoot, go } from '../../utils/navigation';
+import JSZip from 'jszip';
 import { downloadZip, toCSV } from '../../utils/datacollection';
 import type useBle from '../../hooks/useBle';
 import type useWebSerial from '../../hooks/useWebSerial';
@@ -393,28 +394,42 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
 
       if (taskData.length === 0 && taskRawData.length === 0) return;
 
-      const taskDataPackage = {
-        dataCsv: taskData.length > 0 ? toCSV<CollectedData>(taskData, Object.keys(taskData[0]) as (keyof CollectedData)[]) : '',
-        rawDataCsv: taskRawData.length > 0 ? toCSV<CollectedRawData>(taskRawData, Object.keys(taskRawData[0]) as (keyof CollectedRawData)[]) : '',
-        imuDataCsv: taskIMUData.length > 0 ? toCSV<CollectedIMUData>(taskIMUData, Object.keys(taskIMUData[0]) as (keyof CollectedIMUData)[]) : '',
-        participantId,
-        taskTag,
-        taskIdx,
-        timestamp: new Date().toISOString(),
-        task: JSON.stringify(task, null, 2),
-      };
+      const dataCsv = taskData.length > 0 ? toCSV<CollectedData>(taskData, Object.keys(taskData[0]) as (keyof CollectedData)[]) : '';
+      const rawDataCsv = taskRawData.length > 0 ? toCSV<CollectedRawData>(taskRawData, Object.keys(taskRawData[0]) as (keyof CollectedRawData)[]) : '';
+      const imuDataCsv = taskIMUData.length > 0 ? toCSV<CollectedIMUData>(taskIMUData, Object.keys(taskIMUData[0]) as (keyof CollectedIMUData)[]) : '';
+      const timestamp = new Date().toISOString();
+      const taskStr = JSON.stringify(task, null, 2);
 
-      fetch(config.serverURL + '/uploadTaskData', {
+      const taskInfo = { participant_id: participantId, task_tag: taskTag, task_idx: taskIdx, timestamp };
+
+      // 1. Get presigned URL from server
+      fetch(config.serverURL + '/get-upload-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(taskDataPackage),
+        body: JSON.stringify({ participantId, taskTag, taskIdx, timestamp }),
       })
-        .then((response) => {
-          if (!response.ok) {
-            console.error('Failed to upload task data for task:', taskTag);
-          } else {
-            console.log('Task data uploaded successfully for task:', taskTag);
-          }
+        .then((res) => {
+          if (!res.ok) throw new Error('Failed to get upload URL');
+          return res.json();
+        })
+        .then(async ({ uploadUrl }) => {
+          // 2. Create zip client-side
+          const zip = new JSZip();
+          if (dataCsv.trim()) zip.file('data.csv', dataCsv);
+          if (rawDataCsv.trim()) zip.file('rawData.csv', rawDataCsv);
+          if (imuDataCsv.trim()) zip.file('imuData.csv', imuDataCsv);
+          if (taskStr.trim()) zip.file('task.json', taskStr);
+          zip.file('task_info.json', JSON.stringify(taskInfo));
+          const blob = await zip.generateAsync({ type: 'blob' });
+
+          // 3. Upload directly to S3 via presigned URL
+          const putRes = await fetch(uploadUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/zip' },
+            body: blob,
+          });
+          if (!putRes.ok) throw new Error('S3 upload failed');
+          console.log('Task data uploaded successfully for task:', taskTag);
         })
         .catch((error) => {
           console.error('Error uploading task data:', error);
@@ -442,37 +457,49 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
 
   useEffect(() => {
     if (!isStudyComplete || isDataSent || config.serverURL === '') return;
-    const generateDataPackage = () => {
-      if (collectedData.length === 0 || collectedRawData.length === 0) return null;
-      return {
-        dataCsv: toCSV<CollectedData>(collectedData, Object.keys(collectedData[0]) as (keyof CollectedData)[]),
-        rawDataCsv: toCSV<CollectedRawData>(collectedRawData, Object.keys(collectedRawData[0]) as (keyof CollectedRawData)[]),
-        imuDataCsv: collectedIMUData.length > 0 ? toCSV<CollectedIMUData>(collectedIMUData, Object.keys(collectedIMUData[0]) as (keyof CollectedIMUData)[]) : '',
-        participantId,
-        timestamp: new Date().toISOString(),
-        task: JSON.stringify(tasks, null, 2),
-      };
-    };
+    if (collectedData.length === 0 || collectedRawData.length === 0) return;
 
-    const dataPackage = generateDataPackage();
-    if (dataPackage === null) return;
+    const dataCsv = toCSV<CollectedData>(collectedData, Object.keys(collectedData[0]) as (keyof CollectedData)[]);
+    const rawDataCsv = toCSV<CollectedRawData>(collectedRawData, Object.keys(collectedRawData[0]) as (keyof CollectedRawData)[]);
+    const imuDataCsv = collectedIMUData.length > 0 ? toCSV<CollectedIMUData>(collectedIMUData, Object.keys(collectedIMUData[0]) as (keyof CollectedIMUData)[]) : '';
+    const timestamp = new Date().toISOString();
+    const taskStr = JSON.stringify(tasks, null, 2);
+    const taskTag = 'fulldata';
+    const taskIdx = -1;
 
-    fetch(config.serverURL + '/upload', {
+    const participationInfo = { participant_id: participantId, timestamp };
+
+    fetch(config.serverURL + '/get-upload-url', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(dataPackage),
+      body: JSON.stringify({ participantId, taskTag, taskIdx, timestamp }),
     })
-      .then((response) => {
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to get upload URL');
+        return res.json();
+      })
+      .then(async ({ uploadUrl }) => {
+        const zip = new JSZip();
+        zip.file('data.csv', dataCsv);
+        zip.file('rawData.csv', rawDataCsv);
+        if (imuDataCsv.trim()) zip.file('imuData.csv', imuDataCsv);
+        zip.file('task.json', taskStr);
+        zip.file('participation_info.json', JSON.stringify(participationInfo));
+        const blob = await zip.generateAsync({ type: 'blob' });
+
+        const putRes = await fetch(uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/zip' },
+          body: blob,
+        });
+        if (!putRes.ok) throw new Error('S3 upload failed');
+
         setIsDataSent(true);
-        if (!response.ok) {
-          setIsDataSentSuccessfully(false);
-          console.error('Failed to send data');
-        } else {
-          setIsDataSentSuccessfully(true);
-        }
+        setIsDataSentSuccessfully(true);
       })
       .catch((error) => {
         setIsDataSent(true);
+        setIsDataSentSuccessfully(false);
         console.error('Error sending data:', error);
       });
   }, [isStudyComplete, isDataSent, config.serverURL, collectedData, collectedRawData, collectedIMUData, participantId, tasks]);
@@ -784,7 +811,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
 
             <button
               disabled={currentTask?.type === 'MEDIA'}
-              className={`px-4 py-2 rounded-lg font-bold ${
+              className={`flex flex-row gap-2 items-center justify-center px-4 py-2 rounded-lg font-bold ${
                 currentTask?.type === 'MEDIA'
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : isPaused
@@ -793,14 +820,14 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
               }`}
               onClick={togglePauseStudy}
             >
-              <FontAwesomeIcon icon={isPaused ? 'play' : 'pause'} className="mr-2" />
+              <FontAwesomeIcon icon={isPaused ? 'play' : 'pause'} className="mr-2" size='sm' />
               {isPaused ? 'Resume Study' : 'Pause Study'}
             </button>
             <button
-              className="px-4 py-2 rounded-lg bg-red-600 text-white font-bold hover:bg-red-800 cursor-pointer"
+              className="flex flex-row gap-2 items-center justify-center px-4 py-2 rounded-lg bg-red-600 text-white font-bold hover:bg-red-800 cursor-pointer"
               onClick={showStopConfirmation}
             >
-              <FontAwesomeIcon icon="stop" className="mr-2" />
+              <FontAwesomeIcon icon="stop" className="mr-2" size='sm' />
               Stop Study
             </button>
           </div>

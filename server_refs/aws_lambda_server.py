@@ -7,8 +7,14 @@ import urllib.parse
 from datetime import datetime
 import re
 import hashlib
+import logging
+import traceback
 
 import boto3
+
+# ── Logging setup ──
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 s3 = boto3.client("s3", region_name="us-east-1")
 BUCKET = os.environ["BUCKET"]
@@ -16,8 +22,6 @@ API_PASSWORD = os.environ["API_PASSWORD"]
 PREFIX = "data/"
 STUDY_CONFIG_PREFIX = "study_configs/"
 REDIRECT_BASE = "https://adildsw.com/WebHandGuidance/#/prestudy"
-
-# NOTE: Directories data/* and study_configs/* must be added in IAM S3 permissions.
 
 
 def response(status, body, headers=None, is_binary=False):
@@ -29,6 +33,7 @@ def response(status, body, headers=None, is_binary=False):
     if headers:
         base_headers.update(headers)
     if is_binary:
+        logger.info(f"Responding {status} (binary, {len(body)} bytes)")
         return {
             "statusCode": status,
             "headers": base_headers,
@@ -38,6 +43,7 @@ def response(status, body, headers=None, is_binary=False):
     if isinstance(body, (dict, list)):
         body = json.dumps(body)
         base_headers.setdefault("Content-Type", "application/json")
+    logger.info(f"Responding {status} ({len(body) if isinstance(body, str) else 0} chars)")
     return {
         "statusCode": status,
         "headers": base_headers,
@@ -75,10 +81,13 @@ def require_auth(event):
     headers = event.get("headers") or {}
     auth = headers.get("authorization") or headers.get("Authorization") or ""
     if not auth.startswith("Bearer "):
+        logger.warning("Auth failed: missing or malformed Bearer token")
         raise PermissionError
     token = auth.split(" ", 1)[1]
     if token != API_PASSWORD:
+        logger.warning("Auth failed: invalid token")
         raise PermissionError
+    logger.info("Auth succeeded")
 
 
 def safe_fragment(s):
@@ -88,6 +97,7 @@ def safe_fragment(s):
 
 
 def list_data_objects():
+    logger.info(f"Listing objects in s3://{BUCKET}/{PREFIX}")
     objects = []
     paginator = s3.get_paginator("list_objects_v2")
     for page in paginator.paginate(Bucket=BUCKET, Prefix=PREFIX):
@@ -103,72 +113,94 @@ def list_data_objects():
                     }
                 )
     objects.sort(key=lambda x: x["last_modified"])
+    logger.info(f"Found {len(objects)} objects")
     return objects
 
 
 def handler(event, context):
     method, path = get_method_and_path(event)
-
-    if method == "OPTIONS":
-        return response(204, "")
-
-    if path == "/" and method == "GET":
-        return root_handler()
-
-    if path == "/ping" and method == "GET":
-        return ping_handler()
-
-    if path == "/files" and method == "GET":
-        return files_page_handler()
-
-    if path == "/upload" and method == "POST":
-        return upload_handler(event)
-
-    if path == "/uploadTaskData" and method == "POST":
-        return upload_task_data_handler(event)
-
-    if path == "/study-config" and method == "GET":
-        return study_config_page_handler()
-
-    if path == "/upload-study-config" and method == "POST":
-        return upload_study_config_handler(event)
-
-    if path == "/study" and method == "GET":
-        return study_redirect_handler(event)
+    query_params = event.get("queryStringParameters") or {}
+    source_ip = event.get("requestContext", {}).get("http", {}).get("sourceIp", "unknown")
+    logger.info(f">>> {method} {path} | params={json.dumps(query_params)} | ip={source_ip}")
 
     try:
-        require_auth(event)
-    except PermissionError:
-        return response(403, "Forbidden", {"Content-Type": "text/plain"})
+        if method == "OPTIONS":
+            logger.info("CORS preflight request")
+            return response(204, "")
 
-    if path == "/files-json" and method == "GET":
-        return files_json_handler(event)
+        if path == "/" and method == "GET":
+            return root_handler()
 
-    if path == "/download-url" and method == "GET":
-        return download_url_handler(event)
+        if path == "/ping" and method == "GET":
+            return ping_handler()
 
-    if path == "/download-all" and method == "GET":
-        return download_all_handler(event)
+        if path == "/files" and method == "GET":
+            return files_page_handler()
 
-    return response(404, "Not found", {"Content-Type": "text/plain"})
+        if path == "/upload" and method == "POST":
+            return upload_handler(event)
+
+        if path == "/uploadTaskData" and method == "POST":
+            return upload_task_data_handler(event)
+
+        if path == "/get-upload-url" and method == "POST":
+            return get_upload_url_handler(event)
+
+        if path == "/study-config" and method == "GET":
+            return study_config_page_handler()
+
+        if path == "/upload-study-config" and method == "POST":
+            return upload_study_config_handler(event)
+
+        if path == "/study" and method == "GET":
+            return study_redirect_handler(event)
+
+        try:
+            require_auth(event)
+        except PermissionError:
+            return response(403, "Forbidden", {"Content-Type": "text/plain"})
+
+        if path == "/files-json" and method == "GET":
+            return files_json_handler(event)
+
+        if path == "/download-url" and method == "GET":
+            return download_url_handler(event)
+
+        if path == "/download-all" and method == "GET":
+            return download_all_handler(event)
+
+        logger.warning(f"No route matched: {method} {path}")
+        return response(404, "Not found", {"Content-Type": "text/plain"})
+
+    except Exception as e:
+        logger.error(f"UNHANDLED EXCEPTION on {method} {path}: {e}")
+        logger.error(traceback.format_exc())
+        return response(500, "Internal server error", {"Content-Type": "text/plain"})
 
 
 def root_handler():
+    logger.info("Root handler called")
     return response(200, "WebHandGuidance server is running", {"Content-Type": "text/plain"})
 
 
 def ping_handler():
+    logger.info("Ping handler called")
     return response(200, "pong", {"Content-Type": "text/plain"})
 
 
 def upload_handler(event):
+    logger.info("Upload handler called")
     body_bytes = get_body_bytes(event)
+    logger.info(f"Request body size: {len(body_bytes)} bytes")
+
     try:
         payload = json.loads(body_bytes.decode("utf-8"))
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON decode error: {e}")
         return response(400, "Invalid JSON", {"Content-Type": "text/plain"})
 
     if not isinstance(payload, dict):
+        logger.error(f"Expected dict, got {type(payload).__name__}")
         return response(400, "Invalid JSON body", {"Content-Type": "text/plain"})
 
     data_csv = payload.get("dataCsv") or ""
@@ -178,13 +210,22 @@ def upload_handler(event):
     timestamp = payload.get("timestamp") or ""
     task_str = payload.get("task") or ""
 
+    logger.info(f"Upload fields: participantId={participant_id}, timestamp={timestamp}, "
+                f"dataCsv={len(data_csv)} chars, rawDataCsv={len(raw_data_csv)} chars, "
+                f"imuDataCsv={len(imu_data_csv)} chars, task={len(task_str)} chars")
+
     if not all([data_csv, raw_data_csv, participant_id, timestamp, task_str]):
+        missing = [f for f, v in [("dataCsv", data_csv), ("rawDataCsv", raw_data_csv),
+                   ("participantId", participant_id), ("timestamp", timestamp),
+                   ("task", task_str)] if not v]
+        logger.error(f"Missing required fields: {missing}")
         return response(400, "Missing required fields", {"Content-Type": "text/plain"})
 
     safe_pid = safe_fragment(participant_id)
     safe_ts = safe_fragment(timestamp)
     filename = f"{safe_pid}_fulldata_{safe_ts}.zip"
     key = PREFIX + filename
+    logger.info(f"Will upload to s3://{BUCKET}/{key}")
 
     participation_info = {
         "participant_id": participant_id,
@@ -201,6 +242,7 @@ def upload_handler(event):
         zf.writestr("participation_info.json", json.dumps(participation_info))
 
     zipped_bytes = buf.getvalue()
+    logger.info(f"Zip created: {len(zipped_bytes)} bytes")
 
     s3.put_object(
         Bucket=BUCKET,
@@ -208,18 +250,24 @@ def upload_handler(event):
         Body=zipped_bytes,
         ContentType="application/zip"
     )
+    logger.info(f"Upload successful: {key}")
 
     return response(200, {"status": "ok", "key": key, "size": len(zipped_bytes)})
 
 
 def upload_task_data_handler(event):
+    logger.info("Upload task data handler called")
     body_bytes = get_body_bytes(event)
+    logger.info(f"Request body size: {len(body_bytes)} bytes")
+
     try:
         payload = json.loads(body_bytes.decode("utf-8"))
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON decode error: {e}")
         return response(400, "Invalid JSON", {"Content-Type": "text/plain"})
 
     if not isinstance(payload, dict):
+        logger.error(f"Expected dict, got {type(payload).__name__}")
         return response(400, "Invalid JSON body", {"Content-Type": "text/plain"})
 
     data_csv = payload.get("dataCsv") or ""
@@ -231,7 +279,15 @@ def upload_task_data_handler(event):
     timestamp = payload.get("timestamp") or ""
     task_str = payload.get("task") or ""
 
+    logger.info(f"Task upload fields: participantId={participant_id}, taskTag={task_tag}, "
+                f"taskIdx={task_idx}, timestamp={timestamp}, "
+                f"dataCsv={len(data_csv)} chars, rawDataCsv={len(raw_data_csv)} chars, "
+                f"imuDataCsv={len(imu_data_csv)} chars, task={len(task_str)} chars")
+
     if not all([participant_id, timestamp, task_tag]):
+        missing = [f for f, v in [("participantId", participant_id),
+                   ("timestamp", timestamp), ("taskTag", task_tag)] if not v]
+        logger.error(f"Missing required fields: {missing}")
         return response(400, "Missing required fields (participantId, timestamp, taskTag)", {"Content-Type": "text/plain"})
 
     safe_pid = safe_fragment(participant_id)
@@ -240,6 +296,7 @@ def upload_task_data_handler(event):
     safe_ts = safe_fragment(timestamp)
     filename = f"{safe_pid}_task{safe_idx}_{safe_tag}_{safe_ts}.zip"
     key = PREFIX + filename
+    logger.info(f"Will upload to s3://{BUCKET}/{key}")
 
     task_info = {
         "participant_id": participant_id,
@@ -261,6 +318,7 @@ def upload_task_data_handler(event):
         zf.writestr("task_info.json", json.dumps(task_info))
 
     zipped_bytes = buf.getvalue()
+    logger.info(f"Zip created: {len(zipped_bytes)} bytes")
 
     s3.put_object(
         Bucket=BUCKET,
@@ -268,40 +326,101 @@ def upload_task_data_handler(event):
         Body=zipped_bytes,
         ContentType="application/zip"
     )
+    logger.info(f"Task data upload successful: {key}")
 
     return response(200, {"status": "ok", "key": key, "size": len(zipped_bytes)})
 
 
+def get_upload_url_handler(event):
+    """Generate a presigned S3 PUT URL so the client can upload directly to S3."""
+    logger.info("Get upload URL handler called")
+    body_bytes = get_body_bytes(event)
+
+    try:
+        payload = json.loads(body_bytes.decode("utf-8"))
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON decode error: {e}")
+        return response(400, "Invalid JSON", {"Content-Type": "text/plain"})
+
+    participant_id = payload.get("participantId") or ""
+    task_tag = payload.get("taskTag") or ""
+    task_idx = payload.get("taskIdx") or ""
+    timestamp = payload.get("timestamp") or ""
+
+    if not all([participant_id, timestamp, task_tag]):
+        missing = [f for f, v in [("participantId", participant_id),
+                   ("timestamp", timestamp), ("taskTag", task_tag)] if not v]
+        logger.error(f"Missing required fields: {missing}")
+        return response(400, "Missing required fields (participantId, timestamp, taskTag)", {"Content-Type": "text/plain"})
+
+    safe_pid = safe_fragment(participant_id)
+    safe_tag = safe_fragment(task_tag)
+    safe_idx = safe_fragment(str(task_idx))
+    safe_ts = safe_fragment(timestamp)
+    filename = f"{safe_pid}_task{safe_idx}_{safe_tag}_{safe_ts}.zip"
+    key = PREFIX + filename
+
+    presigned_url = s3.generate_presigned_url(
+        "put_object",
+        Params={
+            "Bucket": BUCKET,
+            "Key": key,
+            "ContentType": "application/zip"
+        },
+        ExpiresIn=300  # 5 minutes
+    )
+
+    logger.info(f"Generated presigned upload URL for s3://{BUCKET}/{key} (expires in 300s)")
+
+    return response(200, {
+        "uploadUrl": presigned_url,
+        "key": key,
+        "expiresIn": 300
+    })
+
+
 def files_json_handler(event):
+    logger.info("Files JSON handler called")
     objects = list_data_objects()
     return response(200, objects)
 
 
 def download_url_handler(event):
     key = get_query_param(event, "key")
+    logger.info(f"Download URL handler called: key={key}")
     if not key:
+        logger.error("Missing key parameter")
         return response(400, {"error": "missing key"})
     url = s3.generate_presigned_url(
         "get_object",
         Params={"Bucket": BUCKET, "Key": key},
         ExpiresIn=3600
     )
+    logger.info(f"Generated presigned URL for {key}")
     return response(200, {"url": url})
 
 
 def download_all_handler(event):
+    logger.info("Download all handler called")
     objects = list_data_objects()
     if not objects:
+        logger.warning("No files found to download")
         return response(404, "No files to download", {"Content-Type": "text/plain"})
+
+    logger.info(f"Zipping {len(objects)} files for download")
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for o in objects:
+        for i, o in enumerate(objects):
             key = o["key"]
             name = o["name"]
+            logger.info(f"  Fetching [{i+1}/{len(objects)}] {key} ({o['size']} bytes)")
             obj = s3.get_object(Bucket=BUCKET, Key=key)
             data = obj["Body"].read()
             zf.writestr(name, data)
+
     buf.seek(0)
+    total_size = buf.getbuffer().nbytes
+    logger.info(f"Download-all zip ready: {total_size} bytes")
     return response(
         200,
         buf.getvalue(),
@@ -314,49 +433,65 @@ def download_all_handler(event):
 
 
 def files_page_handler():
+    logger.info("Files page handler called")
     here = os.path.dirname(os.path.abspath(__file__))
     path = os.path.join(here, "templates", "files.html")
     try:
         with open(path, "r", encoding="utf-8") as f:
             html = f.read()
+        logger.info(f"Loaded files.html ({len(html)} chars)")
     except FileNotFoundError:
+        logger.error(f"files.html not found at {path}")
         html = "<html><body><h1>files.html not found</h1></body></html>"
     return response(200, html, {"Content-Type": "text/html; charset=utf-8"})
 
 
 def study_config_page_handler():
+    logger.info("Study config page handler called")
     here = os.path.dirname(os.path.abspath(__file__))
     path = os.path.join(here, "templates", "study_config.html")
     try:
         with open(path, "r", encoding="utf-8") as f:
             html = f.read()
+        logger.info(f"Loaded study_config.html ({len(html)} chars)")
     except FileNotFoundError:
+        logger.error(f"study_config.html not found at {path}")
         html = "<html><body><h1>study_config.html not found</h1></body></html>"
     return response(200, html, {"Content-Type": "text/html; charset=utf-8"})
 
 
 def upload_study_config_handler(event):
+    logger.info("Upload study config handler called")
     body_bytes = get_body_bytes(event)
+    logger.info(f"Request body size: {len(body_bytes)} bytes")
+
     try:
         payload = json.loads(body_bytes.decode("utf-8"))
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON decode error: {e}")
         return response(400, "Invalid JSON", {"Content-Type": "text/plain"})
 
     json_content = payload.get("jsonContent")
     participant_id = payload.get("participantId", "P1")
+    logger.info(f"Study config upload: participantId={participant_id}, "
+                f"jsonContent={'present' if json_content else 'missing'} "
+                f"({len(json_content) if json_content else 0} chars)")
 
     if not json_content:
+        logger.error("Missing jsonContent field")
         return response(400, "Missing jsonContent field", {"Content-Type": "text/plain"})
 
     try:
         parsed = json.loads(json_content)
         normalized = json.dumps(parsed, sort_keys=True, separators=(",", ":"))
-    except json.JSONDecodeError:
+        logger.info(f"JSON content parsed and normalized ({len(normalized)} chars)")
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON in jsonContent: {e}")
         return response(400, "Invalid JSON content in jsonContent field", {"Content-Type": "text/plain"})
 
     content_hash = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
-
     key = STUDY_CONFIG_PREFIX + content_hash + ".json"
+    logger.info(f"Study config hash={content_hash}, uploading to s3://{BUCKET}/{key}")
 
     s3.put_object(
         Bucket=BUCKET,
@@ -364,6 +499,7 @@ def upload_study_config_handler(event):
         Body=normalized.encode("utf-8"),
         ContentType="application/json"
     )
+    logger.info(f"Study config upload successful: {key}")
 
     return response(200, {
         "status": "ok",
@@ -375,25 +511,32 @@ def upload_study_config_handler(event):
 def study_redirect_handler(event):
     config_hash = get_query_param(event, "hash")
     participant_id = get_query_param(event, "participantId") or "P1"
+    logger.info(f"Study redirect handler: hash={config_hash}, participantId={participant_id}")
 
     if not config_hash:
+        logger.error("Missing hash parameter")
         return response(400, "Missing hash parameter", {"Content-Type": "text/plain"})
 
     key = STUDY_CONFIG_PREFIX + config_hash + ".json"
+    logger.info(f"Fetching study config from s3://{BUCKET}/{key}")
 
     try:
         obj = s3.get_object(Bucket=BUCKET, Key=key)
         json_content = obj["Body"].read().decode("utf-8")
+        logger.info(f"Study config loaded ({len(json_content)} chars)")
     except s3.exceptions.NoSuchKey:
+        logger.warning(f"Study config not found: {key}")
         return response(404, "Study configuration not found for the given hash", {"Content-Type": "text/plain"})
     except Exception as e:
         if "NoSuchKey" in str(e) or "404" in str(e):
+            logger.warning(f"Study config not found (fallback check): {key} - {e}")
             return response(404, "Study configuration not found for the given hash", {"Content-Type": "text/plain"})
+        logger.error(f"Unexpected error fetching study config: {e}")
         raise
 
     data_b64 = base64.b64encode(json_content.encode("utf-8")).decode("ascii")
-
     redirect_url = f"{REDIRECT_BASE}?participantId={urllib.parse.quote(participant_id)}&data={urllib.parse.quote(data_b64)}"
+    logger.info(f"Redirecting to {redirect_url[:120]}...")
 
     return response(302, "", {
         "Location": redirect_url,
