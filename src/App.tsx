@@ -23,6 +23,8 @@ import {
   faSquare,
   faUpRightAndDownLeftFromCenter,
   faSpinner,
+  faStop,
+  faPause,
 } from '@fortawesome/free-solid-svg-icons';
 import Study from './pages/TaskExecutor/Study';
 import CameraCalibration from './pages/Calibration/CameraCalibration';
@@ -41,7 +43,7 @@ import PreStudy from './pages/TaskExecutor/PreStudy';
 import { SYSTEM_VERSION } from './utils/constants';
 import FrameCalibration from './pages/Calibration/FrameCalibration';
 
-library.add(faCheck, faArrowRight, faChevronUp, faChevronDown, faLink, faHome, faSave, faFile, faChevronLeft, faChevronRight, faPlus, faTrash, faRedo, faFolderOpen, faDownload, faUpRightAndDownLeftFromCenter, faSquare, faSpinner);
+library.add(faCheck, faArrowRight, faChevronUp, faChevronDown, faLink, faHome, faSave, faFile, faChevronLeft, faChevronRight, faPlus, faTrash, faRedo, faFolderOpen, faDownload, faUpRightAndDownLeftFromCenter, faSquare, faSpinner, faStop, faPause);
 
 const App = () => {
   const webSerial = useWebSerial({ baudRate: 115200 });

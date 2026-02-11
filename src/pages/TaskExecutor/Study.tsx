@@ -69,7 +69,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
   const [isStopConfirmVisible, setIsStopConfirmVisible] = useState<boolean>(false);
 
   // Marker-based pause/resume
-  const PAUSE_MARKER_DURATION = 2000; // 2 seconds
+  const PAUSE_MARKER_DURATION = 3000; // 3 seconds
   const pauseMarkerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pauseMarkerStartTime, setPauseMarkerStartTime] = useState<number | null>(null);
   const [pauseMarkerProgress, setPauseMarkerProgress] = useState<number>(0);
@@ -320,6 +320,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
 
   // Handle continue marker for pause/resume toggle
   useEffect(() => {
+    if (currentTask?.type === 'MEDIA') return;
     if (isContinueMarkerVisible && pauseMarkerTimerRef.current === null) {
       // Start the timer when marker becomes visible
       setPauseMarkerStartTime(Date.now());
@@ -336,7 +337,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
       setPauseMarkerStartTime(null);
       setPauseMarkerProgress(0);
     }
-  }, [isContinueMarkerVisible, PAUSE_MARKER_DURATION, togglePauseStudy]);
+  }, [isContinueMarkerVisible, PAUSE_MARKER_DURATION, togglePauseStudy, currentTask?.type]);
 
   // Update progress bar animation
   useEffect(() => {
@@ -782,8 +783,13 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
             </div>
 
             <button
-              className={`px-4 py-2 rounded-lg font-bold cursor-pointer ${
-                isPaused ? 'bg-green-600 text-white hover:bg-green-800' : 'bg-yellow-500 text-white hover:bg-yellow-600'
+              disabled={currentTask?.type === 'MEDIA'}
+              className={`px-4 py-2 rounded-lg font-bold ${
+                currentTask?.type === 'MEDIA'
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : isPaused
+                    ? 'bg-green-600 text-white hover:bg-green-800 cursor-pointer'
+                    : 'bg-yellow-500 text-white hover:bg-yellow-600 cursor-pointer'
               }`}
               onClick={togglePauseStudy}
             >
