@@ -4,8 +4,8 @@ import type useBle from '../hooks/useBle';
 
 const SerialConnector = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>; ble: ReturnType<typeof useBle> }) => {
   const [isExapnded, setIsExpanded] = useState(false);
-  const { connect: webSerialConnect, isConnected: webSerialIsConnected, isSupported: webSerialIsSupported, lastVibrationData: webSerialLastVibrationData } = webSerial;
-  const { connect: bleConnect, isConnected: bleIsConnected, isSupported: bleIsSupported, lastVibrationData: bleLastVibrationData } = ble;
+  const { connect: webSerialConnect, disconnect: webSerialDisconnect, isConnected: webSerialIsConnected, isSupported: webSerialIsSupported, lastVibrationData: webSerialLastVibrationData } = webSerial;
+  const { connect: bleConnect, disconnect: bleDisconnect, isConnected: bleIsConnected, isSupported: bleIsSupported, lastVibrationData: bleLastVibrationData } = ble;
 
   const imuVal = useMemo(() => {
     if (bleIsConnected) return ble.latestImuVal;
@@ -71,6 +71,15 @@ const SerialConnector = ({ webSerial, ble }: { webSerial: ReturnType<typeof useW
             <div>Left: {lastVibrationData.left}</div>
             <div>Right: {lastVibrationData.right}</div>
           </div>
+          <button
+            onClick={() => {
+              if (bleIsConnected) bleDisconnect();
+              else if (webSerialIsConnected) webSerialDisconnect();
+            }}
+            className="text-red-600 text-sm font-bold p-1 border-t border-green-600 hover:bg-red-50 cursor-pointer"
+          >
+            Disconnect
+          </button>
         </div>
       ) : (
         <span onClick={() => setIsExpanded(!isExapnded)} className="bg-green-600 p-1 px-3 aspect-square rounded-full cursor-pointer hover:bg-green-800"></span>

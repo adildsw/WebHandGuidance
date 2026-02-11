@@ -6,6 +6,7 @@ const MOTOR_CHAR_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
 const IMU_CHAR_UUID = '8f022099-36b0-44cd-909e-d24cc105895a';
 
 const useBle = () => {
+  const deviceRef = useRef<BluetoothDevice | null>(null);
   const motorChar = useRef<BluetoothRemoteGATTCharacteristic | null>(null);
 
   const [isConnected, setIsConnected] = useState(false);
@@ -37,6 +38,7 @@ const useBle = () => {
       optionalServices: [SERVICE_UUID],
     });
 
+    deviceRef.current = device;
     const server = await device.gatt?.connect();
     if (!server) throw new Error('[BLE ERROR] Failed to connect to GATT server');
     const service = await server.getPrimaryService(SERVICE_UUID);
@@ -65,7 +67,14 @@ const useBle = () => {
     });
   }, [writeDirection]);
 
-  return { isConnected, isSupported, connect, writeDirection, latestImuVal, lastVibrationData };
+  const disconnect = useCallback(() => {
+    deviceRef.current?.gatt?.disconnect();
+    deviceRef.current = null;
+    motorChar.current = null;
+    setIsConnected(false);
+  }, []);
+
+  return { isConnected, isSupported, connect, disconnect, writeDirection, latestImuVal, lastVibrationData };
 };
 
 export default useBle;

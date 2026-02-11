@@ -109,9 +109,22 @@ const PreStudy = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSeria
             </div>
           </>
         ) : (
-          <div className="w-128 flex flex-row gap-2 items-center pb-4">
-            <span className="text-lg text-gray-600 italic"><b>Step 2: </b> {selectedDevice} Connected!</span>
-          </div>
+          <>
+            <span className="text-lg text-gray-600 italic">
+              <b>Step 2: </b> {selectedDevice} Connected!
+            </span>
+            <div className="w-full flex flex-row gap-2 items-center pb-4">
+              <button
+                onClick={() => {
+                  if (ble.isConnected) ble.disconnect();
+                  else if (webSerial.isConnected) webSerial.disconnect();
+                }}
+                className="px-4 py-2 bg-red-600 border border-red-700 text-white rounded-lg hover:bg-red-700 cursor-pointer font-bold flex-1"
+              >
+                Disconnect Device
+              </button>
+            </div>
+          </>
         )}
 
         <span className="text-lg text-gray-600 italic">
@@ -122,10 +135,8 @@ const PreStudy = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSeria
             disabled={!participantId || selectedDevice === 'None'}
             onClick={() => window.location.replace(`#/camera-calibration?participantId=${participantId}&data=${encodedData}&homeEnabled=false`)}
             className={
-              "grow px-4 py-2 text-white rounded-lg font-bold " + 
-              (!participantId || selectedDevice === 'None'
-                ? 'bg-gray-300 cursor-not-allowed'
-                : 'border border-blue-700 bg-blue-600 hover:bg-blue-700 cursor-pointer') 
+              'grow px-4 py-2 text-white rounded-lg font-bold ' +
+              (!participantId || selectedDevice === 'None' ? 'bg-gray-300 cursor-not-allowed' : 'border border-blue-700 bg-blue-600 hover:bg-blue-700 cursor-pointer')
             }
           >
             Calibrate and Start Study
@@ -134,10 +145,8 @@ const PreStudy = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSeria
             disabled={!participantId || selectedDevice === 'None'}
             onClick={() => window.location.replace(`#/study?participantId=${participantId}&data=${encodedData}`)}
             className={
-              "grow px-4 py-2 text-white rounded-lg font-bold " + 
-              (!participantId || selectedDevice === 'None'
-                ? 'bg-gray-300 cursor-not-allowed'
-                : 'border border-blue-700 bg-blue-600 hover:bg-blue-700 cursor-pointer') 
+              'grow px-4 py-2 text-white rounded-lg font-bold ' +
+              (!participantId || selectedDevice === 'None' ? 'bg-gray-300 cursor-not-allowed' : 'border border-blue-700 bg-blue-600 hover:bg-blue-700 cursor-pointer')
             }
           >
             Start Study

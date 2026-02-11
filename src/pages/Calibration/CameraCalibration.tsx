@@ -155,8 +155,10 @@ const CameraCalibration = () => {
 
   const downloadMarkers = () => {
     const link = document.createElement('a');
-    link.href = './assets/markers_usletter.zip';
-    link.download = 'markers_usletter.zip';
+    // link.href = './assets/markers_usletter.zip';
+    // link.download = 'markers_usletter.zip';
+    link.href = './assets/webhandguidance_ArUcoMarker.pdf';
+    link.download = 'marker.pdf';
     link.click();
   };
 

@@ -26,81 +26,88 @@ const useWebSerial = (opts: UseWebSerialOpts) => {
   const rxBufRef = useRef<Uint8Array>(new Uint8Array(0));
 
   const parseIMUBytes = useCallback((chunk: Uint8Array) => {
-  const merged = new Uint8Array(rxBufRef.current.length + chunk.length);
-  merged.set(rxBufRef.current, 0);
-  merged.set(chunk, rxBufRef.current.length);
-  let i = 0;
-  let latest: { ax: number; ay: number; az: number } | null = null;
-  while (i < merged.length) {
-    if (merged[i] !== 0xff) { i += 1; continue; }
-    if (i + 13 >= merged.length) break;
-    if (merged[i + 13] === 0xfe) {
-      const view = new DataView(merged.buffer, merged.byteOffset + i + 1, 12);
-      const ax = view.getFloat32(0, true);
-      const ay = view.getFloat32(4, true);
-      const az = view.getFloat32(8, true);
-      latest = { ax, ay, az };
-      i += 14;
-    } else {
-      i += 1;
+    const merged = new Uint8Array(rxBufRef.current.length + chunk.length);
+    merged.set(rxBufRef.current, 0);
+    merged.set(chunk, rxBufRef.current.length);
+    let i = 0;
+    let latest: { ax: number; ay: number; az: number } | null = null;
+    while (i < merged.length) {
+      if (merged[i] !== 0xff) {
+        i += 1;
+        continue;
+      }
+      if (i + 13 >= merged.length) break;
+      if (merged[i + 13] === 0xfe) {
+        const view = new DataView(merged.buffer, merged.byteOffset + i + 1, 12);
+        const ax = view.getFloat32(0, true);
+        const ay = view.getFloat32(4, true);
+        const az = view.getFloat32(8, true);
+        latest = { ax, ay, az };
+        i += 14;
+      } else {
+        i += 1;
+      }
     }
-  }
-  rxBufRef.current = merged.subarray(i);
-  return latest;
-}, []);
+    rxBufRef.current = merged.subarray(i);
+    return latest;
+  }, []);
 
-const connect = useCallback(async () => {
-  if (!('serial' in navigator)) {
-    setIsSupported(false);
-    throw new Error('Web Serial not supported');
-  }
-  setIsSupported(true);
-  const nav = navigator as NavigatorSerial;
-  const port = await nav.serial.requestPort(filters ? { filters } : undefined);
-  await port.open({ baudRate });
-  portRef.current = port;
-  setPortInfo(port.getInfo());
-  if (port.writable) writerRef.current = port.writable.getWriter();
-  const reader = port.readable?.getReader();
-  if (!reader) {
+  const connect = useCallback(async () => {
+    if (!('serial' in navigator)) {
+      setIsSupported(false);
+      throw new Error('Web Serial not supported');
+    }
+    setIsSupported(true);
+    const nav = navigator as NavigatorSerial;
+    const port = await nav.serial.requestPort(filters ? { filters } : undefined);
+    await port.open({ baudRate });
+    portRef.current = port;
+    setPortInfo(port.getInfo());
+    if (port.writable) writerRef.current = port.writable.getWriter();
+    const reader = port.readable?.getReader();
+    if (!reader) {
+      setIsConnected(true);
+      return;
+    }
+    readerRef.current = reader;
+    decoderRef.current = new TextDecoder();
+    readLoopActiveRef.current = true;
     setIsConnected(true);
-    return;
-  }
-  readerRef.current = reader;
-  decoderRef.current = new TextDecoder();
-  readLoopActiveRef.current = true;
-  setIsConnected(true);
-  (async () => {
-    let buf = '';
-    try {
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        if (!value) continue;
-        latestBytesRef.current = value;
-        setLatestBytes(value);
-        const imu = parseIMUBytes(value);
-        if (imu) setLatestImuVal(imu);
-        if (decoderRef.current) {
-          buf += decoderRef.current.decode(value, { stream: true });
-          for (;;) {
-            const idx = buf.indexOf(lineDelimiter);
-            if (idx === -1) break;
-            const line = buf.slice(0, idx).replace(/\r/g, '');
-            latestLineRef.current = line;
-            setLatestLine(line);
-            buf = buf.slice(idx + lineDelimiter.length);
+    (async () => {
+      let buf = '';
+      try {
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          if (!value) continue;
+          latestBytesRef.current = value;
+          setLatestBytes(value);
+          const imu = parseIMUBytes(value);
+          if (imu) setLatestImuVal(imu);
+          if (decoderRef.current) {
+            buf += decoderRef.current.decode(value, { stream: true });
+            for (;;) {
+              const idx = buf.indexOf(lineDelimiter);
+              if (idx === -1) break;
+              const line = buf.slice(0, idx).replace(/\r/g, '');
+              latestLineRef.current = line;
+              setLatestLine(line);
+              buf = buf.slice(idx + lineDelimiter.length);
+            }
           }
         }
+      } catch (e) {
+        console.error('Read loop error', e);
+      } finally {
+        try {
+          reader.releaseLock();
+        } catch (e) {
+          console.error('Reader release lock error', e);
+        }
+        readLoopActiveRef.current = false;
       }
-    } catch (e) {
-      console.error('Read loop error', e);
-    } finally {
-      try { reader.releaseLock(); } catch (e) { console.error('Reader release lock error', e); }
-      readLoopActiveRef.current = false;
-    }
-  })();
-}, [baudRate, filters, lineDelimiter, parseIMUBytes]);
+    })();
+  }, [baudRate, filters, lineDelimiter, parseIMUBytes]);
 
   const write = useCallback(async (data: string | Uint8Array) => {
     if (!writerRef.current) throw new Error('Not connected');
@@ -119,8 +126,37 @@ const connect = useCallback(async () => {
       setLastVibrationData({ up, down, left, right });
       await write(data);
     },
-    [write, isConnected]
+    [write, isConnected],
   );
+
+  const disconnect = useCallback(async () => {
+    readLoopActiveRef.current = false;
+    try {
+      await readerRef.current?.cancel();
+    } catch (e) {
+      console.error('Reader cancel error', e);
+    }
+    try {
+      readerRef.current?.releaseLock();
+      readerRef.current = null;
+    } catch (e) {
+      console.error('Reader release lock error', e);
+    }
+    try {
+      writerRef.current?.releaseLock();
+      writerRef.current = null;
+    } catch (e) {
+      console.error('Writer release error', e);
+    }
+    try {
+      await portRef.current?.close();
+      portRef.current = null;
+    } catch (e) {
+      console.error('Port close error', e);
+    }
+    setIsConnected(false);
+    setPortInfo(null);
+  }, []);
 
   return {
     isSupported,
@@ -129,6 +165,7 @@ const connect = useCallback(async () => {
     latestLine,
     latestBytes,
     connect,
+    disconnect,
     writeDirection,
     latestImuVal,
     lastVibrationData,
