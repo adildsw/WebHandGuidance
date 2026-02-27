@@ -497,7 +497,7 @@ const RomCalibration = () => {
       {isTutorialVisible && (
         <MediaPlayer
           // mediaUrl="https://webhandguidance.b-cdn.net/rom_calibration_demo_test.mp4"
-          mediaUrl="https://webhandguidance.b-cdn.net/phase2_videos/ROMCalibrationTutorial.mp4"
+          mediaUrl="https://CHRB.b-cdn.net/Range%20of%20Motion%20Calibration.mp4"
           mediaTitle="Range of Motion Calibration Tutorial"
           mediaSubtitle="This video will demonstrate how to calibrate your range of motion."
           doneCallback={() => setIsTutorialVisible(false)}

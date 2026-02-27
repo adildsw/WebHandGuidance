@@ -234,7 +234,7 @@ const CameraCalibration = () => {
     <>
       {isTutorialVisible && (
         <MediaPlayer
-          mediaUrl="https://webhandguidance.b-cdn.net/phase2_videos/ScreenCalibrationTutorial.mp4"
+          mediaUrl="https://CHRB.b-cdn.net/Camera%20Calibration%20Video.mp4"
           mediaTitle="Camera Calibration Tutorial"
           mediaSubtitle="This video will demonstrate how to calibrate your camera."
           doneCallback={() => setIsTutorialVisible(false)}
