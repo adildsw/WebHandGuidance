@@ -236,7 +236,7 @@ const ScreenCalibration = () => {
     <>
       {isTutorialVisible && (
         <MediaPlayer
-          mediaUrl="https://webhandguidance.b-cdn.net/screen_calibration_demo_test.mp4"
+          mediaUrl="https://chrb.b-cdn.net/Screen%20Calibration.mp4"
           mediaTitle="Screen Calibration Tutorial"
           mediaSubtitle="This video will demonstrate how to calibrate your screen."
           doneCallback={() => setIsTutorialVisible(false)}
