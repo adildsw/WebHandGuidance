@@ -403,7 +403,7 @@ const RomMoveTaskDesigner = ({ task, modifyTask, detectionProp }: RomMoveTaskDes
               className="w-full"
               type="range"
               min={25}
-              max={150}
+              max={250}
               step={1}
               value={distanceThreshold}
               onChange={(e) => {

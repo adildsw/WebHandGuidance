@@ -2,7 +2,7 @@ import type { Config } from '../types/config';
 import type { FingerTips, HeadShoulderDetectionResult, WristDetectionResult } from '../types/detections';
 import type { Task } from '../types/task';
 
-export const SYSTEM_VERSION = '0.2.2';
+export const SYSTEM_VERSION = '0.2.3';
 
 export const CREDIT_CARD_WIDTH_INCH = 3.37;
 export const CREDIT_CARD_HEIGHT_INCH = 2.13;

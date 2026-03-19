@@ -268,11 +268,18 @@ const taskVisualizationSketch: Sketch = (p5) => {
     if (!headShoulderDetection.nose || !headShoulderDetection.leftShoulder || !headShoulderDetection.rightShoulder) return;
 
     // Draw Positional Error Text
-    p5.noStroke();
-    p5.fill(255, 255, 255, silOpacity);
-    p5.textSize(32);
+    const msg = headShoulderDetection.posMessage;
+    p5.textSize(36);
     p5.textAlign(p5.CENTER, p5.CENTER);
-    p5.text(headShoulderDetection.posMessage, 0, -h / 2 + 40);
+    const tw = p5.textWidth(msg);
+    const th = p5.textAscent() + p5.textDescent();
+    const pad = 10;
+    const ty = -h / 2 + 40;
+    p5.noStroke();
+    p5.fill(0, 0, 0, 200);
+    p5.rect(-tw / 2 - pad, ty - th / 2 - pad, tw + pad * 2, th + pad * 2, 6);
+    p5.fill(255, 255, 255);
+    p5.text(msg, 0, ty);
   };
 
   p5.draw = () => {
