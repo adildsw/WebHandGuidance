@@ -201,6 +201,9 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
     return percent;
   })();
 
+  const isInsideTarget = activeWrist !== null && markers.length > 0 && currentTarget !== -1 && currentTarget !== null &&
+    distance((activeWrist.x * INCH_TO_MM) / worldPPI, (activeWrist.y * INCH_TO_MM) / worldPPI, markers[currentTarget].x, markers[currentTarget].y) < distanceThreshold / 2;
+
   const isTaskRunning = useMemo<boolean>(() => {
     if (taskStartTime !== null) return true;
     return false;
@@ -994,20 +997,20 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
           <span className="text-center text-md text-gray-500">
             {!isTaskRunning && (
               <>
-                <kbd className="bg-gray-200 py-1 font-bold px-2 rounded">Move {hand} Hand</kbd> Inside the <kbd className="bg-red-200 py-1 font-bold px-2 rounded">Red Circle</kbd>{' '}
+                <kbd className="bg-gray-200 py-1 font-bold px-2 rounded">Move {hand} Hand</kbd> Inside the <kbd className="bg-red-200 py-1 font-bold px-2 rounded">{currentTask?.type === 'MOVE' || currentTask?.type === 'ROM_MOVE' ? 'Green' : 'Red'} Circle</kbd>{' '}
                 to Begin Task
               </>
             )}
             {isTaskRunning && ['MOVE', 'ROM_MOVE'].includes(currentTask?.type || '') && (
               <>
-                Follow the <kbd className="bg-red-200 py-1 font-bold px-2 rounded">Red Circle</kbd> with Your{' '}
+                Follow the <kbd className="bg-red-200 py-1 font-bold px-2 rounded">Green Circle</kbd> with Your{' '}
                 <kbd className="bg-gray-200 py-1 font-bold px-2 rounded">{hand} Hand</kbd>
               </>
             )}
             {isTaskRunning && ['HOLD', 'ROM_HOLD'].includes(currentTask?.type || '') && (
               <>
                 Keep Your <kbd className="bg-gray-200 py-1 font-bold px-2 rounded">{hand} Hand</kbd> Steady Inside the{' '}
-                <kbd className="bg-red-200 py-1 font-bold px-2 rounded">Red Circle</kbd> for{' '}
+                <kbd className={`${isInsideTarget ? 'bg-green-200' : 'bg-red-200'} py-1 font-bold px-2 rounded`}>{isInsideTarget ? 'Green' : 'Red'} Circle</kbd> for{' '}
                 <span className="font-bold text-red-600">{Math.ceil(((1 - holdProgress) * (holdDuration || 1)) / 1000)} more seconds</span>
               </>
             )}
