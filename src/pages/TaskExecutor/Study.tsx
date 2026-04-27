@@ -930,8 +930,8 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
                   silParams={silParams}
                 />
 
-                {/* add trial number text in the bottom left */}
-                <div className="absolute bottom-2 left-2 bg-gray-800 bg-opacity-50 text-white px-3 py-1 rounded-lg text-4xl font-semibold border border-white">
+                {/* Trial Number */}
+                <div className="absolute bottom-2 left-2 bg-gray-800 bg-opacity-50 text-white px-3 py-1 rounded-lg text-xl font-semibold border border-white">
                   {currentTask && currentTrial !== null && currentRepetition !== null && (
                     <>
                       Trial: {currentTrial + 1} / {trials}
