@@ -10,6 +10,8 @@ import useDetection from '../../hooks/useMediaPipeHandDetection';
 import { forceRoot } from '../../utils/navigation';
 import { cartesianToPolar, polarToCartesian } from '../../utils/math';
 import MediaPlayer from '../../components/MediaPlayer';
+import ModelLoadingOverlay from '../../components/ModelLoadingOverlay';
+import CameraSelector from '../../components/CameraSelector';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 type RomCalibrationStages = 'init' | 'leftStretch' | 'rightStretch' | 'leftRaised' | 'rightRaised' | 'done';
@@ -293,7 +295,7 @@ const RomCalibration = () => {
   const [areWeDone, setAreWeDone] = useState(false);
   const [isTutorialVisible, setIsTutorialVisible] = useState(true);
 
-  const { videoRef, wristDetection, headShoulderDetection, loading, error, startWebcam, stopWebcam, detectedMarkers } = useDetection(true);
+  const { videoRef, wristDetection, headShoulderDetection, modelsLoading, error, startWebcam, stopWebcam, detectedMarkers, availableCameras, selectedCameraId, selectCamera } = useDetection(true);
   const { isContinueMarkerVisible, isReplayMarkerVisible } = detectedMarkers;
 
   const isUserInPos = useMemo(() => {
@@ -537,9 +539,11 @@ const RomCalibration = () => {
         {/* Camera Feed */}
         <div className="md:col-span-3 bg-gray-100 flex items-center justify-center relative" style={{ width: `${testbedWidth}px`, height: `${testbedHeight}px` }}>
           <div className="absolute inset-0 overflow-hidden rounded-lg shadow-lg">
-            {videoRef !== null && !loading && !error && (
+            {!error && (
               <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
             )}
+            <ModelLoadingOverlay visible={modelsLoading && !error} errorMessage={error} />
+            <CameraSelector availableCameras={availableCameras} selectedCameraId={selectedCameraId} onSelectCamera={selectCamera} />
             {!areWeDone && (
               <div className="absolute inset-0">
                 <ReactP5Wrapper

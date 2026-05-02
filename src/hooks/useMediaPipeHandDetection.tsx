@@ -402,8 +402,33 @@ const useDetection = (runOnStart: boolean = false) => {
     posMessage: 'Uncalibrated',
   });
 
-  const [loading, setLoading] = useState(true);
+  const [modelsLoading, setModelsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('webhandguidance_cameraId');
+    } catch {
+      return null;
+    }
+  });
+  const selectedCameraIdRef = useRef<string | null>(selectedCameraId);
+  useEffect(() => {
+    selectedCameraIdRef.current = selectedCameraId;
+  }, [selectedCameraId]);
+
+  const refreshCameraList = useCallback(async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cams = devices.filter((d) => d.kind === 'videoinput');
+      setAvailableCameras(cams);
+      return cams;
+    } catch (err) {
+      console.error('Failed to enumerate devices:', err);
+      return [];
+    }
+  }, []);
 
   const startDetecting = useCallback(() => {
     console.log('[INFO] Starting Landmark Detection');
@@ -448,29 +473,130 @@ const useDetection = (runOnStart: boolean = false) => {
   }, []);
 
   const startWebcam = useCallback(async () => {
-    if (loading || error) return;
+    if (error) return;
     if (streamRef.current) return;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-        audio: false,
-      });
-      if (!videoRef.current) return;
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error('Camera API not available. Use a modern browser over HTTPS or localhost.');
+      }
+
+      const desiredId = selectedCameraIdRef.current;
+      const baseVideo: MediaTrackConstraints = {
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      };
+      let stream: MediaStream | null = null;
+      if (desiredId) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { ...baseVideo, deviceId: { exact: desiredId } },
+            audio: false,
+          });
+        } catch (err) {
+          const name = (err as { name?: string })?.name;
+          if (name === 'OverconstrainedError' || name === 'NotFoundError') {
+            console.warn('[INFO] Saved camera unavailable, falling back to default.');
+          } else {
+            throw err;
+          }
+        }
+      }
+      if (!stream) {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: baseVideo,
+          audio: false,
+        });
+      }
+
+      // If the consumer unmounted while we were awaiting, drop the stream.
+      if (!videoRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        setError('Camera view did not mount in time. Please refresh the page.');
+        return;
+      }
+
+      // Another caller may have raced and attached a stream first.
+      if (streamRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+
       if (runOnStart) isDetecting.current = true;
-      videoRef.current.srcObject = stream;
-      videoRef.current.onloadedmetadata = () => {
-        videoRef.current?.play();
+      streamRef.current = stream;
+      const video = videoRef.current;
+      video.srcObject = stream;
+
+      const beginPlayback = () => {
+        const playPromise = video.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+          playPromise.catch((e) => {
+            console.warn('Video play() failed:', e);
+            setError(`Could not start camera playback: ${e?.message ?? e}`);
+          });
+        }
+        if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
         animationFrameId.current = requestAnimationFrame(performDetectionLoop);
       };
-      streamRef.current = stream;
+
+      // readyState >= 1 (HAVE_METADATA) means metadata is already available
+      // and 'loadedmetadata' may not fire again. Handle both paths.
+      if (video.readyState >= 1 && video.videoWidth > 0) {
+        beginPlayback();
+      } else {
+        const handler = () => {
+          video.removeEventListener('loadedmetadata', handler);
+          beginPlayback();
+        };
+        video.addEventListener('loadedmetadata', handler);
+        // Fallback in case 'loadedmetadata' never fires (some browsers/streams).
+        setTimeout(() => {
+          if (video.readyState >= 1 && !animationFrameId.current) {
+            video.removeEventListener('loadedmetadata', handler);
+            beginPlayback();
+          }
+        }, 2000);
+      }
+
+      await refreshCameraList();
     } catch (err) {
       console.error('Error accessing webcam:', err);
-      setError(err as string);
+      const e = err as { name?: string; message?: string };
+      let msg = e?.message || String(err);
+      if (e?.name === 'NotAllowedError' || e?.name === 'SecurityError') {
+        msg = 'Camera permission was denied. Please grant access in your browser settings and reload.';
+      } else if (e?.name === 'NotFoundError' || e?.name === 'OverconstrainedError') {
+        msg = 'No compatible camera was found on this device.';
+      } else if (e?.name === 'NotReadableError') {
+        msg = 'The camera is in use by another application. Close other apps using the camera and reload.';
+      } else if (e?.name === 'AbortError') {
+        msg = 'Camera initialization was aborted. Try reloading the page.';
+      }
+      setError(msg);
     }
-  }, [loading, error, performDetectionLoop, runOnStart]);
+  }, [error, performDetectionLoop, runOnStart, refreshCameraList]);
+
+  const selectCamera = useCallback(
+    async (deviceId: string) => {
+      try {
+        localStorage.setItem('webhandguidance_cameraId', deviceId);
+      } catch {
+        // ignore storage errors
+      }
+      setSelectedCameraId(deviceId);
+      selectedCameraIdRef.current = deviceId;
+      if (animationFrameId.current) {
+        cancelAnimationFrame(animationFrameId.current);
+        animationFrameId.current = null;
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+      if (videoRef.current) videoRef.current.srcObject = null;
+      await startWebcam();
+    },
+    [startWebcam]
+  );
 
   const stopWebcam = useCallback(() => {
     console.log('[INFO] Stopping Webcam');
@@ -487,8 +613,7 @@ const useDetection = (runOnStart: boolean = false) => {
 
   const initializeDetector = useCallback(async () => {
     try {
-      setLoading(true);
-      setError(null);
+      setModelsLoading(true);
       detectorRef.current = await initDetectors();
 
       arucoDetectorRef.current = new AR.Detector({
@@ -499,17 +624,29 @@ const useDetection = (runOnStart: boolean = false) => {
         arucoCanvasRef.current = document.createElement('canvas');
       }
 
-      setLoading(false);
+      setModelsLoading(false);
     } catch (err) {
       console.error('Failed to initialize Object Detector:', err);
-      setError(err as string);
-      setLoading(false);
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`Failed to load detection models: ${msg}`);
+      setModelsLoading(false);
     }
   }, []);
 
   useEffect(() => {
     initializeDetector();
   }, [initializeDetector]);
+
+  useEffect(() => {
+    refreshCameraList();
+    const handler = () => {
+      refreshCameraList();
+    };
+    navigator.mediaDevices?.addEventListener?.('devicechange', handler);
+    return () => {
+      navigator.mediaDevices?.removeEventListener?.('devicechange', handler);
+    };
+  }, [refreshCameraList]);
 
   useEffect(() => {
     const cleanup = () => {
@@ -536,7 +673,21 @@ const useDetection = (runOnStart: boolean = false) => {
     };
     return cleanup;
   }, []);
-  return { videoRef, wristDetection, headShoulderDetection, detectedMarkers: markerOperationResults, loading, error, startWebcam, stopWebcam, startDetecting, stopDetecting };
+  return {
+    videoRef,
+    wristDetection,
+    headShoulderDetection,
+    detectedMarkers: markerOperationResults,
+    modelsLoading,
+    error,
+    startWebcam,
+    stopWebcam,
+    startDetecting,
+    stopDetecting,
+    availableCameras,
+    selectedCameraId,
+    selectCamera,
+  };
 };
 
 export default useDetection;

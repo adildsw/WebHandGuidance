@@ -10,6 +10,8 @@ import useDetection from '../../hooks/useMediaPipeHandDetection';
 import { forceRoot } from '../../utils/navigation';
 import type { SilhouetteParams } from '../../types/config';
 import MediaPlayer from '../../components/MediaPlayer';
+import ModelLoadingOverlay from '../../components/ModelLoadingOverlay';
+import CameraSelector from '../../components/CameraSelector';
 import { type Marker, type MarkerOperationResult } from '../../types/detections';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -95,7 +97,7 @@ const CameraCalibration = () => {
 
   const [isTutorialVisible, setIsTutorialVisible] = useState(true);
 
-  const { videoRef, headShoulderDetection, loading, error, startWebcam, stopWebcam, detectedMarkers } = useDetection(true);
+  const { videoRef, headShoulderDetection, modelsLoading, error, startWebcam, stopWebcam, detectedMarkers, availableCameras, selectedCameraId, selectCamera } = useDetection(true);
 
   const latestMarkerDetection = useRef<MarkerOperationResult>(detectedMarkers);
   // const { isCalibrationMarkerVisible, calibrationMarker, isContinueMarkerVisible, isReplayMarkerVisible } = detectedMarkers;
@@ -272,7 +274,9 @@ const CameraCalibration = () => {
         {/* Camera Feed */}
         <div className="md:col-span-3 bg-gray-100 flex items-center justify-center relative" style={{ width: `${testbedWidth}px`, height: `${testbedHeight}px` }}>
           <div className="absolute inset-0 overflow-hidden rounded-lg shadow-lg">
-            {!loading && !error && <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />}
+            {!error && <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />}
+            <ModelLoadingOverlay visible={modelsLoading && !error} errorMessage={error} />
+            <CameraSelector availableCameras={availableCameras} selectedCameraId={selectedCameraId} onSelectCamera={selectCamera} />
             <div className="absolute inset-0">
               <ReactP5Wrapper
                 sketch={sketch}

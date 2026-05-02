@@ -16,6 +16,8 @@ import type useBle from '../../hooks/useBle';
 import type useWebSerial from '../../hooks/useWebSerial';
 import taskVisualizationSketch from './taskVisualizationSketch';
 import MediaPlayer from '../../components/MediaPlayer';
+import ModelLoadingOverlay from '../../components/ModelLoadingOverlay';
+import CameraSelector from '../../components/CameraSelector';
 
 const CLICK_SOUND = new Audio('./audio/click.mp3');
 const BEEP_SOUND = new Audio('./audio/beep.mp3');
@@ -55,7 +57,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
   }, [webSerialIsConnected, bleIsConnected]);
   // #endregion Handling Device Communication
 
-  const { videoRef, error, loading, wristDetection, headShoulderDetection, startWebcam, detectedMarkers } = useDetection(true);
+  const { videoRef, error, modelsLoading, wristDetection, headShoulderDetection, startWebcam, detectedMarkers, availableCameras, selectedCameraId, selectCamera } = useDetection(true);
   const { leftWrist, rightWrist } = wristDetection;
   const { isReplayMarkerVisible, isContinueMarkerVisible } = detectedMarkers;
 
@@ -903,9 +905,11 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
 
           <div className="md:col-span-3 bg-gray-100 flex items-center justify-center relative" style={{ width: `${testbedWidth}px`, height: `${testbedHeight}px` }}>
             <div className="absolute inset-0 overflow-hidden rounded-lg shadow-lg">
-              {!error && !loading && (
+              {!error && (
                 <video ref={videoRef} muted playsInline className={`absolute inset-0 w-full h-full object-cover ${isTaskCorrupt && 'blur'}`} style={{ transform: 'scaleX(-1)' }} />
               )}
+              <ModelLoadingOverlay visible={modelsLoading && !error} errorMessage={error} />
+              <CameraSelector availableCameras={availableCameras} selectedCameraId={selectedCameraId} onSelectCamera={selectCamera} />
               <div className="absolute inset-0">
                 <ReactP5Wrapper
                   sketch={taskVisualizationSketch}

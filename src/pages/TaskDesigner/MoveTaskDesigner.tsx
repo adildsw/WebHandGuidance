@@ -4,6 +4,8 @@ import { INCH_TO_MM, MM_TO_INCH } from '../../utils/constants';
 import { useConfig } from '../../utils/context';
 import { ReactP5Wrapper, type Sketch } from '@p5-wrapper/react';
 import useDetection from '../../hooks/useMediaPipeHandDetection';
+import ModelLoadingOverlay from '../../components/ModelLoadingOverlay';
+import CameraSelector from '../../components/CameraSelector';
 import type { Font } from 'p5';
 
 type MoveTaskDesignerProps = {
@@ -115,7 +117,7 @@ const MoveTaskDesigner = ({ task, modifyTask, detectionProp }: MoveTaskDesignerP
   const { distanceThreshold, hand, markers, repetitions, trials } = taskType === 'MOVE' ? task.movePayload : task.holdPayload;
   const { holdDuration } = taskType === 'HOLD' ? task.holdPayload : { holdDuration: 0 };
 
-  const { startWebcam, stopWebcam, videoRef, loading, error } = detectionProp;
+  const { startWebcam, stopWebcam, videoRef, modelsLoading, error, availableCameras, selectedCameraId, selectCamera } = detectionProp;
   useEffect(() => {
     startWebcam();
     return () => {
@@ -355,7 +357,9 @@ const MoveTaskDesigner = ({ task, modifyTask, detectionProp }: MoveTaskDesignerP
           onContextMenu={onContextMenu}
           style={{ cursor: hoverIndex !== null ? 'pointer' : 'crosshair' }}
         >
-          {!loading && !error && <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />}
+          {!error && <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />}
+          <ModelLoadingOverlay visible={modelsLoading && !error} errorMessage={error} />
+          <CameraSelector availableCameras={availableCameras} selectedCameraId={selectedCameraId} onSelectCamera={selectCamera} />
           <div className="absolute inset-0">
             <ReactP5Wrapper
               sketch={sketch}

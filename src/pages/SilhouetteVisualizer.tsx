@@ -7,6 +7,8 @@ import { defaultConfig, MM_TO_INCH, NOSE_Y_OFFSET, SHOULDER_X_OFFSET, SHOULDER_Y
 import { useConfig } from '../utils/context';
 import useDetection from '../hooks/useMediaPipeHandDetection';
 import { go } from '../utils/navigation';
+import ModelLoadingOverlay from '../components/ModelLoadingOverlay';
+import CameraSelector from '../components/CameraSelector';
 
 const sketch: Sketch = (p5) => {
   let width = 200;
@@ -220,7 +222,7 @@ const SilhouetteVisualizer = () => {
   const testbedWidth = testbedWidthMM * MM_TO_INCH * factor;
   const testbedHeight = testbedHeightMM * MM_TO_INCH * factor;
 
-  const { videoRef, wristDetection, headShoulderDetection, loading, error, startWebcam, stopWebcam, detectedMarkers } = useDetection(true);
+  const { videoRef, wristDetection, headShoulderDetection, modelsLoading, error, startWebcam, stopWebcam, detectedMarkers, availableCameras, selectedCameraId, selectCamera } = useDetection(true);
 
   const [isSilhouetteVisible, setIsSilhouetteVisible] = useState<boolean>(true);
   const [isROMVisible, setIsROMVisible] = useState<boolean>(false);
@@ -245,9 +247,11 @@ const SilhouetteVisualizer = () => {
       {/* Camera Feed */}
       <div className="md:col-span-3 bg-gray-100 flex items-center justify-center relative" style={{ width: `${testbedWidth}px`, height: `${testbedHeight}px` }}>
         <div className="absolute inset-0 overflow-hidden rounded-lg shadow-lg">
-          {videoRef !== null && !loading && !error && (
+          {!error && (
             <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
           )}
+          <ModelLoadingOverlay visible={modelsLoading && !error} errorMessage={error} />
+          <CameraSelector availableCameras={availableCameras} selectedCameraId={selectedCameraId} onSelectCamera={selectCamera} />
           <div className="absolute inset-0">
             <ReactP5Wrapper
               sketch={sketch}
