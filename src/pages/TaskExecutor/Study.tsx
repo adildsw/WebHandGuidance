@@ -172,24 +172,25 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
   const directionPoint = useMemo<Pos | null>(() => {
     if (currentTask === null || currentTask.type === 'MEDIA') return null;
     if (currentTarget === null) return null;
-    if (currentTask.type === 'HOLD' || currentTask.type === 'ROM_HOLD') return markers[0];
+    if (currentTask.type === 'HOLD' || currentTask.type === 'ROM_HOLD') return markers[0] ?? null;
     if (activeWrist === null) return null;
     if (activeWrist.x === undefined || activeWrist.y === undefined) return null;
 
     // For the first target (when previousTarget is null), guide directly to the target
     if (previousTarget === null) {
-      return markers[currentTarget];
+      return markers[currentTarget] ?? null;
     }
 
     const ax = (activeWrist.x * INCH_TO_MM) / worldPPI;
     const ay = (activeWrist.y * INCH_TO_MM) / worldPPI;
     const p1 = markers[previousTarget];
     const p2 = markers[currentTarget];
+    if (!p1 || !p2) return null;
     return closestPointOnLine(ax, ay, p1.x, p1.y, p2.x, p2.y);
   }, [markers, currentTask, currentTarget, previousTarget, activeWrist, worldPPI]);
 
   const directionPointDistanceMM = useMemo<number>(() => {
-    if (directionPoint === null || activeWrist === null) return 0;
+    if (!directionPoint || !activeWrist) return 0;
     return distance(directionPoint.x, directionPoint.y, (activeWrist.x * INCH_TO_MM) / worldPPI, (activeWrist.y * INCH_TO_MM) / worldPPI);
   }, [directionPoint, activeWrist, worldPPI]);
 
@@ -203,7 +204,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
     return percent;
   })();
 
-  const isInsideTarget = activeWrist !== null && markers.length > 0 && currentTarget !== -1 && currentTarget !== null &&
+  const isInsideTarget = activeWrist !== null && markers.length > 0 && currentTarget !== -1 && currentTarget !== null && markers[currentTarget] !== undefined &&
     distance((activeWrist.x * INCH_TO_MM) / worldPPI, (activeWrist.y * INCH_TO_MM) / worldPPI, markers[currentTarget].x, markers[currentTarget].y) < distanceThreshold / 2;
 
   const isTaskRunning = useMemo<boolean>(() => {
@@ -608,10 +609,15 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
       return;
     }
 
+    const targetMarker = markers[currentTarget];
+    if (!targetMarker) {
+      if (isConnected) writeDirection(0, 0);
+      return;
+    }
     const ax = (activeWrist.x * INCH_TO_MM) / worldPPI;
     const ay = (activeWrist.y * INCH_TO_MM) / worldPPI;
-    const cx = markers[currentTarget].x;
-    const cy = markers[currentTarget].y;
+    const cx = targetMarker.x;
+    const cy = targetMarker.y;
 
     let hapticActive: 0 | 1 = 0;
     if (isConnected && directionPoint && !isPaused) {
