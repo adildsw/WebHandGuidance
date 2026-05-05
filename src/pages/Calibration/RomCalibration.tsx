@@ -14,6 +14,8 @@ import ModelLoadingOverlay from '../../components/ModelLoadingOverlay';
 import CameraSelector from '../../components/CameraSelector';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
+const CALIBRATION_TIMER_THRESHOLD = 10000;
+
 type RomCalibrationStages = 'init' | 'leftStretch' | 'rightStretch' | 'leftRaised' | 'rightRaised' | 'done';
 
 const CALIBRATION_MESSAGES: { [key in RomCalibrationStages]: string } = {
@@ -321,7 +323,6 @@ const RomCalibration = () => {
   const [isCalibrationPaused, setIsCalibrationPaused] = useState(false);
   const [elapsedBeforePause, setElapsedBeforePause] = useState(0);
   const timerRef = useRef<number | null>(null);
-  const CALIBRATION_TIMER = config.defaultStartDuration;
 
   // Determine if the required hand is visible for current stage
   const isRequiredHandVisible = useMemo(() => {
@@ -336,10 +337,10 @@ const RomCalibration = () => {
 
   const calibrationProgress = (() => {
     if (isCalibrated) return 1;
-    if (isCalibrationPaused) return Math.min(elapsedBeforePause / 5000, 1);
+    if (isCalibrationPaused) return Math.min(elapsedBeforePause / CALIBRATION_TIMER_THRESHOLD, 1);
     if (!calibrationStartTime || !timerRef.current) return 0;
     const elapsed = Date.now() - calibrationStartTime + elapsedBeforePause;
-    return Math.min(elapsed / 5000, 1);
+    return Math.min(elapsed / CALIBRATION_TIMER_THRESHOLD, 1);
   })();
 
   // Handle pause/resume based on hand visibility during calibration stages
@@ -415,7 +416,7 @@ const RomCalibration = () => {
       return;
     }
 
-    const remainingTime = 5000 - elapsedBeforePause;
+    const remainingTime = CALIBRATION_TIMER_THRESHOLD - elapsedBeforePause;
 
     if (calibrationStage === 'init') {
       if (isUserInPos && timerRef.current === null) {
@@ -425,7 +426,7 @@ const RomCalibration = () => {
           setCalibrationStartTime(null);
           setElapsedBeforePause(0);
           timerRef.current = null;
-        }, 5000);
+        }, CALIBRATION_TIMER_THRESHOLD);
       } else if (!isUserInPos && timerRef.current !== null) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
@@ -579,7 +580,7 @@ const RomCalibration = () => {
         <div className="flex flex-col text-center">
           <p className="text-gray-500 text-md">{CALIBRATION_MESSAGES[calibrationStage]}</p>
           {timerRef.current ? (
-            <p className="text-red-500 text-md font-bold">Please hold steady for {Math.floor((CALIBRATION_TIMER - calibrationProgress * CALIBRATION_TIMER) / 1000)} seconds</p>
+            <p className="text-red-500 text-md font-bold">Please hold steady for {Math.floor((CALIBRATION_TIMER_THRESHOLD - calibrationProgress * CALIBRATION_TIMER_THRESHOLD) / 1000)} seconds</p>
           ) : (
             <p className="text-red-500 text-md font-bold">{'⠀'}</p>
           )}
