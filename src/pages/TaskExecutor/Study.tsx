@@ -72,7 +72,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
   const [isStopConfirmVisible, setIsStopConfirmVisible] = useState<boolean>(false);
 
   // Marker-based pause/resume
-  const PAUSE_MARKER_DURATION = 3000; // 3 seconds
+  const PAUSE_MARKER_DURATION = 6000; // 6 seconds
   const pauseMarkerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pauseMarkerStartTime, setPauseMarkerStartTime] = useState<number | null>(null);
   const [pauseMarkerProgress, setPauseMarkerProgress] = useState<number>(0);
