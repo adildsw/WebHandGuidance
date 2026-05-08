@@ -20,6 +20,7 @@ s3 = boto3.client("s3", region_name="us-east-1")
 BUCKET = os.environ["BUCKET"]
 API_PASSWORD = os.environ["API_PASSWORD"]
 PREFIX = "data/"
+TRASH_PREFIX = "trash/"
 STUDY_CONFIG_PREFIX = "study_configs/"
 REDIRECT_BASE = "https://adildsw.com/WebHandGuidance/#/prestudy"
 
@@ -168,6 +169,12 @@ def handler(event, context):
 
         if path == "/download-all" and method == "GET":
             return download_all_handler(event)
+
+        if path == "/download-selected" and method == "POST":
+            return download_selected_handler(event)
+
+        if path == "/delete-selected" and method == "POST":
+            return delete_selected_handler(event)
 
         logger.warning(f"No route matched: {method} {path}")
         return response(404, "Not found", {"Content-Type": "text/plain"})
@@ -430,6 +437,93 @@ def download_all_handler(event):
         },
         is_binary=True
     )
+
+
+def download_selected_handler(event):
+    logger.info("Download selected handler called")
+    body_bytes = get_body_bytes(event)
+    try:
+        payload = json.loads(body_bytes.decode("utf-8"))
+    except json.JSONDecodeError:
+        return response(400, "Invalid JSON", {"Content-Type": "text/plain"})
+    keys = payload.get("keys") if isinstance(payload, dict) else None
+    if not isinstance(keys, list) or not keys:
+        return response(400, "No keys provided", {"Content-Type": "text/plain"})
+
+    valid_keys = [k for k in keys if isinstance(k, str) and k.startswith(PREFIX)]
+    if not valid_keys:
+        return response(400, "No valid keys", {"Content-Type": "text/plain"})
+
+    logger.info(f"Zipping {len(valid_keys)} selected files")
+    buf = io.BytesIO()
+    added = 0
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for key in valid_keys:
+            name = key.split("/")[-1]
+            try:
+                obj = s3.get_object(Bucket=BUCKET, Key=key)
+                zf.writestr(name, obj["Body"].read())
+                added += 1
+            except Exception as e:
+                logger.warning(f"Skipping {key}: {e}")
+    if added == 0:
+        return response(404, "No matching files", {"Content-Type": "text/plain"})
+    buf.seek(0)
+    return response(
+        200,
+        buf.getvalue(),
+        {
+            "Content-Type": "application/zip",
+            "Content-Disposition": "attachment; filename=selected_data.zip"
+        },
+        is_binary=True
+    )
+
+
+def delete_selected_handler(event):
+    logger.info("Delete selected handler called")
+    body_bytes = get_body_bytes(event)
+    try:
+        payload = json.loads(body_bytes.decode("utf-8"))
+    except json.JSONDecodeError:
+        return response(400, "Invalid JSON", {"Content-Type": "text/plain"})
+    keys = payload.get("keys") if isinstance(payload, dict) else None
+    if not isinstance(keys, list) or not keys:
+        return response(400, "No keys provided", {"Content-Type": "text/plain"})
+
+    valid_keys = [k for k in keys if isinstance(k, str) and k.startswith(PREFIX)]
+    if not valid_keys:
+        return response(400, "No valid keys", {"Content-Type": "text/plain"})
+
+    ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    moved = []
+    skipped = []
+    for key in valid_keys:
+        name = key.split("/")[-1]
+        dest_key = TRASH_PREFIX + name
+        try:
+            s3.head_object(Bucket=BUCKET, Key=dest_key)
+            stem, dot, ext = name.rpartition(".")
+            if dot:
+                dest_key = f"{TRASH_PREFIX}{stem}_{ts}.{ext}"
+            else:
+                dest_key = f"{TRASH_PREFIX}{name}_{ts}"
+        except s3.exceptions.ClientError:
+            pass
+        try:
+            s3.copy_object(
+                Bucket=BUCKET,
+                Key=dest_key,
+                CopySource={"Bucket": BUCKET, "Key": key},
+            )
+            s3.delete_object(Bucket=BUCKET, Key=key)
+            moved.append(name)
+            logger.info(f"Moved {key} -> {dest_key}")
+        except Exception as e:
+            logger.warning(f"Failed to move {key}: {e}")
+            skipped.append(key)
+
+    return response(200, {"moved": moved, "skipped": skipped})
 
 
 def files_page_handler():

@@ -13,9 +13,17 @@
     table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
     th, td { border: 1px solid #ccc; padding: 0.4rem 0.6rem; font-size: 0.9rem; }
     th { background: #f5f5f5; text-align: left; }
+    th.sortable { cursor: pointer; user-select: none; }
+    th.sortable:hover { background: #ececec; }
+    th .sort-indicator { color: #888; margin-left: 0.25rem; font-size: 0.8rem; }
     a.button, button.button { display: inline-block; padding: 0.4rem 0.8rem; border-radius: 4px; border: 1px solid #333; text-decoration: none; font-size: 0.9rem; background: #fff; cursor: pointer; }
+    button.button:disabled { color: #888; border-color: #aaa; cursor: not-allowed; }
+    button.danger { border-color: #b00; color: #b00; }
+    button.danger:hover:not(:disabled) { background: #fee; }
     #login { margin-top: 0.5rem; }
     #app { margin-top: 1rem; display: none; }
+    .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+    td.col-select, th.col-select { text-align: center; width: 2rem; }
   </style>
 </head>
 <body>
@@ -28,15 +36,19 @@
     <button id="login-button">Login</button>
   </div>
   <div id="app">
-    <p>
-      <button class="button" id="download-all-button">Download all as ZIP</button>
+    <p class="actions">
+      <button class="button" id="download-selected-button" disabled>Download selected</button>
+      <button class="button danger" id="delete-selected-button" disabled>Delete selected</button>
+      <button class="button" id="download-all-button">Download all</button>
+      <span id="selected-count" style="font-size: 0.85rem; color: #555;"></span>
     </p>
     <table>
       <thead>
         <tr>
-          <th>Filename</th>
-          <th>Size (bytes)</th>
-          <th>Last modified</th>
+          <th class="col-select"><input type="checkbox" id="select-all" /></th>
+          <th class="sortable" data-sort="name">Filename<span class="sort-indicator"></span></th>
+          <th class="sortable" data-sort="size">Size<span class="sort-indicator"></span></th>
+          <th class="sortable" data-sort="last_modified">Last modified<span class="sort-indicator"></span></th>
           <th>Download</th>
         </tr>
       </thead>
@@ -51,6 +63,15 @@
     const loginButton = document.getElementById('login-button');
     const filesTbody = document.getElementById('files-tbody');
     const downloadAllButton = document.getElementById('download-all-button');
+    const downloadSelectedButton = document.getElementById('download-selected-button');
+    const deleteSelectedButton = document.getElementById('delete-selected-button');
+    const selectAllCheckbox = document.getElementById('select-all');
+    const selectedCountEl = document.getElementById('selected-count');
+
+    let allFiles = [];
+    const selectedKeys = new Set();
+    let sortKey = 'last_modified';
+    let sortDir = 'desc';
 
     function setStatus(msg) {
       statusEl.textContent = msg || '';
@@ -77,6 +98,115 @@
       return res;
     }
 
+    function formatSize(bytes) {
+      const n = Number(bytes);
+      if (!isFinite(n) || n < 0) return '';
+      if (n < 1024) return n + ' B';
+      if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+      if (n < 1024 * 1024 * 1024) return (n / (1024 * 1024)).toFixed(1) + ' MB';
+      return (n / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+    }
+
+    function compareValues(a, b, key) {
+      let av = a[key];
+      let bv = b[key];
+      if (key === 'size') {
+        av = Number(av) || 0;
+        bv = Number(bv) || 0;
+        return av - bv;
+      }
+      av = String(av || '');
+      bv = String(bv || '');
+      return av.localeCompare(bv);
+    }
+
+    function updateSortIndicators() {
+      document.querySelectorAll('th.sortable').forEach(th => {
+        const ind = th.querySelector('.sort-indicator');
+        if (th.dataset.sort === sortKey) {
+          ind.textContent = sortDir === 'asc' ? '▲' : '▼';
+        } else {
+          ind.textContent = '';
+        }
+      });
+    }
+
+    function updateSelectionUI() {
+      downloadSelectedButton.disabled = selectedKeys.size === 0;
+      deleteSelectedButton.disabled = selectedKeys.size === 0;
+      selectedCountEl.textContent = selectedKeys.size > 0 ? `${selectedKeys.size} selected` : '';
+      const visibleKeys = allFiles.map(f => f.key);
+      const allSelected = visibleKeys.length > 0 && visibleKeys.every(k => selectedKeys.has(k));
+      const someSelected = visibleKeys.some(k => selectedKeys.has(k));
+      selectAllCheckbox.checked = allSelected;
+      selectAllCheckbox.indeterminate = !allSelected && someSelected;
+    }
+
+    function renderRows() {
+      const sorted = allFiles.slice().sort((a, b) => {
+        const c = compareValues(a, b, sortKey);
+        return sortDir === 'asc' ? c : -c;
+      });
+      filesTbody.innerHTML = '';
+      if (sorted.length === 0) {
+        filesTbody.innerHTML = '<tr><td colspan="5">No files yet</td></tr>';
+        updateSelectionUI();
+        return;
+      }
+      for (const file of sorted) {
+        const tr = document.createElement('tr');
+
+        const tdSel = document.createElement('td');
+        tdSel.className = 'col-select';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = selectedKeys.has(file.key);
+        cb.addEventListener('change', () => {
+          if (cb.checked) selectedKeys.add(file.key);
+          else selectedKeys.delete(file.key);
+          updateSelectionUI();
+        });
+        tdSel.appendChild(cb);
+        tr.appendChild(tdSel);
+
+        const tdName = document.createElement('td');
+        tdName.textContent = file.name;
+        tr.appendChild(tdName);
+
+        const tdSize = document.createElement('td');
+        tdSize.textContent = formatSize(file.size);
+        tdSize.title = file.size + ' bytes';
+        tr.appendChild(tdSize);
+
+        const tdTime = document.createElement('td');
+        tdTime.textContent = file.last_modified;
+        tr.appendChild(tdTime);
+
+        const tdAction = document.createElement('td');
+        const btn = document.createElement('button');
+        btn.textContent = 'Download';
+        btn.className = 'button';
+        btn.addEventListener('click', async () => {
+          try {
+            const urlRes = await fetchWithAuth('/download-url?key=' + encodeURIComponent(file.key));
+            if (!urlRes.ok) throw new Error('Error ' + urlRes.status);
+            const j = await urlRes.json();
+            if (j.url) {
+              window.location.href = j.url;
+            }
+          } catch (e) {
+            setStatus('Download error: ' + e.message);
+          }
+        });
+        tdAction.appendChild(btn);
+        tr.appendChild(tdAction);
+
+        filesTbody.appendChild(tr);
+      }
+      updateSelectionUI();
+      updateSortIndicators();
+    }
+
     async function loadFiles() {
       setStatus('Loading files...');
       filesTbody.innerHTML = '';
@@ -86,46 +216,12 @@
           throw new Error('Error ' + res.status);
         }
         const data = await res.json();
-        if (!Array.isArray(data) || data.length === 0) {
-          filesTbody.innerHTML = '<tr><td colspan="4">No files yet</td></tr>';
-        } else {
-          for (const file of data) {
-            const tr = document.createElement('tr');
-
-            const tdName = document.createElement('td');
-            tdName.textContent = file.name;
-            tr.appendChild(tdName);
-
-            const tdSize = document.createElement('td');
-            tdSize.textContent = file.size;
-            tr.appendChild(tdSize);
-
-            const tdTime = document.createElement('td');
-            tdTime.textContent = file.last_modified;
-            tr.appendChild(tdTime);
-
-            const tdAction = document.createElement('td');
-            const btn = document.createElement('button');
-            btn.textContent = 'Download';
-            btn.className = 'button';
-            btn.addEventListener('click', async () => {
-              try {
-                const urlRes = await fetchWithAuth('/download-url?key=' + encodeURIComponent(file.key));
-                if (!urlRes.ok) throw new Error('Error ' + urlRes.status);
-                const j = await urlRes.json();
-                if (j.url) {
-                  window.location.href = j.url;
-                }
-              } catch (e) {
-                setStatus('Download error: ' + e.message);
-              }
-            });
-            tdAction.appendChild(btn);
-            tr.appendChild(tdAction);
-
-            filesTbody.appendChild(tr);
-          }
+        allFiles = Array.isArray(data) ? data : [];
+        const validKeys = new Set(allFiles.map(f => f.key));
+        for (const k of Array.from(selectedKeys)) {
+          if (!validKeys.has(k)) selectedKeys.delete(k);
         }
+        renderRows();
         appEl.style.display = 'block';
         setStatus('Files loaded.');
       } catch (e) {
@@ -135,27 +231,77 @@
     }
 
     async function handleDownloadAll() {
-      setStatus('Preparing ZIP...');
+      if (allFiles.length === 0) {
+        setStatus('No files to download');
+        return;
+      }
+      const previous = new Set(selectedKeys);
+      selectedKeys.clear();
+      for (const f of allFiles) selectedKeys.add(f.key);
       try {
-        const res = await fetchWithAuth('/download-all');
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error('Error ' + res.status + ': ' + text);
-        }
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'all_data.zip';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(url);
-        setStatus('Downloaded all_data.zip');
-      } catch (e) {
-        setStatus('Download-all error: ' + e.message);
+        await handleDownloadSelected();
+      } finally {
+        selectedKeys.clear();
+        for (const k of previous) selectedKeys.add(k);
+        updateSelectionUI();
       }
     }
+
+    async function handleDownloadSelected() {
+      const keys = Array.from(selectedKeys);
+      const total = keys.length;
+      if (total === 0) return;
+      setStatus(`Starting ${total} download(s)...`);
+      let done = 0;
+      let failed = 0;
+      for (const key of keys) {
+        try {
+          const urlRes = await fetchWithAuth('/download-url?key=' + encodeURIComponent(key));
+          if (!urlRes.ok) throw new Error('Error ' + urlRes.status);
+          const j = await urlRes.json();
+          if (!j.url) throw new Error('No URL returned');
+          const name = key.split('/').pop() || 'download';
+          const a = document.createElement('a');
+          a.href = j.url;
+          a.download = name;
+          a.rel = 'noopener';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          done += 1;
+          setStatus(`Downloading ${done}/${total}...`);
+          await new Promise(r => setTimeout(r, 250));
+        } catch (e) {
+          failed += 1;
+          console.warn('Download failed for', key, e);
+        }
+      }
+      let msg = `Started ${done}/${total} download(s).`;
+      if (failed) msg += ` ${failed} failed.`;
+      setStatus(msg);
+    }
+
+    document.querySelectorAll('th.sortable').forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.dataset.sort;
+        if (sortKey === key) {
+          sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          sortKey = key;
+          sortDir = key === 'last_modified' ? 'desc' : 'asc';
+        }
+        renderRows();
+      });
+    });
+
+    selectAllCheckbox.addEventListener('change', () => {
+      if (selectAllCheckbox.checked) {
+        for (const f of allFiles) selectedKeys.add(f.key);
+      } else {
+        for (const f of allFiles) selectedKeys.delete(f.key);
+      }
+      renderRows();
+    });
 
     loginButton.addEventListener('click', async () => {
       const pwd = pwdInput.value;
@@ -167,9 +313,43 @@
       await loadFiles();
     });
 
+    async function handleDeleteSelected() {
+      const count = selectedKeys.size;
+      if (count === 0) return;
+      const ok = window.confirm(
+        `Are you sure you want to delete ${count} file${count === 1 ? '' : 's'}? This action is irreversible.`
+      );
+      if (!ok) return;
+      setStatus(`Deleting ${count} file(s)...`);
+      try {
+        const res = await fetchWithAuth('/delete-selected', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keys: Array.from(selectedKeys) }),
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error('Error ' + res.status + ': ' + text);
+        }
+        const j = await res.json().catch(() => ({}));
+        const movedCount = (j.moved || []).length;
+        const skippedCount = (j.skipped || []).length;
+        selectedKeys.clear();
+        await loadFiles();
+        let msg = `Moved ${movedCount} file(s) to trash.`;
+        if (skippedCount) msg += ` Skipped ${skippedCount}.`;
+        setStatus(msg);
+      } catch (e) {
+        setStatus('Delete error: ' + e.message);
+      }
+    }
+
     downloadAllButton.addEventListener('click', handleDownloadAll);
+    downloadSelectedButton.addEventListener('click', handleDownloadSelected);
+    deleteSelectedButton.addEventListener('click', handleDeleteSelected);
 
     window.addEventListener('DOMContentLoaded', async () => {
+      updateSortIndicators();
       const saved = getPassword();
       if (saved) {
         pwdInput.value = saved;

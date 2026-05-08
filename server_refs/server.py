@@ -19,6 +19,8 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 DATA_DIR = Path("data")
 DATA_DIR.mkdir(exist_ok=True)
+TRASH_DIR = Path("trash")
+TRASH_DIR.mkdir(exist_ok=True)
 STUDY_CONFIG_DIR = Path("study_configs")
 STUDY_CONFIG_DIR.mkdir(exist_ok=True)
 API_PASSWORD = os.environ.get("API_PASSWORD", "devpassword")
@@ -237,6 +239,76 @@ def download_all():
         download_name="all_data.zip",
         mimetype="application/zip",
     )
+
+
+@app.route("/download-selected", methods=["POST", "OPTIONS"])
+def download_selected():
+    if request.method == "OPTIONS":
+        return Response("", status=204)
+    if not require_auth():
+        return Response("Forbidden", status=403, mimetype="text/plain")
+    payload = request.get_json(silent=True) or {}
+    keys = payload.get("keys") or []
+    if not isinstance(keys, list) or not keys:
+        return Response("No keys provided", status=400, mimetype="text/plain")
+    buf = io.BytesIO()
+    added = 0
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for key in keys:
+            if not isinstance(key, str):
+                continue
+            name = key.split("/", 1)[1] if key.startswith("data/") else key
+            if "/" in name or name in ("", ".", ".."):
+                continue
+            path = DATA_DIR / name
+            if path.is_file():
+                with open(path, "rb") as f:
+                    zf.writestr(name, f.read())
+                added += 1
+    if added == 0:
+        return Response("No matching files", status=404, mimetype="text/plain")
+    buf.seek(0)
+    return send_file(
+        buf,
+        as_attachment=True,
+        download_name="selected_data.zip",
+        mimetype="application/zip",
+    )
+
+
+@app.route("/delete-selected", methods=["POST", "OPTIONS"])
+def delete_selected():
+    if request.method == "OPTIONS":
+        return Response("", status=204)
+    if not require_auth():
+        return Response("Forbidden", status=403, mimetype="text/plain")
+    payload = request.get_json(silent=True) or {}
+    keys = payload.get("keys") or []
+    if not isinstance(keys, list) or not keys:
+        return Response("No keys provided", status=400, mimetype="text/plain")
+    moved = []
+    skipped = []
+    ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    for key in keys:
+        if not isinstance(key, str):
+            skipped.append(key)
+            continue
+        name = key.split("/", 1)[1] if key.startswith("data/") else key
+        if "/" in name or name in ("", ".", ".."):
+            skipped.append(key)
+            continue
+        src = DATA_DIR / name
+        if not src.is_file():
+            skipped.append(key)
+            continue
+        dest = TRASH_DIR / name
+        if dest.exists():
+            stem = dest.stem
+            suffix = dest.suffix
+            dest = TRASH_DIR / f"{stem}_{ts}{suffix}"
+        src.rename(dest)
+        moved.append(name)
+    return jsonify({"moved": moved, "skipped": skipped})
 
 
 @app.route("/files", methods=["GET", "OPTIONS"])
