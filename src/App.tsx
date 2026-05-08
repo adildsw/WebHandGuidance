@@ -36,7 +36,6 @@ import NoMobileSupport from './pages/NoMobileSupport';
 import { useEffect, useState } from 'react';
 import RomCalibration from './pages/Calibration/RomCalibration';
 import useBle from './hooks/useBle';
-import MediaPlayer from './components/MediaPlayer';
 import TaskDesigner from './pages/TaskDesigner/TaskDesigner';
 import SilhouetteVisualizer from './pages/SilhouetteVisualizer';
 import { ArucoWebcam } from './pages/ArucoTest';
@@ -92,7 +91,7 @@ const App = () => {
       <Toaster />
 
       <span className="fixed bottom-2 left-2 text-xs text-gray-400 select-none">v{SYSTEM_VERSION}</span>
-      
+
       <SerialConnector webSerial={webSerial} ble={ble} />
     </>
   );
