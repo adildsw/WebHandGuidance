@@ -518,7 +518,7 @@ const RomCalibration = () => {
           isReplayMarkerVisible={isReplayMarkerVisible}
         />
       )}
-      <div className="w-screen h-screen flex gap-4 flex-col items-center justify-center p-16 py-8">
+      <div className="w-screen min-h-screen flex gap-4 flex-col items-center justify-center p-16 py-8">
         {isCalibrated ? (
           <div className="w-full flex flex-col text-center gap-2">
             <h1 className="text-3xl font-bold">Calibration Complete</h1>

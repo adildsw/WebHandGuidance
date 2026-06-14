@@ -3,7 +3,7 @@ import type { Sketch } from '@p5-wrapper/react';
 import { useConfig } from '../../utils/context';
 import { useEffect, useRef, useState } from 'react';
 
-import { CREDIT_CARD_HEIGHT_INCH, CREDIT_CARD_WIDTH_INCH, DOLLAR_BILL_HEIGHT_INCH, DOLLAR_BILL_WIDTH_INCH, MM_TO_INCH } from '../../utils/constants';
+import { COMPACT_VIEWPORT_MAX_HEIGHT, COMPACT_VIEWPORT_MAX_WIDTH, CREDIT_CARD_HEIGHT_INCH, CREDIT_CARD_WIDTH_INCH, DOLLAR_BILL_HEIGHT_INCH, DOLLAR_BILL_WIDTH_INCH, MM_TO_INCH } from '../../utils/constants';
 import p5 from 'p5';
 import type { CalibrationTools } from '../../types/config';
 import { go } from '../../utils/navigation';
@@ -220,6 +220,12 @@ const ScreenCalibration = () => {
     };
   }, [config, devicePPI, setDevicePPI]);
 
+  const isCompactDisplay = window.innerWidth <= COMPACT_VIEWPORT_MAX_WIDTH || window.innerHeight <= COMPACT_VIEWPORT_MAX_HEIGHT;
+
+  const continueToFrameCalibration = () => {
+    go(isCompactDisplay ? '#/frame-calibration-camera' : '#/frame-calibration');
+  };
+
   // if (isTutorialVisible)
   //   return (
   //     <MediaPlayer
@@ -295,7 +301,7 @@ const ScreenCalibration = () => {
           <ReactP5Wrapper sketch={sketch} size={canvasSize} devicePPI={devicePPI} devicePixelRatio={devicePixelRatio} calibrationTool={calibrationTool} />
         </div>
 
-        <div className="flex flex-col">
+        <div className={isCompactDisplay ? 'flex flex-row items-center gap-3' : 'flex flex-col'}>
           <span className="text-gray-600 text-center">
             <b>Display PPI:</b> {devicePPI}
           </span>
@@ -318,7 +324,7 @@ const ScreenCalibration = () => {
             Replay Video
           </button>
 
-          <button className="bg-gray-700 border border-gray-300 text-white font-bold px-4 py-2 rounded hover:bg-gray-900 hover:text-white cursor-pointer" onClick={() => go('#/frame-calibration')}>
+          <button className="bg-gray-700 border border-gray-300 text-white font-bold px-4 py-2 rounded hover:bg-gray-900 hover:text-white cursor-pointer" onClick={continueToFrameCalibration}>
             Continue
           </button>
         </div>

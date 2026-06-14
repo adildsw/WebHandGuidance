@@ -17,6 +17,9 @@ export const LETTER_HEIGHT_INCH = 11;
 export const MM_TO_INCH = 1 / 25.4;
 export const INCH_TO_MM = 25.4;
 
+export const COMPACT_VIEWPORT_MAX_WIDTH = 1366;
+export const COMPACT_VIEWPORT_MAX_HEIGHT = 768;
+
 export const CALIBRATION_MARKER_ID = 0;
 export const REPLAY_MARKER_ID = 10;
 export const CONTINUE_MARKER_ID = 20;

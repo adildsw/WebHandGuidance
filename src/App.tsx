@@ -81,6 +81,8 @@ const App = () => {
             <Route path="/visualizer" element={<SilhouetteVisualizer />} />
 
             <Route path="/frame-calibration" element={<FrameCalibration />} />
+            <Route path="/frame-calibration-camera" element={<FrameCalibration cameraOnly />} />
+            <Route path="/frame-recalibration-camera" element={<FrameCalibration cameraOnly preserveCalibration />} />
             
             <Route path="/videotest" element={<MediaPlayer mediaUrl='https://webhandguidance.b-cdn.net/rom_calibration_demo_test.mp4' mediaTitle='Test Video' mediaSubtitle='This is a test video' doneBtnTitle='Begin Calibration' />} />
             <Route path="/imgtest" element={<MediaPlayer mediaUrl='https://webhandguidance.b-cdn.net/first_message_image_test.png' mediaTitle='Test Image' mediaSubtitle='This is a test image' />} />

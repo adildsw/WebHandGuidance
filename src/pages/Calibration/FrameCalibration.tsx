@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useConfig } from '../../utils/context';
 import { MM_TO_INCH } from '../../utils/constants';
 
-const FrameCalibration = () => {
-  const { setTestbedHeight, setTestbedWidth, config } = useConfig();
+const FrameCalibration = ({ cameraOnly = false, preserveCalibration = false }: { cameraOnly?: boolean; preserveCalibration?: boolean }) => {
+  const { setTestbedHeight, setTestbedWidth, setWorldPPI, setSilParams, setRomCalibrationParams, config } = useConfig();
   const { devicePPI, devicePixelRatio } = config;
 
   const taskListRef = useRef<HTMLDivElement>(null);
@@ -22,15 +22,23 @@ const FrameCalibration = () => {
   ];
 
   const [testbedDimensions, setTestbedDimensions] = useState<{ width: number; height: number }>({ width: window.innerWidth * 0.5, height: (window.innerWidth * 0.5) / (16 / 9) });
-  const paddingThreshold = 0.75;
+  const paddingThreshold = 0.85;
+
+  const configRef = useRef(config);
+  configRef.current = config;
 
   // add timer value to show time remaining for calculation
   const [timerStart, setTimerStart] = useState<number | null>(null);
   const [now, setNow] = useState<number>(() => Date.now());
   const TIME_COUNT = 3000; // 3 seconds
 
-    useEffect(() => {
+  useEffect(() => {
     const calculateAvailableDimensions = () => {
+      const oldTestbedWidthMM = configRef.current.testbedWidthMM;
+      const prevWorldPPI = configRef.current.worldPPI;
+      const prevSilParams = configRef.current.silParams;
+      const prevRomCalibrationParams = configRef.current.romCalibrationParams;
+
       const topBarHeight = topBarRef.current ? topBarRef.current.offsetHeight : 0;
       const taskBarHeight = taskBarRef.current ? taskBarRef.current.offsetHeight : 0;
       const taskFormHeight = taskFormRef.current ? taskFormRef.current.offsetHeight : 0;
@@ -54,8 +62,28 @@ const FrameCalibration = () => {
         h = availableHeight * paddingThreshold;
       }
       setTestbedDimensions({ width: w, height: h });
-      setTestbedWidth(Math.round((w * devicePixelRatio) / (MM_TO_INCH * devicePPI)));
+      const newTestbedWidthMM = Math.round((w * devicePixelRatio) / (MM_TO_INCH * devicePPI));
+      setTestbedWidth(newTestbedWidthMM);
       setTestbedHeight(Math.round((h * devicePixelRatio) / (MM_TO_INCH * devicePPI)));
+
+      if (preserveCalibration && oldTestbedWidthMM > 0 && newTestbedWidthMM > 0) {
+        const k = newTestbedWidthMM / oldTestbedWidthMM;
+        setWorldPPI(prevWorldPPI * k);
+        if (prevSilParams.silCalibrated) {
+          setSilParams({
+            silY: prevSilParams.silY * k,
+            silScaleX: prevSilParams.silScaleX * k,
+            silScaleY: prevSilParams.silScaleY * k,
+            silCalibrated: true,
+          });
+        }
+        if (prevRomCalibrationParams) {
+          setRomCalibrationParams({
+            leftRadius: prevRomCalibrationParams.leftRadius * k,
+            rightRadius: prevRomCalibrationParams.rightRadius * k,
+          });
+        }
+      }
     };
 
     const start = Date.now();
@@ -77,7 +105,7 @@ const FrameCalibration = () => {
       window.clearInterval(intervalId);
       window.clearTimeout(timeoutId);
     };
-  }, [setTestbedHeight, setTestbedWidth, devicePPI, devicePixelRatio]);
+  }, [setTestbedHeight, setTestbedWidth, setWorldPPI, setSilParams, setRomCalibrationParams, devicePPI, devicePixelRatio, preserveCalibration]);
 
   const remainingMs = timerStart === null ? 0 : Math.max(0, TIME_COUNT - (now - timerStart));
   const remainingS = Math.ceil(remainingMs / 1000);
@@ -119,6 +147,7 @@ const FrameCalibration = () => {
 
         <div className="flex flex-col gap-2" style={{ width: `${testbedDimensions.width}px` }}>
           {/* Create Study Task Top Bar */}
+          {!cameraOnly && (
           <div ref={topBarRef} className="w-full bg-gray-200 rounded-lg shadow flex items-center justify-between px-2 py-2">
             <div className="flex items-center px-1 gap-2">
               <span className="text-xl font-semibold">Frame Calibration</span>
@@ -144,8 +173,10 @@ const FrameCalibration = () => {
               </button>
             </div>
           </div>
+          )}
 
           {/* Task Bar */}
+          {!cameraOnly && (
           <div ref={taskBarRef} className="flex flex-col bg-white rounded-lg shadow border border-gray-100 ">
             {/* Task Navigator */}
             <div className="flex flex-row w-full justify-between items-center border-b border-gray-100 p-2 bg-gray-100">
@@ -180,10 +211,12 @@ const FrameCalibration = () => {
               </div>
             </div>
           </div>
+          )}
 
           {/* Task Designer */}
           <div className="flex flex-col gap-2 items-center">
             {/* Task Form */}
+            {!cameraOnly && (
             <div ref={taskFormRef} className="px-4 flex flex-row gap-2 overflow-auto p-2 bg-gray-100 rounded-lg w-full">
               <div className="flex flex-col items-center justify-between">
                 <label className="text-sm font-bold text-gray-600">████</label>
@@ -209,6 +242,7 @@ const FrameCalibration = () => {
                 <input className="flex w-full px-2 py-1 rounded border border-gray-300 text-center" inputMode="text" value={''} disabled />
               </div>
             </div>
+            )}
 
             {/* Camera Feed */}
             <div

@@ -103,6 +103,9 @@ const CameraCalibration = () => {
   // const { isCalibrationMarkerVisible, calibrationMarker, isContinueMarkerVisible, isReplayMarkerVisible } = detectedMarkers;
   const { continueMarker, isContinueMarkerVisible, isReplayMarkerVisible } = detectedMarkers;
 
+  const isBodyVisible = headShoulderDetection.nose != null && headShoulderDetection.leftShoulder != null && headShoulderDetection.rightShoulder != null;
+  const isReadyToCalibrate = !isTutorialVisible && isContinueMarkerVisible && isBodyVisible;
+
   const [calibrationStartTime, setCalibrationStartTime] = useState<number | null>(null);
   const [isCalibrated, setIsCalibrated] = useState(false);
   const timerRef = useRef<number | null>(null);
@@ -169,7 +172,7 @@ const CameraCalibration = () => {
   }, [detectedMarkers]);
 
   useEffect(() => {
-    if (!isTutorialVisible && isContinueMarkerVisible && timerRef.current == null && !isCalibrated) {
+    if (isReadyToCalibrate && timerRef.current == null && !isCalibrated) {
       setCalibrationStartTime(Date.now());
       timerRef.current = window.setTimeout(() => {
         const { calibrationMarkerLength } = latestMarkerDetection.current;
@@ -181,11 +184,11 @@ const CameraCalibration = () => {
         }
         timerRef.current = null;
       }, CALIBRATION_TIMER);
-    } else if (!isContinueMarkerVisible && timerRef.current != null) {
+    } else if (!isReadyToCalibrate && timerRef.current != null) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-  }, [isTutorialVisible, isContinueMarkerVisible, setWorldPPI, isCalibrated, getCalculatedSilParams, setSilParams, CALIBRATION_TIMER]);
+  }, [isReadyToCalibrate, setWorldPPI, isCalibrated, getCalculatedSilParams, setSilParams, CALIBRATION_TIMER]);
 
   // Clear redirect timer helper
   const clearRedirectTimer = useCallback(() => {
@@ -246,7 +249,7 @@ const CameraCalibration = () => {
           isReplayMarkerVisible={isReplayMarkerVisible}
         />
       )}
-      <div className="w-screen h-screen flex gap-4 flex-col items-center justify-center p-16 py-8">
+      <div className="w-screen min-h-screen flex gap-4 flex-col items-center justify-center p-16 py-8">
         <div className="w-full flex flex-col text-center gap-2 pb-4">
           {isCalibrated ? (
             <>
@@ -262,7 +265,7 @@ const CameraCalibration = () => {
               <h1 className="text-3xl font-bold">
                 Calibration #2: <span className="font-normal italic">Calibrate Camera</span>
               </h1>
-              {isContinueMarkerVisible ? (
+              {isContinueMarkerVisible && isBodyVisible ? (
                 <p className="text-red-500 text-xl font-bold">Please hold steady for {Math.floor((CALIBRATION_TIMER - calibrationProgress * CALIBRATION_TIMER) / 1000)} seconds</p>
               ) : (
                 <p className="text-gray-600 text-md italic">Please stand 10 feet away from the screen and hold the calibration marker.</p>
@@ -287,6 +290,13 @@ const CameraCalibration = () => {
                 redirectProgress={redirectProgress}
               />
             </div>
+            {!isCalibrated && isContinueMarkerVisible && !isBodyVisible && (
+              <div className="absolute inset-0 flex items-center justify-center p-6 pointer-events-none">
+                <p className="bg-black/70 text-white text-2xl font-bold text-center rounded-lg px-6 py-4">
+                  Please lower the marker so your face and shoulders are visible.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 

@@ -306,6 +306,13 @@ const Config = () => {
             >
               Silhouette Visualizer
             </button>
+
+            <button
+              onClick={() => go('#/frame-recalibration-camera')}
+              className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-gray-100 text-gray-900 hover:bg-gray-800 hover:text-white font-bold cursor-pointer"
+            >
+              Auto Recalibrate Screen
+            </button>
           </div>
         </div>
 

@@ -160,7 +160,7 @@ const TaskDesigner = () => {
   };
 
   return (
-    <div className="w-screen h-screen flex gap-6 flex-col items-center justify-center select-none">
+    <div className="w-screen min-h-screen flex gap-6 flex-col items-center justify-center select-none py-6">
       <div className="flex flex-row gap-4">
         {/* Task List Viewer */}
         <div className="w-32 h-full fixed left-0 top-0 flex flex-col p-4 overflow-auto">
