@@ -73,6 +73,11 @@
     let sortKey = 'last_modified';
     let sortDir = 'desc';
 
+    const MAX_LIST_PAGES = 100;
+    const URL_BATCH_SIZE = 1000;
+    const ZIP64_LIMIT = 0xffffffff;
+    const encoder = new TextEncoder();
+
     function setStatus(msg) {
       statusEl.textContent = msg || '';
     }
@@ -211,12 +216,24 @@
       setStatus('Loading files...');
       filesTbody.innerHTML = '';
       try {
-        const res = await fetchWithAuth('/files-json');
-        if (!res.ok) {
-          throw new Error('Error ' + res.status);
-        }
-        const data = await res.json();
-        allFiles = Array.isArray(data) ? data : [];
+        const collected = [];
+        let token = null;
+        let pages = 0;
+        do {
+          const query = token ? '?token=' + encodeURIComponent(token) : '';
+          const res = await fetchWithAuth('/files-json' + query);
+          if (!res.ok) {
+            throw new Error('Error ' + res.status);
+          }
+          const data = await res.json();
+          const batch = Array.isArray(data) ? data : (data.files || []);
+          collected.push(...batch);
+          token = Array.isArray(data) ? null : (data.nextToken || null);
+          pages += 1;
+          if (token) setStatus(`Loading files... ${collected.length} so far`);
+        } while (token && pages < MAX_LIST_PAGES);
+
+        allFiles = collected;
         const validKeys = new Set(allFiles.map(f => f.key));
         for (const k of Array.from(selectedKeys)) {
           if (!validKeys.has(k)) selectedKeys.delete(k);
@@ -230,55 +247,278 @@
       }
     }
 
+    const crcTable = (() => {
+      const table = new Uint32Array(256);
+      for (let i = 0; i < 256; i++) {
+        let c = i;
+        for (let k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+        table[i] = c >>> 0;
+      }
+      return table;
+    })();
+
+    function crc32(bytes) {
+      let c = 0xffffffff;
+      for (let i = 0; i < bytes.length; i++) {
+        c = crcTable[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+      }
+      return (c ^ 0xffffffff) >>> 0;
+    }
+
+    function dosDateTime(date) {
+      const year = Math.max(1980, date.getFullYear());
+      return {
+        time: ((date.getHours() & 31) << 11) | ((date.getMinutes() & 63) << 5) | ((date.getSeconds() >> 1) & 31),
+        date: (((year - 1980) & 127) << 9) | (((date.getMonth() + 1) & 15) << 5) | (date.getDate() & 31),
+      };
+    }
+
+    function byteWriter(size) {
+      const bytes = new Uint8Array(size);
+      const view = new DataView(bytes.buffer);
+      let pos = 0;
+      return {
+        bytes,
+        u16(v) { view.setUint16(pos, v, true); pos += 2; },
+        u32(v) { view.setUint32(pos, v >>> 0, true); pos += 4; },
+        u64(v) { view.setBigUint64(pos, BigInt(v), true); pos += 8; },
+        raw(b) { bytes.set(b, pos); pos += b.length; },
+      };
+    }
+
+    function localFileHeader(entry) {
+      const zip64 = entry.size >= ZIP64_LIMIT;
+      const extraLength = zip64 ? 20 : 0;
+      const w = byteWriter(30 + entry.nameBytes.length + extraLength);
+      w.u32(0x04034b50);
+      w.u16(zip64 ? 45 : 20);
+      w.u16(0x0800);
+      w.u16(0);
+      w.u16(entry.time);
+      w.u16(entry.date);
+      w.u32(entry.crc);
+      w.u32(zip64 ? ZIP64_LIMIT : entry.size);
+      w.u32(zip64 ? ZIP64_LIMIT : entry.size);
+      w.u16(entry.nameBytes.length);
+      w.u16(extraLength);
+      w.raw(entry.nameBytes);
+      if (zip64) {
+        w.u16(0x0001);
+        w.u16(16);
+        w.u64(entry.size);
+        w.u64(entry.size);
+      }
+      return w.bytes;
+    }
+
+    function centralDirectoryEntry(entry) {
+      const bigSize = entry.size >= ZIP64_LIMIT;
+      const bigOffset = entry.offset >= ZIP64_LIMIT;
+      const extraLength = (bigSize || bigOffset) ? 4 + (bigSize ? 16 : 0) + (bigOffset ? 8 : 0) : 0;
+      const w = byteWriter(46 + entry.nameBytes.length + extraLength);
+      w.u32(0x02014b50);
+      w.u16(extraLength ? 45 : 20);
+      w.u16(extraLength ? 45 : 20);
+      w.u16(0x0800);
+      w.u16(0);
+      w.u16(entry.time);
+      w.u16(entry.date);
+      w.u32(entry.crc);
+      w.u32(bigSize ? ZIP64_LIMIT : entry.size);
+      w.u32(bigSize ? ZIP64_LIMIT : entry.size);
+      w.u16(entry.nameBytes.length);
+      w.u16(extraLength);
+      w.u16(0);
+      w.u16(0);
+      w.u16(0);
+      w.u32(0);
+      w.u32(bigOffset ? ZIP64_LIMIT : entry.offset);
+      w.raw(entry.nameBytes);
+      if (extraLength) {
+        w.u16(0x0001);
+        w.u16(extraLength - 4);
+        if (bigSize) {
+          w.u64(entry.size);
+          w.u64(entry.size);
+        }
+        if (bigOffset) w.u64(entry.offset);
+      }
+      return w.bytes;
+    }
+
+    function endOfCentralDirectory(count, centralSize, centralOffset) {
+      const zip64 = count >= 0xffff || centralSize >= ZIP64_LIMIT || centralOffset >= ZIP64_LIMIT;
+      const w = byteWriter((zip64 ? 76 : 0) + 22);
+      if (zip64) {
+        w.u32(0x06064b50);
+        w.u64(44);
+        w.u16(45);
+        w.u16(45);
+        w.u32(0);
+        w.u32(0);
+        w.u64(count);
+        w.u64(count);
+        w.u64(centralSize);
+        w.u64(centralOffset);
+        w.u32(0x07064b50);
+        w.u32(0);
+        w.u64(centralOffset + centralSize);
+        w.u32(1);
+      }
+      w.u32(0x06054b50);
+      w.u16(0);
+      w.u16(0);
+      w.u16(zip64 ? 0xffff : count);
+      w.u16(zip64 ? 0xffff : count);
+      w.u32(zip64 ? ZIP64_LIMIT : centralSize);
+      w.u32(zip64 ? ZIP64_LIMIT : centralOffset);
+      w.u16(0);
+      return w.bytes;
+    }
+
+    async function fetchDownloadUrls(keys) {
+      const items = [];
+      for (let i = 0; i < keys.length; i += URL_BATCH_SIZE) {
+        const res = await fetchWithAuth('/download-urls', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keys: keys.slice(i, i + URL_BATCH_SIZE) }),
+        });
+        if (!res.ok) throw new Error('Error ' + res.status);
+        const data = await res.json();
+        items.push(...(data.urls || []));
+      }
+      return items;
+    }
+
+    async function fetchObjectBytes(url) {
+      const opts = url.startsWith('/')
+        ? { headers: { Authorization: 'Bearer ' + getPassword() } }
+        : {};
+      const res = await fetch(url, opts);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return new Uint8Array(await res.arrayBuffer());
+    }
+
+    async function streamZipToDisk(keys) {
+      const stamp = new Date().toISOString().slice(0, 10);
+      const handle = await window.showSaveFilePicker({
+        suggestedName: `whg_data_${stamp}.zip`,
+        types: [{ description: 'ZIP archive', accept: { 'application/zip': ['.zip'] } }],
+      });
+
+      setStatus('Requesting download URLs...');
+      const items = await fetchDownloadUrls(keys);
+      const modified = new Map(allFiles.map(f => [f.key, f.last_modified]));
+      const writable = await handle.createWritable();
+      const entries = [];
+      let offset = 0;
+      let failed = 0;
+
+      try {
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          setStatus(`Archiving ${i + 1}/${items.length} — ${item.name}`);
+          let bytes;
+          try {
+            bytes = await fetchObjectBytes(item.url);
+          } catch (err) {
+            console.warn('Skipping', item.key, err);
+            failed += 1;
+            continue;
+          }
+          const when = modified.get(item.key);
+          const stamped = dosDateTime(when ? new Date(when) : new Date());
+          const entry = {
+            nameBytes: encoder.encode(item.name),
+            size: bytes.length,
+            crc: crc32(bytes),
+            offset,
+            time: stamped.time,
+            date: stamped.date,
+          };
+          const header = localFileHeader(entry);
+          await writable.write(header);
+          await writable.write(bytes);
+          offset += header.length + bytes.length;
+          entries.push(entry);
+        }
+
+        const centralOffset = offset;
+        let centralSize = 0;
+        for (const entry of entries) {
+          const record = centralDirectoryEntry(entry);
+          await writable.write(record);
+          centralSize += record.length;
+        }
+        await writable.write(endOfCentralDirectory(entries.length, centralSize, centralOffset));
+      } finally {
+        await writable.close();
+      }
+
+      let msg = `Archived ${entries.length} file(s).`;
+      if (failed) msg += ` ${failed} failed and were skipped.`;
+      setStatus(msg);
+    }
+
+    async function downloadIndividually(keys, reason) {
+      const note = reason ? ` [zip unavailable — ${reason}]` : '';
+      const total = keys.length;
+      setStatus(`Starting ${total} download(s)...${note}`);
+      let items;
+      try {
+        items = await fetchDownloadUrls(keys);
+      } catch (e) {
+        setStatus('Download error: ' + e.message);
+        return;
+      }
+      let done = 0;
+      for (const item of items) {
+        const a = document.createElement('a');
+        a.href = item.url;
+        a.download = item.name;
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        done += 1;
+        setStatus(`Downloading ${done}/${total}...`);
+        await new Promise(r => setTimeout(r, 250));
+      }
+      setStatus(`Started ${done}/${total} download(s).${note}`);
+    }
+
+    async function downloadKeys(keys) {
+      if (keys.length === 0) return;
+      let reason = '';
+      if (!window.showSaveFilePicker) {
+        reason = 'browser has no File System Access API';
+      } else {
+        try {
+          await streamZipToDisk(keys);
+          return;
+        } catch (e) {
+          if (e && e.name === 'AbortError') {
+            setStatus('Cancelled.');
+            return;
+          }
+          console.warn('Zip download failed, falling back to individual files', e);
+          reason = (e && e.name ? e.name + ': ' : '') + (e && e.message ? e.message : String(e));
+        }
+      }
+      await downloadIndividually(keys, reason);
+    }
+
     async function handleDownloadAll() {
       if (allFiles.length === 0) {
         setStatus('No files to download');
         return;
       }
-      const previous = new Set(selectedKeys);
-      selectedKeys.clear();
-      for (const f of allFiles) selectedKeys.add(f.key);
-      try {
-        await handleDownloadSelected();
-      } finally {
-        selectedKeys.clear();
-        for (const k of previous) selectedKeys.add(k);
-        updateSelectionUI();
-      }
+      await downloadKeys(allFiles.map(f => f.key));
     }
 
     async function handleDownloadSelected() {
-      const keys = Array.from(selectedKeys);
-      const total = keys.length;
-      if (total === 0) return;
-      setStatus(`Starting ${total} download(s)...`);
-      let done = 0;
-      let failed = 0;
-      for (const key of keys) {
-        try {
-          const urlRes = await fetchWithAuth('/download-url?key=' + encodeURIComponent(key));
-          if (!urlRes.ok) throw new Error('Error ' + urlRes.status);
-          const j = await urlRes.json();
-          if (!j.url) throw new Error('No URL returned');
-          const name = key.split('/').pop() || 'download';
-          const a = document.createElement('a');
-          a.href = j.url;
-          a.download = name;
-          a.rel = 'noopener';
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          done += 1;
-          setStatus(`Downloading ${done}/${total}...`);
-          await new Promise(r => setTimeout(r, 250));
-        } catch (e) {
-          failed += 1;
-          console.warn('Download failed for', key, e);
-        }
-      }
-      let msg = `Started ${done}/${total} download(s).`;
-      if (failed) msg += ` ${failed} failed.`;
-      setStatus(msg);
+      await downloadKeys(Array.from(selectedKeys));
     }
 
     document.querySelectorAll('th.sortable').forEach(th => {

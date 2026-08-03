@@ -1,6 +1,5 @@
 from flask import Flask, request, Response, jsonify, send_file, render_template, redirect
 import os
-import io
 import zipfile
 import base64
 import hashlib
@@ -25,6 +24,8 @@ STUDY_CONFIG_DIR = Path("study_configs")
 STUDY_CONFIG_DIR.mkdir(exist_ok=True)
 API_PASSWORD = os.environ.get("API_PASSWORD", "devpassword")
 REDIRECT_BASE = "https://adildsw.com/WebHandGuidance/#/prestudy"
+DEFAULT_PAGE_SIZE = 1000
+MAX_DOWNLOAD_URLS = 2000
 
 
 def require_auth():
@@ -35,7 +36,7 @@ def require_auth():
     return token == API_PASSWORD
 
 
-def list_data_objects():
+def list_data_objects(continuation_token=None, max_keys=DEFAULT_PAGE_SIZE):
     objs = []
     for p in sorted(DATA_DIR.glob("*")):
         if p.is_file():
@@ -49,7 +50,11 @@ def list_data_objects():
                     "last_modified": datetime.utcfromtimestamp(stat.st_mtime).isoformat() + "Z",
                 }
             )
-    return objs
+
+    start = int(continuation_token) if continuation_token else 0
+    page = objs[start:start + max_keys]
+    next_token = str(start + max_keys) if start + max_keys < len(objs) else None
+    return page, next_token
 
 
 def safe_fragment(s):
@@ -175,8 +180,19 @@ def files_json():
         return Response("", status=204)
     if not require_auth():
         return Response("Forbidden", status=403, mimetype="text/plain")
-    objs = list_data_objects()
-    return jsonify(objs)
+    token = request.args.get("token")
+    limit = request.args.get("limit")
+    max_keys = DEFAULT_PAGE_SIZE
+    if limit:
+        try:
+            max_keys = max(1, min(DEFAULT_PAGE_SIZE, int(limit)))
+        except ValueError:
+            return jsonify({"error": "invalid limit"}), 400
+    try:
+        objs, next_token = list_data_objects(token, max_keys)
+    except ValueError:
+        return jsonify({"error": "invalid token"}), 400
+    return jsonify({"files": objs, "nextToken": next_token})
 
 
 @app.route("/download-url", methods=["GET", "OPTIONS"])
@@ -196,6 +212,32 @@ def download_url():
     return jsonify({"url": url})
 
 
+@app.route("/download-urls", methods=["POST", "OPTIONS"])
+def download_urls():
+    if request.method == "OPTIONS":
+        return Response("", status=204)
+    if not require_auth():
+        return Response("Forbidden", status=403, mimetype="text/plain")
+    payload = request.get_json(silent=True) or {}
+    keys = payload.get("keys") or []
+    if not isinstance(keys, list) or not keys:
+        return Response("No keys provided", status=400, mimetype="text/plain")
+    if len(keys) > MAX_DOWNLOAD_URLS:
+        return jsonify({"error": f"at most {MAX_DOWNLOAD_URLS} keys per request"}), 400
+
+    urls = []
+    for key in keys:
+        if not isinstance(key, str):
+            continue
+        name = key.split("/", 1)[1] if key.startswith("data/") else key
+        if "/" in name or name in ("", ".", ".."):
+            continue
+        urls.append({"key": key, "name": name, "url": f"/download-file?key={urllib.parse.quote(name)}"})
+    if not urls:
+        return Response("No valid keys", status=400, mimetype="text/plain")
+    return jsonify({"urls": urls})
+
+
 @app.route("/download-file", methods=["GET", "OPTIONS"])
 def download_file():
     if request.method == "OPTIONS":
@@ -213,67 +255,6 @@ def download_file():
     if not path.exists() or not path.is_file():
         return Response("Not found", status=404, mimetype="text/plain")
     return send_file(path, as_attachment=True, download_name=name, mimetype="application/zip")
-
-
-@app.route("/download-all", methods=["GET", "OPTIONS"])
-def download_all():
-    if request.method == "OPTIONS":
-        return Response("", status=204)
-    if not require_auth():
-        return Response("Forbidden", status=403, mimetype="text/plain")
-    objs = list_data_objects()
-    if not objs:
-        return Response("No files to download", status=404, mimetype="text/plain")
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for o in objs:
-            name = o["name"]
-            path = DATA_DIR / name
-            if path.is_file():
-                with open(path, "rb") as f:
-                    zf.writestr(name, f.read())
-    buf.seek(0)
-    return send_file(
-        buf,
-        as_attachment=True,
-        download_name="all_data.zip",
-        mimetype="application/zip",
-    )
-
-
-@app.route("/download-selected", methods=["POST", "OPTIONS"])
-def download_selected():
-    if request.method == "OPTIONS":
-        return Response("", status=204)
-    if not require_auth():
-        return Response("Forbidden", status=403, mimetype="text/plain")
-    payload = request.get_json(silent=True) or {}
-    keys = payload.get("keys") or []
-    if not isinstance(keys, list) or not keys:
-        return Response("No keys provided", status=400, mimetype="text/plain")
-    buf = io.BytesIO()
-    added = 0
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for key in keys:
-            if not isinstance(key, str):
-                continue
-            name = key.split("/", 1)[1] if key.startswith("data/") else key
-            if "/" in name or name in ("", ".", ".."):
-                continue
-            path = DATA_DIR / name
-            if path.is_file():
-                with open(path, "rb") as f:
-                    zf.writestr(name, f.read())
-                added += 1
-    if added == 0:
-        return Response("No matching files", status=404, mimetype="text/plain")
-    buf.seek(0)
-    return send_file(
-        buf,
-        as_attachment=True,
-        download_name="selected_data.zip",
-        mimetype="application/zip",
-    )
 
 
 @app.route("/delete-selected", methods=["POST", "OPTIONS"])

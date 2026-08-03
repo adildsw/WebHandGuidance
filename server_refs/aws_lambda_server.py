@@ -22,6 +22,9 @@ API_PASSWORD = os.environ["API_PASSWORD"]
 PREFIX = "data/"
 TRASH_PREFIX = "trash/"
 STUDY_CONFIG_PREFIX = "study_configs/"
+DEFAULT_PAGE_SIZE = 1000
+MAX_DOWNLOAD_URLS = 2000
+DOWNLOAD_URL_TTL = 21600
 REDIRECT_BASE = "https://adildsw.com/WebHandGuidance/#/prestudy"
 
 
@@ -97,25 +100,30 @@ def safe_fragment(s):
     return re.sub(r"[^A-Za-z0-9_\-]+", "_", str(s))
 
 
-def list_data_objects():
-    logger.info(f"Listing objects in s3://{BUCKET}/{PREFIX}")
+def list_data_objects(continuation_token=None, max_keys=DEFAULT_PAGE_SIZE):
+    logger.info(f"Listing objects in s3://{BUCKET}/{PREFIX} "
+                f"(max_keys={max_keys}, continued={bool(continuation_token)})")
+    kwargs = {"Bucket": BUCKET, "Prefix": PREFIX, "MaxKeys": max_keys}
+    if continuation_token:
+        kwargs["ContinuationToken"] = continuation_token
+
+    page = s3.list_objects_v2(**kwargs)
     objects = []
-    paginator = s3.get_paginator("list_objects_v2")
-    for page in paginator.paginate(Bucket=BUCKET, Prefix=PREFIX):
-        for obj in page.get("Contents", []):
-            key = obj["Key"]
-            if not key.endswith("/"):
-                objects.append(
-                    {
-                        "key": key,
-                        "name": key.split("/")[-1],
-                        "size": obj["Size"],
-                        "last_modified": obj["LastModified"].isoformat()
-                    }
-                )
-    objects.sort(key=lambda x: x["last_modified"])
-    logger.info(f"Found {len(objects)} objects")
-    return objects
+    for obj in page.get("Contents", []):
+        key = obj["Key"]
+        if not key.endswith("/"):
+            objects.append(
+                {
+                    "key": key,
+                    "name": key.split("/")[-1],
+                    "size": obj["Size"],
+                    "last_modified": obj["LastModified"].isoformat()
+                }
+            )
+
+    next_token = page.get("NextContinuationToken")
+    logger.info(f"Found {len(objects)} objects (more={bool(next_token)})")
+    return objects, next_token
 
 
 def handler(event, context):
@@ -167,11 +175,8 @@ def handler(event, context):
         if path == "/download-url" and method == "GET":
             return download_url_handler(event)
 
-        if path == "/download-all" and method == "GET":
-            return download_all_handler(event)
-
-        if path == "/download-selected" and method == "POST":
-            return download_selected_handler(event)
+        if path == "/download-urls" and method == "POST":
+            return download_urls_handler(event)
 
         if path == "/delete-selected" and method == "POST":
             return delete_selected_handler(event)
@@ -388,8 +393,60 @@ def get_upload_url_handler(event):
 
 def files_json_handler(event):
     logger.info("Files JSON handler called")
-    objects = list_data_objects()
-    return response(200, objects)
+    token = get_query_param(event, "token")
+    limit = get_query_param(event, "limit")
+
+    max_keys = DEFAULT_PAGE_SIZE
+    if limit:
+        try:
+            max_keys = max(1, min(DEFAULT_PAGE_SIZE, int(limit)))
+        except ValueError:
+            logger.error(f"Invalid limit parameter: {limit}")
+            return response(400, {"error": "invalid limit"})
+
+    try:
+        objects, next_token = list_data_objects(token, max_keys)
+    except s3.exceptions.ClientError as e:
+        logger.error(f"Invalid continuation token: {e}")
+        return response(400, {"error": "invalid token"})
+
+    return response(200, {"files": objects, "nextToken": next_token})
+
+
+def download_urls_handler(event):
+    logger.info("Download URLs handler called")
+    body_bytes = get_body_bytes(event)
+    try:
+        payload = json.loads(body_bytes.decode("utf-8"))
+    except json.JSONDecodeError:
+        return response(400, "Invalid JSON", {"Content-Type": "text/plain"})
+
+    keys = payload.get("keys") if isinstance(payload, dict) else None
+    if not isinstance(keys, list) or not keys:
+        return response(400, "No keys provided", {"Content-Type": "text/plain"})
+    if len(keys) > MAX_DOWNLOAD_URLS:
+        logger.error(f"Too many keys requested: {len(keys)}")
+        return response(400, {"error": f"at most {MAX_DOWNLOAD_URLS} keys per request"})
+
+    valid_keys = [k for k in keys if isinstance(k, str) and k.startswith(PREFIX)]
+    if not valid_keys:
+        return response(400, "No valid keys", {"Content-Type": "text/plain"})
+
+    urls = [
+        {
+            "key": key,
+            "name": key.split("/")[-1],
+            "url": s3.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": BUCKET, "Key": key},
+                ExpiresIn=DOWNLOAD_URL_TTL
+            )
+        }
+        for key in valid_keys
+    ]
+
+    logger.info(f"Generated {len(urls)} presigned download URLs (expire in {DOWNLOAD_URL_TTL}s)")
+    return response(200, {"urls": urls, "expiresIn": DOWNLOAD_URL_TTL})
 
 
 def download_url_handler(event):
@@ -405,79 +462,6 @@ def download_url_handler(event):
     )
     logger.info(f"Generated presigned URL for {key}")
     return response(200, {"url": url})
-
-
-def download_all_handler(event):
-    logger.info("Download all handler called")
-    objects = list_data_objects()
-    if not objects:
-        logger.warning("No files found to download")
-        return response(404, "No files to download", {"Content-Type": "text/plain"})
-
-    logger.info(f"Zipping {len(objects)} files for download")
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for i, o in enumerate(objects):
-            key = o["key"]
-            name = o["name"]
-            logger.info(f"  Fetching [{i+1}/{len(objects)}] {key} ({o['size']} bytes)")
-            obj = s3.get_object(Bucket=BUCKET, Key=key)
-            data = obj["Body"].read()
-            zf.writestr(name, data)
-
-    buf.seek(0)
-    total_size = buf.getbuffer().nbytes
-    logger.info(f"Download-all zip ready: {total_size} bytes")
-    return response(
-        200,
-        buf.getvalue(),
-        {
-            "Content-Type": "application/zip",
-            "Content-Disposition": "attachment; filename=all_data.zip"
-        },
-        is_binary=True
-    )
-
-
-def download_selected_handler(event):
-    logger.info("Download selected handler called")
-    body_bytes = get_body_bytes(event)
-    try:
-        payload = json.loads(body_bytes.decode("utf-8"))
-    except json.JSONDecodeError:
-        return response(400, "Invalid JSON", {"Content-Type": "text/plain"})
-    keys = payload.get("keys") if isinstance(payload, dict) else None
-    if not isinstance(keys, list) or not keys:
-        return response(400, "No keys provided", {"Content-Type": "text/plain"})
-
-    valid_keys = [k for k in keys if isinstance(k, str) and k.startswith(PREFIX)]
-    if not valid_keys:
-        return response(400, "No valid keys", {"Content-Type": "text/plain"})
-
-    logger.info(f"Zipping {len(valid_keys)} selected files")
-    buf = io.BytesIO()
-    added = 0
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for key in valid_keys:
-            name = key.split("/")[-1]
-            try:
-                obj = s3.get_object(Bucket=BUCKET, Key=key)
-                zf.writestr(name, obj["Body"].read())
-                added += 1
-            except Exception as e:
-                logger.warning(f"Skipping {key}: {e}")
-    if added == 0:
-        return response(404, "No matching files", {"Content-Type": "text/plain"})
-    buf.seek(0)
-    return response(
-        200,
-        buf.getvalue(),
-        {
-            "Content-Type": "application/zip",
-            "Content-Disposition": "attachment; filename=selected_data.zip"
-        },
-        is_binary=True
-    )
 
 
 def delete_selected_handler(event):
