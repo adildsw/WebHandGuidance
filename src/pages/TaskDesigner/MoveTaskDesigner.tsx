@@ -357,7 +357,7 @@ const MoveTaskDesigner = ({ task, modifyTask, detectionProp }: MoveTaskDesignerP
           onContextMenu={onContextMenu}
           style={{ cursor: hoverIndex !== null ? 'pointer' : 'crosshair' }}
         >
-          {!error && <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />}
+          <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
           <ModelLoadingOverlay visible={modelsLoading && !error} errorMessage={error} />
           <CameraSelector availableCameras={availableCameras} selectedCameraId={selectedCameraId} onSelectCamera={selectCamera} />
           <div className="absolute inset-0">

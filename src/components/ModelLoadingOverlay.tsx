@@ -13,7 +13,7 @@ const ModelLoadingOverlay = ({ visible, message = 'Loading detection models...',
       <div className="relative flex flex-col items-center gap-3 px-6 py-4 rounded-lg bg-black/70 text-white max-w-[80%] text-center">
         {showError ? (
           <>
-            <span className="text-base font-bold text-red-300">Camera Error</span>
+            <span className="text-base font-bold text-red-300">Setup Error</span>
             <span className="text-sm whitespace-pre-wrap break-words">{errorMessage}</span>
           </>
         ) : (

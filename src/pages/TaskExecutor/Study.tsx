@@ -911,9 +911,7 @@ const Study = ({ webSerial, ble }: { webSerial: ReturnType<typeof useWebSerial>;
 
           <div className="md:col-span-3 bg-gray-100 flex items-center justify-center relative" style={{ width: `${testbedWidth}px`, height: `${testbedHeight}px` }}>
             <div className="absolute inset-0 overflow-hidden rounded-lg shadow-lg">
-              {!error && (
-                <video ref={videoRef} muted playsInline className={`absolute inset-0 w-full h-full object-cover ${isTaskCorrupt && 'blur'}`} style={{ transform: 'scaleX(-1)' }} />
-              )}
+              <video ref={videoRef} muted playsInline className={`absolute inset-0 w-full h-full object-cover ${isTaskCorrupt && 'blur'}`} style={{ transform: 'scaleX(-1)' }} />
               <ModelLoadingOverlay visible={modelsLoading && !error} errorMessage={error} />
               <CameraSelector availableCameras={availableCameras} selectedCameraId={selectedCameraId} onSelectCamera={selectCamera} />
               <div className="absolute inset-0">

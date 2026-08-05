@@ -511,7 +511,7 @@ const useDetection = (runOnStart: boolean = false) => {
       // If the consumer unmounted while we were awaiting, drop the stream.
       if (!videoRef.current) {
         stream.getTracks().forEach((t) => t.stop());
-        setError('Camera view did not mount in time. Please refresh the page.');
+        setError((prev) => prev ?? 'Camera view did not mount in time. Please refresh the page.');
         return;
       }
 
